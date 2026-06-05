@@ -3,7 +3,8 @@ import { ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { supabase } from '../services/supabase'
 import { toast } from 'vue3-toastify'
-import VueTurnstile from 'vue-turnstile' // Importação do Captcha
+import VueTurnstile from 'vue-turnstile'
+import api from '../services/api' // Garanta que o api está importado!
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -24,13 +25,33 @@ const handleLogin = async () => {
       email: email.value,
       password: senha.value,
       options: {
-        captchaToken: captchaToken.value, // <--- TOKEN DO CAPTCHA AQUI
+        captchaToken: captchaToken.value,
       },
     })
 
     if (error) throw error
 
     if (data?.session) {
+      // ==========================================
+      // AUTO-CURA: Garante que o perfil existe no banco local
+      // Se o banco caiu durante o cadastro, isso recria o perfil agora
+      // ==========================================
+      try {
+        await api.post('/api/v1/auth/sincronizar-cadastro', {
+          supabase_user_id: data.user.id,
+          email: data.user.email,
+          nome_completo: data.user.user_metadata?.full_name || data.user.email,
+          nome_escritorio: data.user.user_metadata?.company_name || 'Meu Escritório',
+        })
+      } catch (syncError: any) {
+        // Se der erro 400 (já existe), ignoramos. Se for 500, o banco está offline.
+        console.warn(
+          'Aviso na sincronização pós-login:',
+          syncError.response?.data?.detail || syncError.message,
+        )
+      }
+
+      // Só redireciona depois de tentar sincronizar
       router.push('/dashboard')
     }
   } catch (error: any) {

@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { supabase } from './services/supabase' // Ajuste o caminho se necessário
-import CookieView from './components/CookieView.vue'
+import CookiesView from './components/CookiesView.vue'
 
 // Estado de carregamento global
 const isAppReady = ref(false)
@@ -38,6 +38,6 @@ onMounted(async () => {
   <!-- Aplicação Real (Quando estiver pronta) -->
   <div v-else>
     <RouterView />
-    <CookieView />
+    <CookiesView />
   </div>
 </template>

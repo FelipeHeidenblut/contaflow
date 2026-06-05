@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase' // Ajuste o caminho se necessár
 
 // Cria a instância base do Axios apontando para o FastAPI
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   timeout: 10000,
 })
 

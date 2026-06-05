@@ -1,0 +1,35 @@
+# ==========================
+# AMBIENTES E SEGREDOOS (CRÍTICO!)
+# ==========================
+.env
+.env.local
+.env.production
+
+# ==========================
+# PYTHON (BACKEND)
+# ==========================
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.sqlite3
+
+# ==========================
+# NODE.JS / VUE (FRONTEND)
+# ==========================
+node_modules/
+dist/
+.vite/
+
+# ==========================
+# SISTEMA OPERACIONAL
+# ==========================
+.DS_Store
+Thumbs.db
+
+# ==========================
+# ARQUIVOS LOCAIS DE UPLOAD (Se tiver criado a pasta)
+# ==========================
+backend/uploads/

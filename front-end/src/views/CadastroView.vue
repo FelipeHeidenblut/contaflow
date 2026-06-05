@@ -15,10 +15,18 @@ const email = ref('')
 const senha = ref('')
 const nomeEscritorio = ref('')
 
+// Termos de uso
+const acceptedTerms = ref(false)
+
 // Variável do CAPTCHA
 const captchaToken = ref('')
 
 const handleRegister = async () => {
+  if (!acceptedTerms.value) {
+    erroMensagem.value =
+      'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.'
+    return // O return "mata" a função aqui e impede o envio para o banco
+  }
   erroMensagem.value = ''
   isLoading.value = true
 
@@ -176,14 +184,43 @@ const handleRegister = async () => {
               theme="light"
             />
           </div>
+          <!-- Check dos termos de uso e política de privacidade -->
+          <div class="flex items-start mb-6 mt-4">
+            <div class="flex items-center h-5">
+              <input
+                id="termos"
+                type="checkbox"
+                v-model="acceptedTerms"
+                class="w-4 h-4 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500 focus:ring-2 cursor-pointer"
+              />
+            </div>
+            <div class="ml-3 text-sm">
+              <label for="termos" class="font-medium text-gray-300 cursor-pointer">
+                Eu li e concordo com os
+                <a
+                  href="/termos"
+                  target="_blank"
+                  class="text-indigo-400 hover:text-indigo-300 underline"
+                  >Termos de Uso</a
+                >
+                e a
+                <a
+                  href="/privacidade"
+                  target="_blank"
+                  class="text-indigo-400 hover:text-indigo-300 underline"
+                  >Política de Privacidade</a
+                >.
+              </label>
+            </div>
+          </div>
 
           <div class="pt-2">
             <button
               type="submit"
-              :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
+              :disabled="!acceptedTerms"
+              class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {{ isLoading ? 'Criando Conta...' : 'Criar Minha Conta' }}
+              Criar minha conta
             </button>
           </div>
         </form>

@@ -8,6 +8,9 @@ import DocumentosView from '@/views/DocumentosView.vue'
 import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 import LandingView from '../views/LandingView.vue'
+import PrivacidadeView from '../views/PrivacidadeView.vue'
+import TermosView from '../views/TermosView.vue'
+
 import { supabase } from '../services/supabase'
 
 const routes = [
@@ -17,6 +20,8 @@ const routes = [
   { path: '/cadastro', component: CadastroView },
   { path: '/esqueceu-senha', component: ForgotPasswordView },
   { path: '/redefinir-senha', component: ResetPasswordView },
+  { path: '/privacidade', component: PrivacidadeView },
+  { path: '/termos', component: TermosView },
 
   // Rotas Privadas (Blindadas)
   {

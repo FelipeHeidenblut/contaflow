@@ -20,21 +20,40 @@ def criar_cliente(
 ):
     tenant_id = current_user.get("tenant_id")
 
-    cnpj_existente = (
-        db.query(models.Client)
-        .filter(
-            models.Client.tenant_id == tenant_id, models.Client.cnpj == cliente.cnpj
+    # LÓGICA DE DUPLICIDADE INTELIGENTE
+    if cliente.tipo_pessoa == "PJ" and cliente.cnpj:
+        cnpj_existente = (
+            db.query(models.Client)
+            .filter(
+                models.Client.tenant_id == tenant_id, models.Client.cnpj == cliente.cnpj
+            )
+            .first()
         )
-        .first()
-    )
+        if cnpj_existente:
+            raise HTTPException(
+                status_code=400,
+                detail="Este CNPJ já está cadastrado no seu escritório.",
+            )
 
-    if cnpj_existente:
-        raise HTTPException(
-            status_code=400, detail="Este CNPJ já está cadastrado no seu escritório."
+    elif cliente.tipo_pessoa == "PF" and cliente.cpf:
+        cpf_existente = (
+            db.query(models.Client)
+            .filter(
+                models.Client.tenant_id == tenant_id, models.Client.cpf == cliente.cpf
+            )
+            .first()
         )
+        if cpf_existente:
+            raise HTTPException(
+                status_code=400, detail="Este CPF já está cadastrado no seu escritório."
+            )
 
+    # CRIAÇÃO DO CLIENTE COM TODOS OS CAMPOS
     novo_cliente = models.Client(
         tenant_id=tenant_id,
+        tipo_pessoa=cliente.tipo_pessoa,  # Novo
+        nome=cliente.nome,  # Novo
+        cpf=cliente.cpf,  # Novo
         razao_social=cliente.razao_social,
         cnpj=cliente.cnpj,
         regime_tributario=cliente.regime_tributario,

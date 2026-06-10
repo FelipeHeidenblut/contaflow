@@ -46,19 +46,19 @@ class Client(Base):
     __tablename__ = "clients"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(
-        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
-    )
-    razao_social = Column(String(255), nullable=False)
-    cnpj = Column(String(18), nullable=False)
-    regime_tributario = Column(String(50))
-    ativo = Column(Boolean, default=True, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
-    # Garante que um mesmo escritório não cadastre o mesmo CNPJ duas vezes
-    __table_args__ = (UniqueConstraint("tenant_id", "cnpj", name="uq_tenant_cnpj"),)
+    # Novos campos
+    tipo_pessoa = Column(String, default="PJ")  # PJ ou PF
+    nome = Column(String, nullable=True)  # Para PF
+    cpf = Column(String, nullable=True)  # Para PF
+
+    # Antigos campos (Agora opcionais)
+    razao_social = Column(String, nullable=True)  # Mudança crítica aqui
+    cnpj = Column(String, nullable=True)  # Mudança crítica aqui
+
+    regime_tributario = Column(String, nullable=False)
+    ativo = Column(Boolean, default=True)
 
 
 class Task(Base):

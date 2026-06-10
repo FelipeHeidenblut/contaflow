@@ -25,7 +25,7 @@ const handleRegister = async () => {
   if (!acceptedTerms.value) {
     erroMensagem.value =
       'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.'
-    return // O return "mata" a função aqui e impede o envio para o banco
+    return
   }
   erroMensagem.value = ''
   isLoading.value = true
@@ -38,7 +38,7 @@ const handleRegister = async () => {
         data: {
           full_name: nomeCompleto.value,
         },
-        captchaToken: captchaToken.value, // Token do Captcha aqui
+        captchaToken: captchaToken.value,
       },
     })
 
@@ -80,45 +80,46 @@ const handleRegister = async () => {
 
 <template>
   <div class="min-h-screen flex">
-    <!-- Lado Esquerdo: Branding (Escuro) -->
+    <!-- Lado Esquerdo: Branding (Verde Escuro) -->
     <div
-      class="hidden md:flex md:w-1/2 bg-slate-900 text-white flex-col justify-center items-center p-12 relative overflow-hidden"
+      class="hidden md:flex md:w-1/2 bg-[#19341a] text-white flex-col justify-center items-center p-12 relative overflow-hidden"
     >
+      <!-- Efeito de luzes sutis -->
       <div class="absolute inset-0 opacity-10">
         <div
-          class="absolute top-1/3 right-1/4 w-72 h-72 bg-indigo-500 rounded-full filter blur-3xl"
+          class="absolute top-1/3 right-1/4 w-72 h-72 bg-[#ff8a65] rounded-full filter blur-3xl"
         ></div>
         <div
-          class="absolute bottom-1/3 left-1/4 w-72 h-72 bg-indigo-700 rounded-full filter blur-3xl"
+          class="absolute bottom-1/3 left-1/4 w-72 h-72 bg-[#2a4830] rounded-full filter blur-3xl"
         ></div>
       </div>
 
       <div class="relative z-10 text-center">
-        <h1 class="text-5xl font-black tracking-tight mb-4">
-          Conta<span class="text-indigo-400">Flow</span>.
+        <h1 class="text-5xl font-extrabold tracking-tight mb-4">
+          Contably<span class="text-[#ff8a65]">Task</span>
         </h1>
-        <p class="text-slate-300 text-lg max-w-md mx-auto">
-          Comece agora a organizar seus prazos e tenha o controle total do seu escritório.
+        <p class="text-white/60 text-lg max-w-md mx-auto leading-relaxed">
+          Comece agora a organizar seus prazos e tenha o controle total do seu escritório contábil.
         </p>
       </div>
     </div>
 
-    <!-- Lado Direito: Formulário (Claro) -->
-    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-gray-50">
+    <!-- Lado Direito: Formulário (Fundo Claro) -->
+    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[#f8f8f8]">
       <div class="w-full max-w-md">
         <!-- Logo no Mobile -->
         <div class="md:hidden text-center mb-8">
-          <h1 class="text-4xl font-black tracking-tight text-gray-900">
-            Conta<span class="text-indigo-600">Flow</span>.
+          <h1 class="text-4xl font-extrabold tracking-tight text-[#19341a]">
+            Contably<span class="text-[#ff8a65]">Task</span>
           </h1>
         </div>
 
-        <h2 class="text-2xl font-bold text-gray-900 mb-2">Crie sua conta</h2>
-        <p class="text-gray-500 mb-6">Preencha os dados abaixo para começar.</p>
+        <h2 class="text-2xl font-bold text-[#19341a] mb-2">Crie sua conta</h2>
+        <p class="text-[#2a2a2a]/60 mb-6">Preencha os dados abaixo para começar.</p>
 
         <div
           v-if="erroMensagem"
-          class="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg font-medium flex items-center gap-2"
+          class="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl font-medium flex items-center gap-2"
         >
           <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -133,46 +134,52 @@ const handleRegister = async () => {
 
         <form @submit.prevent="handleRegister" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Seu Nome Completo</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
+              >Seu Nome Completo</label
+            >
             <input
               v-model="nomeCompleto"
               type="text"
               required
               placeholder="João da Silva"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-colors"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors bg-white"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nome do Escritório</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
+              >Nome do Escritório</label
+            >
             <input
               v-model="nomeEscritorio"
               type="text"
               required
               placeholder="JS Contabilidade"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-colors"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors bg-white"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">E-mail Corporativo</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
+              >E-mail Corporativo</label
+            >
             <input
               v-model="email"
               type="email"
               required
               placeholder="seu@email.com"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-colors"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors bg-white"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Senha</label>
             <input
               v-model="senha"
               type="password"
               required
               placeholder="Mínimo 6 caracteres"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm transition-colors"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors bg-white"
             />
           </div>
 
@@ -184,6 +191,7 @@ const handleRegister = async () => {
               theme="light"
             />
           </div>
+
           <!-- Check dos termos de uso e política de privacidade -->
           <div class="flex items-start mb-6 mt-4">
             <div class="flex items-center h-5">
@@ -191,23 +199,23 @@ const handleRegister = async () => {
                 id="termos"
                 type="checkbox"
                 v-model="acceptedTerms"
-                class="w-4 h-4 text-indigo-600 bg-gray-800 border-gray-600 rounded focus:ring-indigo-500 focus:ring-2 cursor-pointer"
+                class="w-4 h-4 text-[#ff8a65] bg-white border-gray-300 rounded focus:ring-[#ff8a65] focus:ring-2 cursor-pointer"
               />
             </div>
             <div class="ml-3 text-sm">
-              <label for="termos" class="font-medium text-gray-300 cursor-pointer">
+              <label for="termos" class="font-medium text-[#2a2a2a]/60 cursor-pointer">
                 Eu li e concordo com os
                 <a
                   href="/termos"
                   target="_blank"
-                  class="text-indigo-400 hover:text-indigo-300 underline"
+                  class="text-[#ff8a65] hover:text-[#f07047] underline transition-colors"
                   >Termos de Uso</a
                 >
                 e a
                 <a
                   href="/privacidade"
                   target="_blank"
-                  class="text-indigo-400 hover:text-indigo-300 underline"
+                  class="text-[#ff8a65] hover:text-[#f07047] underline transition-colors"
                   >Política de Privacidade</a
                 >.
               </label>
@@ -218,16 +226,19 @@ const handleRegister = async () => {
             <button
               type="submit"
               :disabled="!acceptedTerms"
-              class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               Criar minha conta
             </button>
           </div>
         </form>
 
-        <div class="mt-6 text-center text-sm text-gray-500">
+        <div class="mt-8 text-center text-sm text-[#2a2a2a]/50">
           Já tem uma conta?
-          <RouterLink to="/login" class="font-semibold text-indigo-600 hover:text-indigo-500">
+          <RouterLink
+            to="/login"
+            class="font-bold text-[#19341a] hover:text-[#ff8a65] transition-colors"
+          >
             Fazer Login
           </RouterLink>
         </div>

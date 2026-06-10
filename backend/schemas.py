@@ -1,21 +1,47 @@
+import re
 from datetime import date, datetime
 from typing import Optional
 from uuid import UUID
 
 from enums import TaskStatus  # Importando o Enum
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ================== CLIENTES ==================
 class ClientBase(BaseModel):
-    razao_social: str
-    # Validação básica de formato de CNPJ (XX.XXX.XXX/0001-XX)
-    cnpj: str = Field(..., pattern=r"^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$")
+    tipo_pessoa: str = "PJ"  # Valor padrão para manter compatibilidade
+    razao_social: Optional[str] = None  # Agora opcional
+    cnpj: Optional[str] = None  # Agora opcional
+    nome: Optional[str] = None  # Novo campo PF
+    cpf: Optional[str] = None  # Novo campo PF
     regime_tributario: Optional[str] = None
 
 
 class ClientCreate(ClientBase):
-    pass
+    @model_validator(mode="after")
+    def check_pessoa_fields(self):
+        if self.tipo_pessoa == "PJ":
+            if not self.razao_social:
+                raise ValueError("Razão Social é obrigatória para Pessoa Jurídica")
+            # Validação de formato de CNPJ
+            if not self.cnpj or not re.match(
+                r"^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$", self.cnpj
+            ):
+                raise ValueError(
+                    "CNPJ inválido para Pessoa Jurídica (Formato: XX.XXX.XXX/0001-XX)"
+                )
+        elif self.tipo_pessoa == "PF":
+            if not self.nome:
+                raise ValueError("Nome completo é obrigatório para Pessoa Física")
+            # Validação de formato de CPF
+            if not self.cpf or not re.match(r"^\d{3}\.\d{3}\.\d{3}\-\d{2}$", self.cpf):
+                raise ValueError(
+                    "CPF inválido para Pessoa Física (Formato: XXX.XXX.XXX-XX)"
+                )
+        else:
+            raise ValueError('tipo_pessoa deve ser "PF" ou "PJ"')
+
+        return self
 
 
 class ClientResponse(ClientBase):

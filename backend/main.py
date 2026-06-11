@@ -6,6 +6,7 @@ from typing import List
 import auth
 import clientes
 import dashboard
+import fiscal_deadlines
 import documentos
 import models
 import obrigacoes
@@ -40,6 +41,7 @@ app.include_router(obrigacoes.router)
 app.include_router(documentos.router)
 app.include_router(dashboard.router)
 app.include_router(auth.router)
+app.include_router(fiscal_deadlines.router)
 
 
 @app.get("/")
@@ -96,3 +98,23 @@ def dev_fake_login(db: Session = Depends(get_db)):
         "tenant_id": dev_tenant.id,
         "aviso": "Copie apenas o texto do access_token!",
     }
+    
+@app.get("/api/v1/fiscal-deadlines")
+def get_fiscal_deadlines(db: Session = Depends(get_db)):
+    # Busca todos os prazos fiscais (TaxDeadline) do banco
+    deadlines = db.query(models.fiscal_deadlines).all()
+    
+    # Formata a resposta para o Vue entender
+    resultados = []
+    for d in deadlines:
+        resultados.append({
+            "id": d.id,
+            "title": d.title,
+            "description": d.description,
+            # Garante que a data vá como string "YYYY-MM-DD"
+            "deadline_date": d.deadline_date.isoformat() if d.deadline_date else None,
+            "is_monthly": d.is_monthly,
+            "reference_link": d.reference_link
+        })
+        
+    return resultados

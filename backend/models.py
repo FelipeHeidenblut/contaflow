@@ -11,6 +11,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    Integer
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -102,3 +103,13 @@ class Document(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    
+class TaxDeadline(Base):
+    __tablename__ = "tax_deadlines"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True, nullable=False)
+    description = Column(String, nullable=True)
+    deadline_date = Column(Date, nullable=False)
+    is_monthly = Column(Boolean, default=False)
+    reference_link = Column(String, nullable=True)

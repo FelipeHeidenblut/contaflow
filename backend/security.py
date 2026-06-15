@@ -6,6 +6,7 @@ import requests
 from dotenv import load_dotenv
 from database import get_db
 import models
+from sqlalchemy.orm import Session
 
 load_dotenv()
 

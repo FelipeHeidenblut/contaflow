@@ -77,6 +77,7 @@ def criar_obrigacao(
         if isinstance(tarefa_in.status, TaskStatus)
         else tarefa_in.status,
         assigned_to=tarefa_in.assigned_to,
+        grau_importancia=tarefa_in.grau_importancia,
     )
 
     db.add(nova_tarefa)
@@ -132,3 +133,48 @@ def excluir_obrigacao(
     db.commit()
 
     return None
+
+@router.put("/{tarefa_id}", response_model=schemas.TaskResponse)
+def atualizar_obrigacao(
+    tarefa_id: UUID,
+    tarefa_update: schemas.TaskCreate, # Reaproveitamos o schema de validação para garantir a consistência
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    tenant_id = current_user.get("tenant_id")
+
+    # 1. Busca a tarefa existente no banco
+    tarefa = (
+        db.query(models.Task)
+        .filter(models.Task.id == tarefa_id, models.Task.tenant_id == tenant_id)
+        .first()
+    )
+
+    if not tarefa:
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+
+    # 🇧🇷 REGRA DE NEGÓCIO: Se a data foi alterada, ajustamos novamente para o próximo dia útil
+    data_ajustada = ajustar_para_dia_util(tarefa_update.due_date)
+
+    # 2. Atualiza os campos dinamicamente
+    tarefa.title = tarefa_update.title
+    tarefa.description = tarefa_update.description
+    tarefa.client_id = tarefa_update.client_id
+    tarefa.due_date = data_ajustada
+    tarefa.grau_importancia = tarefa_update.grau_importancia
+    
+    # Tratamento seguro para o Enum do Status
+    tarefa.status = (
+        tarefa_update.status.value 
+        if hasattr(tarefa_update.status, 'value') 
+        else tarefa_update.status
+    )
+    
+    if tarefa_update.assigned_to:
+        tarefa.assigned_to = tarefa_update.assigned_to
+
+    # 3. Salva no Supabase
+    db.commit()
+    db.refresh(tarefa)
+
+    return tarefa

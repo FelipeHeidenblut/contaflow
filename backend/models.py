@@ -83,6 +83,8 @@ class Task(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # Dentro da classe Tarefa
+    grau_importancia = Column(String, default="Média")
 
 
 class Document(Base):

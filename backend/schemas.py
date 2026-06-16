@@ -60,6 +60,7 @@ class TaskBase(BaseModel):
     status: TaskStatus = TaskStatus.PENDENTE  # Usando Enum
     client_id: UUID
     assigned_to: Optional[UUID] = None
+    grau_importancia: str = "Média"
 
 
 class TaskCreate(TaskBase):
@@ -70,6 +71,7 @@ class TaskResponse(TaskBase):
     id: UUID
     tenant_id: UUID
     created_at: datetime
+
 
 
 # ================== DOCUMENTOS ==================

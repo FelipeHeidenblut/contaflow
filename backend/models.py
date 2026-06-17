@@ -60,6 +60,8 @@ class Client(Base):
 
     regime_tributario = Column(String, nullable=False)
     ativo = Column(Boolean, default=True)
+    
+    natureza_operacao = Column(String, default="Serviços") # Comércio, Serviços, Indústria
 
 
 class Task(Base):

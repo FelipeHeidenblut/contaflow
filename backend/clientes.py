@@ -61,6 +61,7 @@ def criar_cliente(
         razao_social=cliente.razao_social,
         cnpj=cliente.cnpj,
         regime_tributario=cliente.regime_tributario,
+        natureza_operacao=cliente.natureza_operacao,
     )
 
     db.add(novo_cliente)
@@ -155,7 +156,8 @@ async def importar_clientes_csv(
             novo_cliente = models.Client(
                 tenant_id=tenant_ativo, # O banco de dados agora vai aceitar!
                 tipo_pessoa=tipo_pessoa if tipo_pessoa in ['PF', 'PJ'] else 'PJ',
-                regime_tributario=regime
+                regime_tributario=regime,
+                natureza_operacao=str(row.get('NATUREZA_OPERACAO', 'Serviços')).strip(),
             )
 
             if novo_cliente.tipo_pessoa == 'PF':

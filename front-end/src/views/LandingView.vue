@@ -8,48 +8,48 @@ const ctaMsg = ref('')
 const features = [
   {
     icon: '📅',
-    title: 'Calendário de obrigações',
-    desc: 'Visualize todos os vencimentos fiscais em um calendário inteligente. Configure alertas automáticos por e-mail ou WhatsApp.',
+    title: 'Calendário inteligente',
+    desc: 'Visualize todos os vencimentos federais e estaduais em um só lugar. Alertas automáticos para nunca mais pagar multas.',
   },
   {
     icon: '👥',
     title: 'Gestão por cliente',
-    desc: 'Organize tarefas por cliente, sócio ou colaborador. Veja em segundos o que está pendente para cada um.',
+    desc: 'Centralize tarefas, documentos e histórico. Saiba exatamente o que está pendente para cada CNPJ em segundos.',
   },
   {
     icon: '📊',
-    title: 'Painel de produtividade',
-    desc: 'Métricas reais do seu escritório: tarefas concluídas, tempo médio por obrigação e gargalos da equipe.',
+    title: 'Produtividade real',
+    desc: 'Métricas claras do seu escritório: gargalos da equipe, tarefas concluídas e prazos em risco.',
   },
   {
     icon: '🔔',
     title: 'Alertas de prazo',
-    desc: 'Nunca mais perca um prazo da Receita Federal. Receba notificações com antecedência configurável por tipo de obrigação.',
+    desc: 'Receba notificações estratégicas com antecedência. O sistema sabe se o prazo cai no fim de semana e ajusta automaticamente.',
   },
   {
     icon: '📎',
-    title: 'Documentos por tarefa',
-    desc: 'Anexe comprovantes, XMLs e planilhas diretamente nas tarefas. Histórico completo de cada obrigação.',
+    title: 'Documentos centralizados',
+    desc: 'Anexe XMLs, planilhas e comprovantes diretamente nas tarefas. Adeus pastas espalhadas no computador.',
   },
   {
     icon: '🤝',
     title: 'Colaboração em equipe',
-    desc: 'Delegue com um clique, adicione comentários e acompanhe o status em tempo real sem precisar interromper ninguém.',
+    desc: 'Delegue obrigações com um clique. Acompanhe o status em tempo real sem precisar interromper a equipe.',
   },
 ]
 
 const steps = [
   {
-    title: 'Cadastre seus clientes',
-    desc: 'Importe sua base de clientes em minutos. Vincule as obrigações fiscais de cada CNPJ ao responsável na sua equipe.',
+    title: 'Centralize seus clientes',
+    desc: 'Importe sua base em minutos via CSV ou manualmente. Vincule obrigações fiscais a cada empresa.',
   },
   {
-    title: 'Organize as tarefas',
-    desc: 'Use os modelos prontos para escritórios contábeis ou crie seu próprio fluxo. Atribua, priorize e defina prazos.',
+    title: 'Organize o caos',
+    desc: 'Use tags de Comércio ou Serviços. Defina prioridades, atribua responsáveis e acompanhe o progresso.',
   },
   {
-    title: 'Entregue com confiança',
-    desc: 'Acompanhe o progresso em tempo real, comprove o trabalho realizado e mantenha seu cliente sempre informado.',
+    title: 'Entregue com precisão',
+    desc: 'Comprove o trabalho realizado, mantenha o histórico organizado e ganhe a confiança dos seus clientes.',
   },
 ]
 
@@ -64,7 +64,7 @@ const testimonials = [
     initials: 'CR',
     name: 'Carlos Ribeiro',
     role: 'Contador — Escritório Ribeiro, MG',
-    text: 'O dashboard de obrigações salvou meu escritório em dois meses. Zerou os atrasos que eu tinha com o eSocial dos clientes.',
+    text: 'O dashboard de obrigações salvou meu escritório. Zerou os atrasos que eu tinha com o eSocial e a Receita Federal dos meus clientes.',
   },
   {
     initials: 'AP',
@@ -93,7 +93,7 @@ const plans = [
     name: 'Básico',
     price: '149',
     featured: false,
-    desc: 'Para contadores autônomos.',
+    desc: 'Para contadores em transição.',
     cta: 'Começar grátis',
     features: [
       'Até 40 clientes',
@@ -149,7 +149,7 @@ const handleCTA = () => {
   email.value = ''
 }
 
-// Diretiva customizada para o Fade-in ao rolar (Substitui o IntersectionObserver antigo)
+// Diretiva customizada para o Fade-in ao rolar
 const vFadeIn = {
   mounted(el: HTMLElement) {
     const observer = new IntersectionObserver(
@@ -169,13 +169,13 @@ const vFadeIn = {
 </script>
 
 <template>
-  <div class="bg-[#f8f8f8] text-[#2a2a2a] antialiased font-sans">
-    <!-- NAV -->
+  <div class="bg-white text-[#2a2a2a] antialiased font-sans overflow-x-hidden">
+    <!-- NAV (Glassmorphism moderno) -->
     <nav
-      class="sticky top-0 z-50 bg-[#f8f8f8]/92 backdrop-blur-md border-b border-gray-200 h-16 flex items-center justify-between px-[5%]"
+      class="sticky top-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100 h-16 flex items-center justify-between px-[5%] transition-shadow"
     >
       <div class="flex items-center gap-2.5">
-        <div class="w-9 h-9 rounded-[10px] bg-[#19341a] flex items-center justify-center">
+        <div class="w-9 h-9 rounded-[10px] bg-[#19341a] flex items-center justify-center shadow-sm">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -189,35 +189,23 @@ const vFadeIn = {
             <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
           </svg>
         </div>
-        <span class="text-[1.05rem] font-bold text-[#19341a]"
-          >Contably <span class="text-[#ff8a65]">Task</span></span
+        <span class="text-[1.1rem] font-bold text-[#19341a] tracking-tight"
+          >Contably<span class="text-[#ff8a65]">Task</span></span
         >
       </div>
-      <div class="hidden md:flex items-center gap-7">
-        <a
-          href="#features"
-          class="text-[0.9rem] font-medium text-[#2a2a2a] hover:text-[#19341a] transition-colors"
-          >Funcionalidades</a
-        >
-        <a
-          href="#how"
-          class="text-[0.9rem] font-medium text-[#2a2a2a] hover:text-[#19341a] transition-colors"
-          >Como funciona</a
-        >
-        <a
-          href="#pricing"
-          class="text-[0.9rem] font-medium text-[#2a2a2a] hover:text-[#19341a] transition-colors"
-          >Planos</a
-        >
+      <div class="hidden md:flex items-center gap-8">
+        <a href="#features" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Funcionalidades</a>
+        <a href="#how" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Como funciona</a>
+        <a href="#pricing" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Planos</a>
         <RouterLink
           to="/login"
-          class="inline-flex items-center bg-transparent text-[#19341a] border-2 border-[#19341a]/20 rounded-lg py-2 px-5 font-semibold text-[0.88rem] cursor-pointer hover:bg-[#eaf3ea] hover:-translate-y-0 transition-all"
+          class="inline-flex items-center bg-transparent text-[#19341a] border border-gray-200 rounded-lg py-2 px-5 font-semibold text-[0.9rem] cursor-pointer hover:bg-gray-50 transition-all"
         >
           Login
         </RouterLink>
         <RouterLink
           to="/cadastro"
-          class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-2 px-5 font-semibold text-[0.88rem] cursor-pointer hover:bg-[#f07047] hover:-translate-y-0.5 transition-all"
+          class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-2 px-5 font-semibold text-[0.9rem] cursor-pointer hover:bg-[#f07047] hover:shadow-lg hover:shadow-[#ff8a65]/30 transition-all"
         >
           Começar grátis
         </RouterLink>
@@ -226,241 +214,171 @@ const vFadeIn = {
 
     <!-- HERO -->
     <section
-      class="max-w-[1100px] mx-auto pt-20 pb-16 px-[5%] md:grid md:grid-cols-2 md:gap-16 items-center"
+      class="relative max-w-[1200px] mx-auto pt-24 pb-20 px-[5%] md:grid md:grid-cols-2 md:gap-12 items-center"
     >
+      <!-- Fundo Grid Sutil -->
+      <div class="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] z-[-1]"></div>
+
       <div v-fade-in class="fade-in">
         <div
-          class="inline-flex items-center gap-2 bg-[#eaf3ea] text-[#19341a] rounded-full py-1.5 px-3.5 text-[0.78rem] font-semibold tracking-wider uppercase mb-5"
+          class="inline-flex items-center gap-2 bg-[#eaf3ea] text-[#19341a] rounded-full py-1.5 px-4 text-[0.8rem] font-semibold tracking-wide mb-6 border border-[#19341a]/10"
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-[#ff8a65]"></span> Feito para contadores
+          <span class="w-1.5 h-1.5 rounded-full bg-[#ff8a65]"></span> Feito para o nicho contábil
         </div>
-        <h1 class="text-4xl lg:text-5xl font-extrabold text-[#19341a] leading-tight mb-5">
+        <h1 class="text-4xl lg:text-[3.5rem] font-extrabold text-[#19341a] leading-[1.1] tracking-tight mb-6">
           Organize seu escritório.<br />Entregue com
-          <em class="not-italic text-[#ff8a65]">precisão.</em>
+          <span class="text-[#ff8a65]">precisão.</span>
         </h1>
-        <p class="text-[1.05rem] text-gray-500 max-w-[440px] mb-9">
-          Gerencie prazos, delegue tarefas e acompanhe obrigações fiscais em um único lugar — sem
-          planilha, sem caos.
+        <p class="text-[1.1rem] text-gray-500 max-w-[480px] mb-9 leading-relaxed">
+          Centralize clientes, obrigações fiscais e documentos. Acabe com o caos das planilhas e garanta a conformidade do seu escritório.
         </p>
-        <div class="flex gap-3.5 flex-wrap">
+        <div class="flex gap-4 flex-wrap">
           <RouterLink
             to="/cadastro"
-            class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-2 px-5 font-semibold text-[0.88rem] cursor-pointer hover:bg-[#f07047] hover:-translate-y-0.5 transition-all"
+            class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-3 px-6 font-semibold text-[0.95rem] cursor-pointer hover:bg-[#f07047] hover:shadow-xl hover:shadow-[#ff8a65]/30 hover:-translate-y-0.5 transition-all"
           >
             Testar 7 dias grátis
           </RouterLink>
           <button
             @click="scrollTo('how')"
-            class="inline-flex items-center bg-transparent text-[#19341a] border-2 border-[#19341a] rounded-lg py-2 px-5 font-semibold text-[0.88rem] cursor-pointer hover:bg-[#19341a] hover:text-white transition-colors"
+            class="inline-flex items-center bg-transparent text-[#19341a] border-2 border-gray-200 rounded-lg py-3 px-6 font-semibold text-[0.95rem] cursor-pointer hover:border-[#19341a] hover:bg-white transition-colors"
           >
             Ver como funciona
           </button>
         </div>
-        <div class="mt-8 flex items-center gap-2.5">
-          <p class="text-[0.82rem] text-gray-500">
-            <strong class="text-[#2a2a2a]">Faça parte dessa nova experiência</strong> em gestão de
-            tarefas!
-          </p>
+        
+        <!-- Selos de Confiança -->
+        <div class="mt-10 flex items-center gap-6 text-gray-400">
+          <div class="flex items-center gap-2 text-xs font-medium">
+            <svg class="w-5 h-5 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+            Dados Criptografados
+          </div>
+          <div class="flex items-center gap-2 text-xs font-medium">
+            <svg class="w-5 h-5 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"></path></svg>
+            Conforme a LGPD
+          </div>
         </div>
       </div>
 
-      <!-- TASK BOARD -->
+      <!-- TASK BOARD (Mockup Refinado) -->
       <div
         v-fade-in
-        class="fade-in bg-white rounded-2xl border border-gray-200 shadow-[0_20px_60px_rgba(25,52,26,0.10)] p-5 mt-10 md:mt-0 hidden sm:block"
+        class="fade-in bg-white rounded-2xl border border-gray-100 shadow-[0_25px_60px_-15px_rgba(25,52,26,0.15)] p-6 mt-12 md:mt-0 hidden sm:block"
       >
-        <div class="flex items-center justify-between mb-4">
-          <span class="text-[0.85rem] font-bold text-[#19341a]">📋 Obrigações — Junho 2025</span>
+        <div class="flex items-center justify-between mb-5 border-b border-gray-100 pb-3">
+          <span class="text-[0.9rem] font-bold text-[#19341a]">Visão Geral — Junho 2025</span>
           <div class="flex gap-1.5">
-            <span class="w-2.5 h-2.5 rounded-full bg-[#ff6b6b]"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-[#ffd93d]"></span>
-            <span class="w-2.5 h-2.5 rounded-full bg-[#6bcb77]"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-[#ff8a65]"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-gray-200"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-gray-200"></span>
           </div>
         </div>
-        <div class="grid sm:grid-cols-3 gap-2.5">
+        <div class="grid grid-cols-3 gap-3">
           <!-- Coluna A Fazer -->
-          <div>
-            <div
-              class="text-[0.72rem] font-bold tracking-wider uppercase text-gray-500 mb-2.5 pb-2 border-b-2 border-gray-200"
-            >
-              A fazer
+          <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">A fazer</div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">SPED Fiscal — Cliente A</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Vence 20/06</div>
+              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Fiscal</div>
             </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-[#19341a] hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                SPED Fiscal — Cliente A
-              </div>
-              <div class="text-[0.68rem] text-gray-500">Vence 20/06</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Fiscal
-              </div>
-            </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-[#ff8a65] hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                Folha de pagamento — Junho
-              </div>
-              <div class="text-[0.68rem] text-gray-500">Vence 18/06</div>
-              <div
-                class="inline-block bg-[#fff3e0] text-[#e65100] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Urgente
-              </div>
-            </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-gray-400 hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                DAS Simples — 3 clientes
-              </div>
-              <div class="text-[0.68rem] text-gray-500">Vence 25/06</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Tributário
-              </div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm border-l-[3px] border-l-[#ff8a65]">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">Folha de pagamento</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Vence 18/06</div>
+              <div class="inline-block bg-[#fff3e0] text-[#e65100] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Urgente</div>
             </div>
           </div>
           <!-- Coluna Em andamento -->
-          <div>
-            <div
-              class="text-[0.72rem] font-bold tracking-wider uppercase text-gray-500 mb-2.5 pb-2 border-b-2 border-gray-200"
-            >
-              Em andamento
+          <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">Em andamento</div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm animate-pulse-border">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">DCTF Web — Cliente B</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Atribuído: Ana</div>
+              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">eSocial</div>
             </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-[#19341a] animate-pulse-border hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                DCTF Web — Cliente B
-              </div>
-              <div class="text-[0.68rem] text-gray-500">Atribuído: Ana</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                eSocial
-              </div>
-            </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-[#ff8a65] hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                Balanço anual — Cliente C
-              </div>
-              <div class="text-[0.68rem] text-gray-500">85% concluído</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Contábil
-              </div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">Balanço anual — C</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">85% concluído</div>
+              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Contábil</div>
             </div>
           </div>
           <!-- Coluna Concluído -->
-          <div>
-            <div
-              class="text-[0.72rem] font-bold tracking-wider uppercase text-gray-500 mb-2.5 pb-2 border-b-2 border-gray-200"
-            >
-              Concluído
+          <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">Concluído</div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm opacity-60">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">ECF 2024 — 5 clientes</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Enviado em 12/06</div>
+              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">IRPJ</div>
             </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-gray-400 hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">
-                ECF 2024 — 5 clientes
-              </div>
-              <div class="text-[0.68rem] text-gray-500">Enviado em 12/06</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                IRPJ
-              </div>
-            </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-gray-400 hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">PGDAS-D — Maio</div>
-              <div class="text-[0.68rem] text-gray-500">Enviado em 08/06</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Simples
-              </div>
-            </div>
-            <div
-              class="bg-[#f8f8f8] rounded-lg p-2.5 mb-2 border-l-[3px] border-gray-400 hover:-translate-y-0.5 hover:shadow-sm transition-all"
-            >
-              <div class="text-[0.78rem] font-semibold text-[#2a2a2a] mb-1">RAIS — Cliente D</div>
-              <div class="text-[0.68rem] text-gray-500">Enviado em 01/06</div>
-              <div
-                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.65rem] font-bold mt-1.5"
-              >
-                Trabalhista
-              </div>
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm opacity-60">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">PGDAS-D — Maio</div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Enviado em 08/06</div>
+              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Simples</div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- STRIP -->
-    <div class="bg-[#19341a] text-white py-3.5 px-[5%] text-center text-[0.9rem] font-medium">
-      🔒 Gerencie Prazos &nbsp;·&nbsp;
-      <strong class="text-[#ff8a65]">Entregas e clientes alinhados</strong>
-      &nbsp;·&nbsp; Organização sem complicações
+    <!-- STRIP DE SEGURANÇA -->
+    <div class="bg-[#19341a] text-white py-4 px-[5%] text-center text-[0.9rem] font-medium flex flex-wrap justify-center items-center gap-x-6 gap-y-2">
+      <span class="flex items-center gap-2"><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Criptografia Ponta a Ponta</span>
+      <span class="hidden md:inline text-white/20">·</span>
+      <span class="flex items-center gap-2"><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg> Conformidade LGPD</span>
+      <span class="hidden md:inline text-white/20">·</span>
+      <span class="flex items-center gap-2"><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Servidores no Brasil</span>
     </div>
 
     <!-- FEATURES -->
-    <section id="features" class="max-w-[1100px] mx-auto py-20 px-[5%]">
-      <div v-fade-in class="fade-in">
-        <div class="text-[0.78rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-2.5">
+    <section id="features" class="max-w-[1200px] mx-auto py-24 px-[5%]">
+      <div v-fade-in class="fade-in text-center mb-16">
+        <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Funcionalidades
         </div>
-        <h2 class="text-3xl lg:text-4xl font-extrabold text-[#19341a] leading-tight mb-3.5">
-          Tudo que seu escritório precisa,<br />sem a complexidade que não precisa.
+        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight">
+          Tudo que seu escritório precisa.<br />Sem a complexidade que não precisa.
         </h2>
-        <p class="text-[1rem] text-gray-500 max-w-[520px] mb-12">
-          Desenvolvido com contadores, para contadores. Cada detalhe pensado para o dia a dia real
-          de um escritório contábil.
+        <p class="text-[1.1rem] text-gray-500 max-w-[600px] mx-auto">
+          Desenvolvido lado a lado com contadores. Cada detalhe pensado para o dia a dia real de um escritório contábil.
         </p>
       </div>
-      <div class="grid md:grid-cols-3 gap-6">
+      <div class="grid md:grid-cols-3 gap-8">
         <div
           v-fade-in
-          class="fade-in bg-white border border-gray-200 rounded-[14px] p-7 hover:shadow-[0_8px_28px_rgba(25,52,26,0.09)] hover:-translate-y-1 transition-all"
+          class="fade-in bg-white border border-gray-100 rounded-2xl p-8 hover:shadow-[0_15px_40px_rgba(25,52,26,0.07)] hover:-translate-y-1.5 transition-all duration-300"
           v-for="f in features"
           :key="f.title"
         >
-          <div
-            class="w-11 h-11 rounded-xl bg-[#eaf3ea] flex items-center justify-center mb-4 text-xl"
-          >
+          <div class="w-12 h-12 rounded-xl bg-[#eaf3ea] flex items-center justify-center mb-5 text-2xl">
             {{ f.icon }}
           </div>
-          <h3 class="text-[1rem] font-bold text-[#19341a] mb-2">{{ f.title }}</h3>
-          <p class="text-[0.88rem] text-gray-500 leading-relaxed">{{ f.desc }}</p>
+          <h3 class="text-[1.15rem] font-bold text-[#19341a] mb-2.5">{{ f.title }}</h3>
+          <p class="text-[0.95rem] text-gray-500 leading-relaxed">{{ f.desc }}</p>
         </div>
       </div>
     </section>
 
-    <!-- HOW IT WORKS -->
-    <section id="how" class="bg-[#19341a] text-white py-20 px-[5%]">
-      <div class="max-w-[1100px] mx-auto">
-        <div class="text-[0.78rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-2.5">
+    <!-- HOW IT WORKS (Dark Section) -->
+    <section id="how" class="bg-[#19341a] text-white py-24 px-[5%] relative overflow-hidden">
+      <!-- Efeito de luz no fundo -->
+      <div class="absolute top-0 left-1/4 w-96 h-96 bg-[#ff8a65]/10 rounded-full blur-[120px]"></div>
+      
+      <div class="max-w-[1200px] mx-auto relative z-10">
+        <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Como funciona
         </div>
-        <h2 class="text-3xl lg:text-4xl font-extrabold text-white leading-tight mb-12">
+        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-white leading-tight mb-14 tracking-tight">
           Do cadastro à entrega<br />em três passos.
         </h2>
-        <div class="grid md:grid-cols-3 gap-8">
+        <div class="grid md:grid-cols-3 gap-12">
           <div v-fade-in class="fade-in relative" v-for="(s, i) in steps" :key="s.title">
-            <div class="text-5xl font-extrabold text-white/10 leading-none mb-3">0{{ i + 1 }}</div>
-            <h3 class="text-[1rem] font-bold mb-2 text-white">{{ s.title }}</h3>
-            <p class="text-[0.88rem] text-white/65 leading-relaxed">{{ s.desc }}</p>
+            <div class="text-6xl font-extrabold text-white/5 leading-none mb-4 absolute -top-8 -left-2">0{{ i + 1 }}</div>
+            <div class="relative z-10">
+              <h3 class="text-[1.2rem] font-bold mb-3 text-white">{{ s.title }}</h3>
+              <p class="text-[0.95rem] text-white/60 leading-relaxed">{{ s.desc }}</p>
+            </div>
             <span
-              class="absolute top-6 right-[-16px] text-xl text-[#ff8a65]/50 hidden md:block"
+              class="absolute top-6 right-[-24px] text-2xl text-[#ff8a65]/30 hidden md:block font-light"
               v-if="i < steps.length - 1"
               >→</span
             >
@@ -470,33 +388,33 @@ const vFadeIn = {
     </section>
 
     <!-- TESTIMONIALS -->
-    <section class="max-w-[1100px] mx-auto py-20 px-[5%]">
-      <div v-fade-in class="fade-in">
-        <div class="text-[0.78rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-2.5">
+    <section class="max-w-[1200px] mx-auto py-24 px-[5%]">
+      <div v-fade-in class="fade-in text-center mb-16">
+        <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Depoimentos
         </div>
-        <h2 class="text-3xl lg:text-4xl font-extrabold text-[#19341a] leading-tight">
-          Escritórios que transformaram<br />sua rotina com o Contably Task.
+        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight tracking-tight">
+          Escritórios que transformaram<br />sua rotina conosco.
         </h2>
       </div>
-      <div class="grid md:grid-cols-3 gap-6 mt-12">
+      <div class="grid md:grid-cols-3 gap-8">
         <div
           v-fade-in
-          class="fade-in bg-white border border-gray-200 rounded-[14px] p-7"
+          class="fade-in bg-[#f8f8f8] rounded-2xl p-8 border border-gray-100"
           v-for="t in testimonials"
           :key="t.name"
         >
-          <div class="text-[#ff8a65] text-[0.9rem] mb-3.5">★★★★★</div>
-          <p class="text-[0.9rem] text-[#2a2a2a] leading-relaxed mb-5">"{{ t.text }}"</p>
-          <div class="flex items-center gap-2.5">
+          <svg class="w-8 h-8 text-[#ff8a65]/30 mb-4" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+          <p class="text-[0.95rem] text-[#2a2a2a] leading-relaxed mb-6 italic">"{{ t.text }}"</p>
+          <div class="flex items-center gap-3 pt-4 border-t border-gray-200">
             <div
-              class="w-9.5 h-9.5 rounded-full bg-[#19341a] text-white text-[0.8rem] font-bold flex items-center justify-center"
+              class="w-10 h-10 rounded-full bg-[#19341a] text-white text-[0.85rem] font-bold flex items-center justify-center"
             >
               {{ t.initials }}
             </div>
             <div>
-              <div class="text-[0.85rem] font-bold text-[#2a2a2a]">{{ t.name }}</div>
-              <div class="text-[0.75rem] text-gray-500">{{ t.role }}</div>
+              <div class="text-[0.9rem] font-bold text-[#19341a]">{{ t.name }}</div>
+              <div class="text-[0.8rem] text-gray-500">{{ t.role }}</div>
             </div>
           </div>
         </div>
@@ -504,56 +422,60 @@ const vFadeIn = {
     </section>
 
     <!-- PRICING -->
-    <section id="pricing" class="bg-[#eaf3ea] py-20 px-[5%]">
-      <div class="max-w-[1100px] mx-auto">
-        <div v-fade-in class="fade-in">
-          <div class="text-[0.78rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-2.5">
+    <section id="pricing" class="bg-[#f8f8f8] py-24 px-[5%] border-y border-gray-100">
+      <div class="max-w-[1200px] mx-auto">
+        <div v-fade-in class="fade-in text-center mb-16">
+          <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
             Planos
           </div>
-          <h2 class="text-3xl lg:text-4xl font-extrabold text-[#19341a] leading-tight mb-3.5">
-            Simples, transparente,<br />sem surpresas.
+          <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight">
+            Simples, transparente, sem surpresas.
           </h2>
-          <p class="text-[1rem] text-gray-500 max-w-[520px]">
+          <p class="text-[1.1rem] text-gray-500 max-w-[500px] mx-auto">
             Cancele quando quiser. Sem taxas escondidas.
           </p>
         </div>
-        <div class="grid md:grid-cols-4 gap-6 mt-12">
+        <div class="grid md:grid-cols-4 gap-6 items-start">
           <div
             v-fade-in
-            class="fade-in bg-white border border-gray-200 rounded-2xl p-8 relative"
+            class="fade-in bg-white border border-gray-100 rounded-2xl p-8 relative transition-all duration-300 hover:shadow-lg"
             v-for="p in plans"
             :key="p.name"
-            :class="{ 'border-[#ff8a65] shadow-[0_8px_32px_rgba(255,138,101,0.18)]': p.featured }"
+            :class="{ 'md:scale-110 shadow-[0_20px_50px_rgba(25,52,26,0.1)] border-[#ff8a65] z-10': p.featured }"
           >
             <div
               v-if="p.featured"
-              class="absolute top-[-12px] left-1/2 -translate-x-1/2 bg-[#ff8a65] text-white rounded-full py-1 px-4 text-[0.72rem] font-bold whitespace-nowrap"
+              class="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#ff8a65] text-white rounded-full py-1.5 px-5 text-[0.75rem] font-bold whitespace-nowrap shadow-md shadow-[#ff8a65]/40"
             >
               Mais popular
             </div>
-            <div class="text-[0.85rem] font-bold uppercase tracking-wider text-gray-500 mb-2">
+            <div class="text-[0.85rem] font-bold uppercase tracking-wider text-gray-400 mb-3">
               {{ p.name }}
             </div>
-            <div class="text-4xl font-extrabold text-[#19341a] leading-none">
-              R$ {{ p.price }}<sub class="text-[0.9rem] font-medium text-gray-500">/mês</sub>
+            <div class="text-4xl font-extrabold text-[#19341a] leading-none mb-1">
+              R$ {{ p.price }}
             </div>
-            <div class="text-[0.83rem] text-gray-500 mt-2.5 mb-6">{{ p.desc }}</div>
-            <ul class="mb-7 space-y-1.5">
+            <div class="text-[0.85rem] text-gray-400 font-medium mb-6">/mês</div>
+            
+            <div class="text-[0.85rem] text-gray-500 mt-2 mb-6 min-h-[40px]">{{ p.desc }}</div>
+            
+            <ul class="mb-8 space-y-3 border-t border-gray-100 pt-6">
               <li
-                class="text-[0.86rem] text-[#2a2a2a] flex items-start gap-2"
+                class="text-[0.9rem] text-[#2a2a2a] flex items-start gap-2.5"
                 v-for="f in p.features"
                 :key="f"
               >
-                <span class="text-[#ff8a65] font-bold">✓</span> {{ f }}
+                <svg class="w-4 h-4 text-[#ff8a65] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                {{ f }}
               </li>
             </ul>
             <button
               @click="scrollTo('cta')"
-              class="w-full border-none rounded-[10px] py-3 font-bold text-[0.9rem] cursor-pointer transition-colors"
+              class="w-full rounded-xl py-3 font-bold text-[0.95rem] cursor-pointer transition-all duration-300"
               :class="
                 p.featured
-                  ? 'bg-[#ff8a65] text-white hover:bg-[#f07047]'
-                  : 'bg-transparent text-[#19341a] border-2 border-[#19341a] hover:bg-[#19341a] hover:text-white'
+                  ? 'bg-[#ff8a65] text-white hover:bg-[#f07047] shadow-lg shadow-[#ff8a65]/30'
+                  : 'bg-transparent text-[#19341a] border-2 border-gray-200 hover:border-[#19341a] hover:bg-white'
               "
             >
               {{ p.cta }}
@@ -564,68 +486,56 @@ const vFadeIn = {
     </section>
 
     <!-- CTA FINAL -->
-    <section id="cta" class="py-20 px-[5%] text-center">
+    <section id="cta" class="py-28 px-[5%] text-center relative overflow-hidden">
+      <div class="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] z-[-1]"></div>
       <div v-fade-in class="fade-in max-w-[640px] mx-auto">
-        <div class="text-[0.78rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-2.5">
-          Comece agora
-        </div>
-        <h2 class="text-3xl lg:text-4xl font-extrabold text-[#19341a] leading-tight mb-4">
+        <h2 class="text-3xl lg:text-[2.8rem] font-extrabold text-[#19341a] leading-tight mb-5 tracking-tight">
           Sua equipe merece uma gestão à altura do seu trabalho.
         </h2>
-        <p class="text-gray-500 mb-9 text-[1rem]">
+        <p class="text-gray-500 mb-10 text-[1.1rem]">
           Crie sua conta em menos de 2 minutos. Nenhum cartão de crédito necessário.
         </p>
-        <div class="flex flex-col sm:flex-row gap-2.5 max-w-[480px] mx-auto">
+        <div class="flex flex-col sm:flex-row gap-3 max-w-[500px] mx-auto">
           <input
             type="email"
             v-model="email"
             placeholder="seu@email.com.br"
-            class="flex-1 py-3 px-4 border-[1.5px] border-gray-200 rounded-[10px] text-[0.9rem] bg-white text-[#2a2a2a] outline-none focus:border-[#ff8a65] transition-colors"
+            class="flex-1 py-3.5 px-5 border border-gray-200 rounded-xl text-[0.95rem] bg-white text-[#2a2a2a] outline-none focus:border-[#ff8a65] focus:ring-2 focus:ring-[#ff8a65]/20 transition-all"
           />
           <button
             @click="handleCTA"
-            class="bg-[#ff8a65] text-white border-none rounded-[10px] py-3 px-6 font-bold text-[0.95rem] cursor-pointer shadow-[0_4px_14px_rgba(255,138,101,0.35)] hover:bg-[#f07047] hover:-translate-y-0.5 transition-all"
+            class="bg-[#ff8a65] text-white border-none rounded-xl py-3.5 px-7 font-bold text-[0.95rem] cursor-pointer shadow-lg shadow-[#ff8a65]/30 hover:bg-[#f07047] hover:-translate-y-0.5 transition-all whitespace-nowrap"
           >
             Começar grátis
           </button>
         </div>
         <p
-          class="text-[0.78rem] text-gray-500 mt-3.5"
+          class="text-[0.85rem] mt-4 font-semibold"
           v-if="ctaMsg"
-          style="color: #ff8a65; font-weight: 600"
+          style="color: #19341a"
         >
           {{ ctaMsg }}
         </p>
-        <p class="text-[0.78rem] text-gray-500 mt-3.5" v-else>
-          7 dias gratuitos · Sem cartão de crédito · Suporte em português
+        <p class="text-[0.85rem] text-gray-400 mt-4" v-else>
+          7 dias gratuitos · Sem cartão de crédito · Suporte humano em português
         </p>
       </div>
     </section>
 
     <!-- FOOTER -->
     <footer
-      class="bg-[#19341a] text-white/60 py-8 px-[5%] flex flex-col md:flex-row items-center justify-between gap-4 flex-wrap"
+      class="bg-[#19341a] text-white/60 py-10 px-[5%] flex flex-col md:flex-row items-center justify-between gap-6 flex-wrap"
     >
       <div>
-        <span class="text-[0.95rem] font-bold text-white"
-          >Contably <span class="text-[#ff8a65]">Task</span></span
+        <span class="text-[1.1rem] font-bold text-white tracking-tight"
+          >Contably<span class="text-[#ff8a65]">Task</span></span
         >
-        <p class="text-[0.82rem] mt-1">© 2026 ContablyTask. Todos os direitos reservados.</p>
+        <p class="text-[0.82rem] mt-2">© 2026 ContablyTask. Todos os direitos reservados.</p>
       </div>
-      <div class="flex gap-5">
-        <a
-          href="./PrivacidadeView.vue"
-          class="text-[0.82rem] text-white/50 hover:text-white transition-colors"
-          >Privacidade</a
-        >
-        <a
-          href="./TermosView.vue"
-          class="text-[0.82rem] text-white/50 hover:text-white transition-colors"
-          >Termos</a
-        >
-        <a href="#" class="text-[0.82rem] text-white/50 hover:text-white transition-colors"
-          >Contato</a
-        >
+      <div class="flex gap-8">
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Privacidade</a>
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Termos</a>
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Contato</a>
       </div>
     </footer>
   </div>
@@ -635,10 +545,10 @@ const vFadeIn = {
 /* Animação Fade-in controlada pela Diretiva v-fade-in */
 .fade-in {
   opacity: 0;
-  transform: translateY(18px);
+  transform: translateY(20px);
   transition:
-    opacity 0.5s ease-out,
-    transform 0.5s ease-out;
+    opacity 0.6s ease-out,
+    transform 0.6s ease-out;
 }
 .fade-in.visible {
   opacity: 1;
@@ -647,19 +557,18 @@ const vFadeIn = {
 
 /* Animação customizada do card "DCTF Web" no Task Board */
 @keyframes pulse-border {
-  0%,
-  100% {
+  0%, 100% {
     box-shadow: 0 0 0 0 rgba(255, 138, 101, 0);
   }
   50% {
-    box-shadow: 0 0 0 4px rgba(255, 138, 101, 0.25);
+    box-shadow: 0 0 0 4px rgba(255, 138, 101, 0.2);
   }
 }
 .animate-pulse-border {
-  animation: pulse-border 2s ease-in-out infinite;
+  animation: pulse-border 2.5s ease-in-out infinite;
 }
 
-/* Scroll suave global para os links âncora */
+/* Scroll suave global */
 html {
   scroll-behavior: smooth;
 }

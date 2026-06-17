@@ -27,8 +27,9 @@ const obrigacoes = ref<Obrigacao[]>([])
 const clientes = ref<Cliente[]>([])
 const isLoading = ref(true)
 
-// Filtros Reativos
+// Filtros Reativos (Adicionado filtroStatus)
 const filtroClienteId = ref('')
+const filtroStatus = ref('')
 const searchQuery = ref('')
 
 // Estados dos Modais
@@ -36,7 +37,7 @@ const isDetalhesModalOpen = ref(false)
 const obrigacaoSelecionada = ref<Obrigacao | null>(null)
 const isCadastroModalOpen = ref(false)
 
-// Estado do Formulário (Usado para Criar e Editar)
+// Estado do Formulário
 const isEditando = ref(false)
 const idSendoEditado = ref<string | number | null>(null)
 const formularioObrigacao = ref({
@@ -48,12 +49,17 @@ const formularioObrigacao = ref({
   grau_importancia: 'Média'
 })
 
-// 2. Computed Property (Motor de Busca + Ordenação Segura)
+// 2. Computed Property (Motor de Busca + Filtros + Ordenação)
 const obrigacoesFiltradas = computed(() => {
   let resultado = obrigacoes.value
 
   if (filtroClienteId.value) {
     resultado = resultado.filter((obrigacao) => obrigacao.client_id === filtroClienteId.value)
+  }
+
+  // Novo filtro de Status
+  if (filtroStatus.value) {
+    resultado = resultado.filter((obrigacao) => obrigacao.status === filtroStatus.value)
   }
 
   if (searchQuery.value) {
@@ -84,7 +90,7 @@ const fecharDetalhes = () => {
 }
 
 // ==========================================
-// FUNÇÕES DE CRUD (CRIAR, EDITAR, CONCLUIR, EXCLUIR)
+// FUNÇÕES DE CRUD
 // ==========================================
 const abrirCadastro = () => {
   isEditando.value = false
@@ -101,7 +107,6 @@ const abrirCadastro = () => {
 }
 
 const abrirEdicao = (obrigacao: Obrigacao) => {
-  // Previne a edição de tarefas automáticas da Receita
   if (obrigacao.type === 'receita_federal') {
     toast.info('Não é possível editar prazos federais fixos.')
     return
@@ -118,7 +123,7 @@ const abrirEdicao = (obrigacao: Obrigacao) => {
     grau_importancia: obrigacao.grau_importancia || 'Média'
   }
 
-  fecharDetalhes() // Fecha os detalhes se estiver aberto
+  fecharDetalhes()
   isCadastroModalOpen.value = true
 }
 
@@ -134,16 +139,11 @@ const salvarObrigacao = async () => {
 
   try {
     if (isEditando.value && idSendoEditado.value) {
-      // 🔵 Rota de Edição (PUT)
       const response = await api.put(`/api/v1/obrigacoes/${idSendoEditado.value}`, formularioObrigacao.value)
-
-      // Atualiza o item na lista localmente sem recarregar a página
       const index = obrigacoes.value.findIndex(o => o.id === idSendoEditado.value)
       if (index !== -1) obrigacoes.value[index] = response.data
-
       toast.success('Tarefa atualizada com sucesso!')
     } else {
-      // 🟢 Rota de Criação (POST)
       const response = await api.post('/api/v1/obrigacoes', formularioObrigacao.value)
       obrigacoes.value.push(response.data)
       toast.success('Nova obrigação criada com sucesso!')
@@ -155,20 +155,14 @@ const salvarObrigacao = async () => {
   }
 }
 
-// Ação Rápida (1 clique)
 const concluirTarefa = async (obrigacao: Obrigacao) => {
   try {
     const response = await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/concluir`)
-
-    // Atualiza na tela
     const index = obrigacoes.value.findIndex(o => o.id === obrigacao.id)
     if (index !== -1) obrigacoes.value[index] = response.data
-
-    // Se o modal de detalhes estiver aberto, atualiza a informação dele também
     if (obrigacaoSelecionada.value?.id === obrigacao.id) {
       obrigacaoSelecionada.value = response.data
     }
-
     toast.success('🎉 Obrigação concluída!')
   } catch (error) {
     toast.error('Erro ao concluir tarefa.')
@@ -188,7 +182,6 @@ const excluirTarefa = async (id: string | number) => {
   }
 }
 
-// Sincronização com o Backend
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -206,7 +199,9 @@ const fetchData = async () => {
   }
 }
 
-// Helpers Visuais
+// ==========================================
+// HELPERS VISUAIS
+// ==========================================
 const getNomeCliente = (clientId: string | number) => {
   const cliente = clientes.value.find((c) => c.id === clientId)
   if (cliente) return cliente.nome || cliente.razao_social || 'Nome Indisponível'
@@ -217,6 +212,17 @@ const formatDate = (dateString: string) => {
   if (!dateString) return '-'
   const [year, month, day] = dateString.split('-')
   return `${day}/${month}/${year}`
+}
+
+// Nova função para destacar atrasos
+const isAtrasada = (dateString: string, status: string) => {
+  if (status === 'concluida' || !dateString) return false
+  
+  // Pega a data de hoje no formato local (YYYY-MM-DD) sem depender de toISOString
+  const today = new Date()
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  
+  return dateString < todayStr
 }
 
 const getStatusBadge = (status: string) => {
@@ -259,7 +265,7 @@ onMounted(() => fetchData())
   <Layout title="Controle de Obrigações">
 
     <header class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900">Obrigações e Tarefas</h1>
+      <h1 class="text-2xl font-bold text-[#19341a]">Obrigações e Tarefas</h1>
       <p class="text-gray-500 text-sm mt-1">Gerencie os prazos e pendências do seu escritório.</p>
     </header>
 
@@ -274,15 +280,25 @@ onMounted(() => fetchData())
             </svg>
           </div>
           <input v-model="searchQuery" type="text" placeholder="Buscar por nome..."
-            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-coral focus:border-brand-coral text-sm transition-all shadow-sm" />
+            class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-[#ff8a65] text-sm transition-all shadow-sm" />
         </div>
 
         <select v-model="filtroClienteId"
-          class="w-full sm:w-60 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-coral bg-white text-gray-700 cursor-pointer text-sm shadow-sm">
+          class="w-full sm:w-52 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 cursor-pointer text-sm shadow-sm">
           <option value="">🏢 Todos os Clientes</option>
           <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
             {{ cliente.nome || cliente.razao_social }}
           </option>
+        </select>
+
+        <!-- Novo Filtro de Status -->
+        <select v-model="filtroStatus"
+          class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 cursor-pointer text-sm shadow-sm">
+          <option value="">Todos os Status</option>
+          <option value="pendente">Pendentes</option>
+          <option value="em_andamento">Em Andamento</option>
+          <option value="aguardando_cliente">Aguardando Cliente</option>
+          <option value="concluida">Concluídas</option>
         </select>
       </div>
 
@@ -308,7 +324,7 @@ onMounted(() => fetchData())
             </path>
           </svg>
         </div>
-        <h3 class="text-lg font-bold text-gray-900 mb-1">Nenhuma obrigação encontrada</h3>
+        <h3 class="text-lg font-bold text-[#19341a] mb-1">Nenhuma obrigação encontrada</h3>
         <p class="text-sm text-gray-500 max-w-md">Não localizamos nenhuma tarefa com os filtros atuais.</p>
       </div>
 
@@ -316,19 +332,16 @@ onMounted(() => fetchData())
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-50">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Arquivo</th>
-              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente
-              </th>
-              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
-              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Prioridade
-              </th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Tarefa</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Prazo</th>
+              <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Prioridade</th>
               <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
               <th class="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-200">
-            <tr v-for="obrigacao in obrigacoesFiltradas" :key="obrigacao.id"
-              class="hover:bg-gray-50 transition-colors group">
+            <tr v-for="obrigacao in obrigacoesFiltradas" :key="obrigacao.id" class="hover:bg-gray-50 transition-colors group">
               <td class="px-6 py-4">
                 <div class="text-sm font-bold text-[#19341a]">{{ obrigacao.title }}</div>
                 <div v-if="obrigacao.description" class="text-xs text-[#2a2a2a]/60 truncate max-w-xs mt-0.5">{{
@@ -336,8 +349,11 @@ onMounted(() => fetchData())
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 font-medium">{{
                 getNomeCliente(obrigacao.client_id) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">{{
-                formatDate(obrigacao.due_date) }}</td>
+              <!-- Destaque para tarefas atrasadas -->
+              <td class="px-6 py-4 whitespace-nowrap text-center text-sm" :class="isAtrasada(obrigacao.due_date, obrigacao.status) ? 'text-red-600 font-extrabold' : 'text-gray-500'">
+                {{ formatDate(obrigacao.due_date) }}
+                <span v-if="isAtrasada(obrigacao.due_date, obrigacao.status)" class="block text-[10px] text-red-500 font-bold uppercase">Atrasada</span>
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-center">
                 <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">{{
                   getImportanciaBadge(obrigacao.grau_importancia).label }}</span>
@@ -348,7 +364,6 @@ onMounted(() => fetchData())
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
                 <div class="flex justify-center items-center gap-2">
-
                   <button v-if="obrigacao.status !== 'concluida' && obrigacao.type !== 'receita_federal'"
                     @click="concluirTarefa(obrigacao)"
                     class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-bold transition-colors shadow-sm"
@@ -363,7 +378,6 @@ onMounted(() => fetchData())
                     class="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-lg text-xs font-bold transition-colors shadow-sm">
                     Detalhes
                   </button>
-
                 </div>
               </td>
             </tr>
@@ -372,6 +386,7 @@ onMounted(() => fetchData())
       </div>
     </div>
 
+    <!-- Modal de Cadastro/Edição -->
     <div v-if="isCadastroModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-[#f8f8f8]">
@@ -385,21 +400,21 @@ onMounted(() => fetchData())
           <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Título da Tarefa *</label>
             <input v-model="formularioObrigacao.title" type="text" placeholder="Ex: Declarar Simples Nacional"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-coral" />
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65]" />
           </div>
 
           <div>
             <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição / Instruções</label>
             <textarea v-model="formularioObrigacao.description" rows="3"
               placeholder="Instruções adicionais para a tarefa..."
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-coral"></textarea>
+              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65]"></textarea>
           </div>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Vincular Cliente *</label>
               <select v-model="formularioObrigacao.client_id"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-coral">
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#ff8a65]">
                 <option value="">Selecione...</option>
                 <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
                   {{ cliente.nome || cliente.razao_social }}
@@ -410,7 +425,7 @@ onMounted(() => fetchData())
             <div>
               <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Prazo Limite *</label>
               <input v-model="formularioObrigacao.due_date" type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-coral" />
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65]" />
             </div>
           </div>
 
@@ -418,7 +433,7 @@ onMounted(() => fetchData())
             <div>
               <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Grau de Importância</label>
               <select v-model="formularioObrigacao.grau_importancia"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-coral">
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#ff8a65]">
                 <option value="Urgente">🚨 Urgente</option>
                 <option value="Alta">🟠 Alta</option>
                 <option value="Média">🔵 Média</option>
@@ -429,7 +444,7 @@ onMounted(() => fetchData())
             <div>
               <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Status Atual</label>
               <select v-model="formularioObrigacao.status"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-coral">
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#ff8a65]">
                 <option value="pendente">Pendente</option>
                 <option value="em_andamento">Em Andamento</option>
                 <option value="aguardando_cliente">Aguardando Cliente</option>
@@ -456,6 +471,7 @@ onMounted(() => fetchData())
       </div>
     </div>
 
+    <!-- Modal de Detalhes -->
     <div v-if="isDetalhesModalOpen && obrigacaoSelecionada"
       class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
@@ -484,8 +500,7 @@ onMounted(() => fetchData())
           </div>
 
           <div v-if="obrigacaoSelecionada.description">
-            <span class="block text-xs font-bold text-[#2a2a2a]/40 uppercase tracking-wider mb-1">Descrição /
-              Instruções</span>
+            <span class="block text-xs font-bold text-[#2a2a2a]/40 uppercase tracking-wider mb-1">Descrição / Instruções</span>
             <p class="text-[#2a2a2a]/70 text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded-lg border border-gray-100">{{
               obrigacaoSelecionada.description }}</p>
           </div>
@@ -493,12 +508,14 @@ onMounted(() => fetchData())
           <div class="grid grid-cols-2 gap-4">
             <div>
               <span class="block text-xs font-bold text-[#2a2a2a]/40 uppercase tracking-wider mb-1">Vínculo</span>
-              <p class="text-[#2a2a2a]/80 text-sm font-semibold">{{ getNomeCliente(obrigacaoSelecionada.client_id) }}
-              </p>
+              <p class="text-[#2a2a2a]/80 text-sm font-semibold">{{ getNomeCliente(obrigacaoSelecionada.client_id) }}</p>
             </div>
             <div>
               <span class="block text-xs font-bold text-[#2a2a2a]/40 uppercase tracking-wider mb-1">Prazo Limite</span>
-              <p class="text-[#2a2a2a]/80 text-sm font-semibold">{{ formatDate(obrigacaoSelecionada.due_date) }}</p>
+              <p class="text-sm font-semibold" :class="isAtrasada(obrigacaoSelecionada.due_date, obrigacaoSelecionada.status) ? 'text-red-600' : 'text-[#2a2a2a]/80'">
+                {{ formatDate(obrigacaoSelecionada.due_date) }}
+                <span v-if="isAtrasada(obrigacaoSelecionada.due_date, obrigacaoSelecionada.status)" class="block text-[10px] text-red-500 font-bold uppercase">Atrasada</span>
+              </p>
             </div>
           </div>
 

@@ -12,6 +12,7 @@ import documentos
 import models
 import obrigacoes
 import schemas
+import membros
 from database import get_db
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -43,7 +44,7 @@ app.include_router(documentos.router)
 app.include_router(dashboard.router)
 app.include_router(auth.router)
 app.include_router(fiscal_deadlines.router)
-
+app.include_router(membros.router)
 
 @app.get("/")
 def read_root():

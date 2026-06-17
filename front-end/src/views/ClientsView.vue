@@ -12,8 +12,9 @@ const isLoading = ref(true)
 const isModalOpen = ref(false)
 const isSubmitting = ref(false)
 
-// Estado da busca por texto
+// Estado da busca por texto e Filtro de Tipo
 const searchQuery = ref('')
+const filtroNatureza = ref('Todos') // Novo filtro
 
 // Dados do novo cliente
 const newClient = ref({
@@ -23,6 +24,7 @@ const newClient = ref({
   nome: '', // Novo campo para PF
   cpf: '', // Novo campo para PF
   regime_tributario: 'Simples Nacional',
+  natureza_operacao: 'Serviços', // Novo campo
 })
 
 // Validação de erro no formulário
@@ -33,15 +35,22 @@ const formErrors = ref({
   cpf: '',
 })
 
-// O MOTOR DE BUSCA: Filtra por nome, razão social, CNPJ ou CPF
+// O MOTOR DE BUSCA: Filtra por nome, razão social, CNPJ, CPF e Tipo
 const clientsFiltrados = computed(() => {
-  const termo = searchQuery.value.trim().toLowerCase()
+  let listaFiltrada = clients.value
 
-  if (!termo) {
-    return clients.value
+  // 1. Filtro por Natureza (Comércio/Serviço)
+  if (filtroNatureza.value !== 'Todos') {
+    listaFiltrada = listaFiltrada.filter(
+      (client) => client.natureza_operacao === filtroNatureza.value
+    )
   }
 
-  return clients.value.filter((client) => {
+  // 2. Filtro por Texto
+  const termo = searchQuery.value.trim().toLowerCase()
+  if (!termo) return listaFiltrada
+
+  return listaFiltrada.filter((client) => {
     const nome = (client.nome || '').toLowerCase()
     const razaoSocial = (client.razao_social || '').toLowerCase()
     const cnpj = (client.cnpj || '').replace(/\D/g, '')
@@ -125,6 +134,7 @@ const handleCreateClient = async () => {
     const response = await api.post('/api/v1/clientes', newClient.value)
     clients.value.unshift(response.data)
 
+    // Limpa o formulário
     newClient.value = {
       tipo_pessoa: 'PJ',
       razao_social: '',
@@ -132,6 +142,7 @@ const handleCreateClient = async () => {
       nome: '',
       cpf: '',
       regime_tributario: 'Simples Nacional',
+      natureza_operacao: 'Serviços',
     }
     isModalOpen.value = false
     toast.success('Cliente cadastrado com sucesso!')
@@ -208,13 +219,14 @@ const handleUploadCsv = async () => {
   }
 }
 
-// Gera o Template CSV no navegador para download (Sem precisar de backend)
+// Gera o Template CSV no navegador para download (Atualizado com a nova coluna)
 const baixarTemplate = () => {
-  const cabecalhos = "TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO\n"
-  const exemplo1 = "PJ;Transportes LTDA;12.345.678/0001-90;Simples Nacional\n"
-  const exemplo2 = "PF;João da Silva;123.456.789-00;MEI\n"
+  const cabecalhos = "TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO;NATUREZA_OPERACAO\n"
+  const exemplo1 = "PJ;Transportes LTDA;12.345.678/0001-90;Simples Nacional;Comércio\n"
+  const exemplo2 = "PJ;Contabilidade XYZ;12.345.678/0001-91;Lucro Presumido;Serviços\n"
+  const exemplo3 = "PF;João da Silva;123.456.789-00;MEI;Serviços\n"
   
-  const blob = new Blob([cabecalhos + exemplo1 + exemplo2], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob([cabecalhos + exemplo1 + exemplo2 + exemplo3], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
   link.setAttribute("href", url)
@@ -231,10 +243,22 @@ onMounted(() => {
 
 <template>
   <Layout title="Gerenciar Clientes">
+    <!-- Filtros e Botões Superiores -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-      <div class="relative w-full sm:w-72">
-        <input v-model="searchQuery" type="text" placeholder="Buscar cliente..."
-          class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white" />
+      <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <!-- Busca Texto -->
+        <div class="relative w-full sm:w-72">
+          <input v-model="searchQuery" type="text" placeholder="Buscar cliente..."
+            class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white" />
+        </div>
+        
+        <!-- Filtro Natureza (Comércio/Serviço) -->
+        <select v-model="filtroNatureza" class="w-full sm:w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white">
+          <option value="Todos">Todas as Naturezas</option>
+          <option value="Comércio">Comércio</option>
+          <option value="Serviços">Serviços</option>
+          <option value="Indústria">Indústria</option>
+        </select>
       </div>
       
       <div class="flex gap-3 w-full sm:w-auto">
@@ -254,6 +278,7 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Tabela de Clientes -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
       <div v-if="isLoading" class="p-8 text-center text-[#2a2a2a]/50">
         Carregando carteira de clientes...
@@ -262,7 +287,7 @@ onMounted(() => {
         Nenhum cliente ativo cadastrado no escritório ainda.
       </div>
       <div v-else-if="clientsFiltrados.length === 0" class="p-12 text-center text-gray-500 text-sm">
-        Nenhum cliente corresponde à sua busca por "{{ searchQuery }}".
+        Nenhum cliente corresponde à sua busca.
       </div>
 
       <div v-else class="overflow-x-auto">
@@ -272,6 +297,7 @@ onMounted(() => {
               <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Identificação</th>
               <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Documento</th>
               <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Regime</th>
+              <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Natureza</th>
               <th class="px-6 py-4 text-center text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Ações</th>
             </tr>
           </thead>
@@ -293,6 +319,15 @@ onMounted(() => {
                   {{ client.regime_tributario }}
                 </span>
               </td>
+              <!-- Badge de Natureza (Comércio/Serviço) -->
+              <td class="px-6 py-4 whitespace-nowrap text-sm">
+                <span 
+                  class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-lg"
+                  :class="client.natureza_operacao === 'Comércio' ? 'bg-blue-50 text-blue-700' : (client.natureza_operacao === 'Indústria' ? 'bg-purple-50 text-purple-700' : 'bg-amber-50 text-amber-700')"
+                >
+                  {{ client.natureza_operacao || 'Não definido' }}
+                </span>
+              </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                 <button @click="handleDesativar(client.id)"
                   class="text-[#2a2a2a]/40 hover:text-red-500 font-semibold transition-colors">
@@ -305,6 +340,7 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Modal de Cadastro -->
     <div v-if="isModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
@@ -360,14 +396,24 @@ onMounted(() => {
             </div>
           </template>
 
-          <div>
-            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Regime Tributário</label>
-            <select v-model="newClient.regime_tributario" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm">
-              <option value="Simples Nacional">Simples Nacional</option>
-              <option value="Lucro Presumido">Lucro Presumido</option>
-              <option value="Lucro Real">Lucro Real</option>
-              <option value="MEI">MEI</option>
-            </select>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Regime Tributário</label>
+              <select v-model="newClient.regime_tributario" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm">
+                <option value="Simples Nacional">Simples Nacional</option>
+                <option value="Lucro Presumido">Lucro Presumido</option>
+                <option value="Lucro Real">Lucro Real</option>
+                <option value="MEI">MEI</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Natureza</label>
+              <select v-model="newClient.natureza_operacao" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm">
+                <option value="Serviços">Serviços</option>
+                <option value="Comércio">Comércio</option>
+                <option value="Indústria">Indústria</option>
+              </select>
+            </div>
           </div>
 
           <div class="mt-8 flex justify-end gap-3">
@@ -382,6 +428,7 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- Modal de Importação CSV -->
     <div v-if="isImportModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-[#f8f8f8]">

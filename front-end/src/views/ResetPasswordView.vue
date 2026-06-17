@@ -44,55 +44,56 @@ const handleUpdatePassword = async () => {
   <div class="min-h-screen flex">
     <!-- Lado Esquerdo (Escuro) -->
     <div
-      class="hidden md:flex md:w-1/2 bg-slate-900 text-white flex-col justify-center items-center p-12 relative overflow-hidden"
+      class="hidden md:flex md:w-1/2 bg-[#19341a] text-white flex-col justify-center items-center p-12 relative overflow-hidden"
     >
-      <div class="absolute inset-0 opacity-10">
-        <div
-          class="absolute bottom-1/4 right-1/4 w-64 h-64 bg-indigo-500 rounded-full filter blur-3xl"
-        ></div>
-      </div>
+      <!-- Efeito de luz moderna -->
+      <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px]"></div>
+
       <div class="relative z-10 text-center">
-        <h1 class="text-5xl font-black tracking-tight mb-4">
-          Conta<span class="text-indigo-400">Flow</span>.
+        <h1 class="text-5xl font-extrabold tracking-tight mb-4">
+          Contably<span class="text-[#ff8a65]">Task</span>.
         </h1>
-        <p class="text-slate-300 text-lg max-w-md mx-auto">
-          Crie uma nova senha segura para sua conta.
+        <p class="text-white/60 text-lg max-w-md mx-auto leading-relaxed">
+          Crie uma nova senha segura para sua conta e proteja os dados dos seus clientes.
         </p>
       </div>
     </div>
 
     <!-- Lado Direito (Formulário) -->
-    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-gray-50">
+    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[#f8f8f8]">
       <div class="w-full max-w-md">
+        <!-- Logo para Mobile -->
         <div class="md:hidden text-center mb-8">
-          <h1 class="text-4xl font-black tracking-tight text-gray-900">
-            Conta<span class="text-indigo-600">Flow</span>.
+          <h1 class="text-4xl font-extrabold tracking-tight text-[#19341a]">
+            Contably<span class="text-[#ff8a65]">Task</span>.
           </h1>
         </div>
 
-        <h2 class="text-2xl font-bold text-gray-900 mb-2">Redefinir Senha</h2>
-        <p class="text-gray-500 mb-8">Escolha uma nova senha para acessar o sistema.</p>
+        <h2 class="text-2xl font-extrabold text-[#19341a] mb-2 tracking-tight">Redefinir Senha</h2>
+        <p class="text-gray-500 mb-8 text-[0.95rem]">
+          Escolha uma nova senha para acessar o sistema.
+        </p>
 
-        <form @submit.prevent="handleUpdatePassword" class="space-y-5">
+        <form @submit.prevent="handleUpdatePassword" class="space-y-6">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Nova Senha</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Nova Senha</label>
             <input
               v-model="novaSenha"
               type="password"
               required
               placeholder="Mínimo 6 caracteres"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-all"
             />
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Confirmar Nova Senha</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Confirmar Nova Senha</label>
             <input
               v-model="confirmarSenha"
               type="password"
               required
               placeholder="Repita a senha"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-all"
             />
           </div>
 
@@ -100,7 +101,7 @@ const handleUpdatePassword = async () => {
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md shadow-[#ff8a65]/30 text-sm font-semibold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 transition-all"
             >
               {{ isLoading ? 'Salvando...' : 'Salvar Nova Senha' }}
             </button>

@@ -15,6 +15,7 @@ class ClientBase(BaseModel):
     nome: Optional[str] = None  # Novo campo PF
     cpf: Optional[str] = None  # Novo campo PF
     regime_tributario: Optional[str] = None
+    natureza_operacao: Optional[str] = "Serviços"
 
 
 class ClientCreate(ClientBase):

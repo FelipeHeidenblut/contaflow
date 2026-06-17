@@ -36,61 +36,65 @@ const handleResetPassword = async () => {
   <div class="min-h-screen flex">
     <!-- Lado Esquerdo (Escuro) -->
     <div
-      class="hidden md:flex md:w-1/2 bg-slate-900 text-white flex-col justify-center items-center p-12 relative overflow-hidden"
+      class="hidden md:flex md:w-1/2 bg-[#19341a] text-white flex-col justify-center items-center p-12 relative overflow-hidden"
     >
-      <div class="absolute inset-0 opacity-10">
-        <div
-          class="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-500 rounded-full filter blur-3xl"
-        ></div>
-      </div>
+      <!-- Efeito de luz moderna -->
+      <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px]"></div>
+      
       <div class="relative z-10 text-center">
-        <h1 class="text-5xl font-black tracking-tight mb-4">
-          Conta<span class="text-indigo-400">Flow</span>.
+        <h1 class="text-5xl font-extrabold tracking-tight mb-4">
+          Contably<span class="text-[#ff8a65]">Task</span>.
         </h1>
-        <p class="text-slate-300 text-lg max-w-md mx-auto">
-          Recupere o acesso à sua conta de forma segura.
+        <p class="text-white/60 text-lg max-w-md mx-auto leading-relaxed">
+          Recupere o acesso à sua conta de forma segura e retome o controle do seu escritório.
         </p>
       </div>
     </div>
 
     <!-- Lado Direito (Formulário) -->
-    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-gray-50">
+    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[#f8f8f8]">
       <div class="w-full max-w-md">
+        <!-- Logo para Mobile -->
         <div class="md:hidden text-center mb-8">
-          <h1 class="text-4xl font-black tracking-tight text-gray-900">
-            Conta<span class="text-indigo-600">Flow</span>.
+          <h1 class="text-4xl font-extrabold tracking-tight text-[#19341a]">
+            Contably<span class="text-[#ff8a65]">Task</span>.
           </h1>
         </div>
 
-        <h2 class="text-2xl font-bold text-gray-900 mb-2">Esqueceu a senha?</h2>
-        <p class="text-gray-500 mb-8">
-          Informe seu e-mail e enviaremos um link para redefinir sua senha.
+        <h2 class="text-2xl font-extrabold text-[#19341a] mb-2 tracking-tight">Esqueceu a senha?</h2>
+        <p class="text-gray-500 mb-8 text-[0.95rem]">
+          Informe seu e-mail cadastrado e enviaremos um link seguro para redefinir sua senha.
         </p>
 
         <!-- Mensagem de Sucesso -->
         <div
           v-if="emailEnviado"
-          class="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg text-sm"
+          class="bg-[#eaf3ea] border border-[#19341a]/10 text-[#19341a] p-5 rounded-xl text-sm shadow-sm"
         >
-          📧 E-mail enviado! Verifique sua caixa de entrada (e o spam) e clique no link para
-          redefinir sua senha.
-          <div class="mt-4">
-            <RouterLink to="/login" class="font-semibold text-indigo-600 hover:text-indigo-500">
-              Voltar para o Login
+          <div class="flex items-start gap-3">
+            <svg class="w-6 h-6 flex-shrink-0 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <div>
+              <strong class="font-bold">E-mail enviado!</strong><br>
+              Verifique sua caixa de entrada (e a pasta de spam) e clique no link para redefinir sua senha.
+            </div>
+          </div>
+          <div class="mt-5 pt-4 border-t border-[#19341a]/10">
+            <RouterLink to="/login" class="font-bold text-[#ff8a65] hover:text-[#f07047] transition-colors">
+              ← Voltar para o Login
             </RouterLink>
           </div>
         </div>
 
         <!-- Formulário -->
-        <form v-else @submit.prevent="handleResetPassword" class="space-y-5">
+        <form v-else @submit.prevent="handleResetPassword" class="space-y-6">
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">E-mail cadastrado</label>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">E-mail cadastrado</label>
             <input
               v-model="email"
               type="email"
               required
               placeholder="seu@email.com"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-all"
             />
           </div>
 
@@ -107,16 +111,16 @@ const handleResetPassword = async () => {
             <button
               type="submit"
               :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md shadow-[#ff8a65]/30 text-sm font-semibold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 transition-all"
             >
               {{ isLoading ? 'Enviando...' : 'Enviar Link de Recuperação' }}
             </button>
           </div>
         </form>
 
-        <div v-if="!emailEnviado" class="mt-6 text-center text-sm text-gray-500">
+        <div v-if="!emailEnviado" class="mt-8 text-center text-sm text-gray-500">
           Lembrou a senha?
-          <RouterLink to="/login" class="font-semibold text-indigo-600 hover:text-indigo-500">
+          <RouterLink to="/login" class="font-bold text-[#19341a] hover:text-[#ff8a65] transition-colors">
             Fazer Login
           </RouterLink>
         </div>

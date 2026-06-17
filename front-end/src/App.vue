@@ -21,17 +21,20 @@ onMounted(async () => {
   <!-- Tela de Splash (Enquanto o Supabase carrega) -->
   <div
     v-if="!isAppReady"
-    class="h-screen w-screen flex flex-col items-center justify-center bg-slate-900"
+    class="h-screen w-screen flex flex-col items-center justify-center bg-[#19341a] relative overflow-hidden"
   >
-    <div class="text-center">
-      <h1 class="text-5xl font-black tracking-tight text-white mb-8">
-        Conta<span class="text-indigo-400">Flow</span>.
+    <!-- Efeito de luz de fundo (igual as outras telas) -->
+    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px] z-0"></div>
+    
+    <div class="text-center relative z-10">
+      <h1 class="text-5xl font-extrabold tracking-tight text-white mb-8">
+        Conta<span class="text-[#ff8a65]">Flow</span>.
       </h1>
-      <!-- Spinner de Carregamento do Tailwind -->
+      <!-- Spinner de Carregamento com as cores da marca -->
       <div
-        class="w-10 h-10 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto"
+        class="w-10 h-10 border-4 border-[#ff8a65]/30 border-t-[#ff8a65] rounded-full animate-spin mx-auto"
       ></div>
-      <p class="text-slate-400 text-sm mt-4">Carregando sistema...</p>
+      <p class="text-white/50 text-sm mt-4 font-medium">Carregando sistema...</p>
     </div>
   </div>
 

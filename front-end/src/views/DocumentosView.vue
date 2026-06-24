@@ -14,14 +14,20 @@ const isUploading = ref(false)
 
 // Filtros
 const filtroClienteId = ref('')
-const searchQuery = ref('') // Adicionado para a busca de texto
+const filtroCategoria = ref('') // NOVO FILTRO
+const searchQuery = ref('')
 
-// Computed: Filtra por cliente E por termo de busca
+// Computed: Filtra por cliente, categoria E por termo de busca
 const documentosFiltrados = computed(() => {
   let resultado = documentos.value
 
   if (filtroClienteId.value) {
     resultado = resultado.filter((doc) => doc.client_id === filtroClienteId.value)
+  }
+
+  // Filtro de Categoria
+  if (filtroCategoria.value) {
+    resultado = resultado.filter((doc) => doc.categoria === filtroCategoria.value)
   }
 
   if (searchQuery.value) {
@@ -34,8 +40,8 @@ const documentosFiltrados = computed(() => {
   return resultado
 })
 
-// Formulário de Upload
-const docForm = ref({ client_id: '' })
+// Formulário de Upload (com categoria)
+const docForm = ref({ client_id: '', categoria: 'Geral' })
 const selectedFile = ref<File | null>(null)
 
 // Busca documentos e clientes
@@ -69,6 +75,7 @@ const handleUpload = async () => {
   try {
     const formData = new FormData()
     formData.append('client_id', docForm.value.client_id)
+    formData.append('categoria', docForm.value.categoria) // ENVIA A CATEGORIA
     formData.append('file', selectedFile.value)
 
     const response = await api.post('/api/v1/documentos', formData, {
@@ -77,7 +84,7 @@ const handleUpload = async () => {
 
     documentos.value.unshift(response.data)
     isModalOpen.value = false
-    docForm.value.client_id = ''
+    docForm.value = { client_id: '', categoria: 'Geral' }
     selectedFile.value = null
 
     toast.success('Documento salvo com sucesso!')
@@ -94,22 +101,17 @@ const handleUpload = async () => {
 // ==========================================
 const baixarDocumento = async (docId: string, nomeArquivo: string) => {
   try {
-    // Faz a requisição enviando o Token no cabeçalho e recebendo um 'blob' (arquivo)
     const response = await api.get(`/api/v1/documentos/${docId}/download`, {
       responseType: 'blob',
     })
 
-    // Cria uma URL temporária para o arquivo baixado
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    
-    // Força o download com o nome original do arquivo
     link.setAttribute('download', nomeArquivo)
     document.body.appendChild(link)
     link.click()
 
-    // Limpa o DOM
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
   } catch (error) {
@@ -132,16 +134,40 @@ const handleExcluirDocumento = async (docId: string, nomeArquivo: string) => {
   }
 }
 
-// Helpers
+// ==========================================
+// HELPERS VISUAIS (ÍCONES E BADGES)
+// ==========================================
 const getNomeCliente = (clientId: string) => {
   const cliente = clientes.value.find((c) => c.id === clientId)
-  // Corrigido para mostrar nome se for PF
   return cliente ? (cliente.nome || cliente.razao_social) : 'Desconhecido'
 }
 
 const formatDate = (dateString: string) => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleDateString('pt-BR')
+}
+
+// NOVO: Retorna classe de cor e ícone baseado na extensão do arquivo
+const getFileIcon = (fileName: string) => {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  if (ext === 'pdf') return { icon: '📕', color: 'text-red-500', bg: 'bg-red-50' }
+  if (ext === 'xml') return { icon: '📄', color: 'text-blue-500', bg: 'bg-blue-50' }
+  if (['xls', 'xlsx', 'csv'].includes(ext || '')) return { icon: '📗', color: 'text-green-600', bg: 'bg-green-50' }
+  if (['doc', 'docx'].includes(ext || '')) return { icon: '📘', color: 'text-indigo-500', bg: 'bg-indigo-50' }
+  if (['jpg', 'jpeg', 'png'].includes(ext || '')) return { icon: '🖼️', color: 'text-purple-500', bg: 'bg-purple-50' }
+  return { icon: '📄', color: 'text-gray-500', bg: 'bg-gray-50' }
+}
+
+// NOVO: Retorna classe de cor da badge de categoria
+const getCategoriaBadge = (categoria: string) => {
+  const styles: Record<string, string> = {
+    'Fiscal': 'bg-blue-50 text-blue-700 border-blue-100',
+    'Contábil': 'bg-purple-50 text-purple-700 border-purple-100',
+    'Departamento Pessoal': 'bg-amber-50 text-amber-700 border-amber-100',
+    'Societário': 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    'Geral': 'bg-gray-50 text-gray-600 border-gray-100'
+  }
+  return `px-2 py-0.5 rounded-md text-[11px] font-bold border ${styles[categoria] || styles['Geral']}`
 }
 
 onMounted(() => fetchData())
@@ -152,8 +178,8 @@ onMounted(() => fetchData())
     <!-- Barra de Ações -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
       <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto sm:max-w-2xl">
-        <!-- Busca agora vinculada com v-model -->
-        <div class="relative w-full sm:w-64">
+        <!-- Busca -->
+        <div class="relative w-full sm:w-56">
           <input
             v-model="searchQuery"
             type="text"
@@ -164,12 +190,25 @@ onMounted(() => fetchData())
 
         <select
           v-model="filtroClienteId"
-          class="w-full sm:w-60 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 cursor-pointer text-sm"
+          class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 text-sm shadow-sm"
         >
           <option value="">📁 Todos os Clientes</option>
           <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
             {{ cliente.nome || cliente.razao_social }}
           </option>
+        </select>
+
+        <!-- NOVO FILTRO DE CATEGORIA -->
+        <select
+          v-model="filtroCategoria"
+          class="w-full sm:w-48 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 text-sm shadow-sm"
+        >
+          <option value="">Todas as Categorias</option>
+          <option value="Fiscal">Fiscal</option>
+          <option value="Contábil">Contábil</option>
+          <option value="Departamento Pessoal">Dep. Pessoal</option>
+          <option value="Societário">Societário</option>
+          <option value="Geral">Geral</option>
         </select>
       </div>
 
@@ -196,6 +235,7 @@ onMounted(() => fetchData())
           <thead class="bg-gray-50">
             <tr>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Arquivo</th>
+              <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Categoria</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente</th>
               <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
               <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Ações</th>
@@ -204,16 +244,22 @@ onMounted(() => fetchData())
           <tbody class="bg-white divide-y divide-gray-200">
             <tr v-for="doc in documentosFiltrados" :key="doc.id" class="hover:bg-gray-50 transition-colors">
               <td class="px-6 py-4 whitespace-nowrap">
-                <!-- Trocado <a> por <button> chamando a função segura -->
                 <button
                   @click="baixarDocumento(doc.id, doc.nome_arquivo)"
-                  class="flex items-center gap-2 text-sm font-medium text-[#19341a] hover:text-[#ff8a65] cursor-pointer"
+                  class="flex items-center gap-3 text-sm font-medium text-[#19341a] hover:text-[#ff8a65] cursor-pointer"
                 >
-                  <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path>
-                  </svg>
+                  <!-- ÍCONE DINÂMICO -->
+                  <div class="w-8 h-8 rounded-lg flex items-center justify-center text-base" :class="getFileIcon(doc.nome_arquivo).bg">
+                    {{ getFileIcon(doc.nome_arquivo).icon }}
+                  </div>
                   {{ doc.nome_arquivo }}
                 </button>
+              </td>
+              <!-- BADGE DE CATEGORIA -->
+              <td class="px-6 py-4 whitespace-nowrap text-center">
+                <span :class="getCategoriaBadge(doc.categoria || 'Geral')">
+                  {{ doc.categoria || 'Geral' }}
+                </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                 {{ getNomeCliente(doc.client_id) }}
@@ -255,6 +301,22 @@ onMounted(() => fetchData())
               <option v-for="cliente in clientes" :key="cliente.id" :value="cliente.id">
                 {{ cliente.nome || cliente.razao_social }}
               </option>
+            </select>
+          </div>
+
+          <!-- CAMPO NOVO: CATEGORIA -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria do Documento</label>
+            <select
+              v-model="docForm.categoria"
+              required
+              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-sm"
+            >
+              <option value="Geral">Geral</option>
+              <option value="Fiscal">Fiscal</option>
+              <option value="Contábil">Contábil</option>
+              <option value="Departamento Pessoal">Departamento Pessoal</option>
+              <option value="Societário">Societário</option>
             </select>
           </div>
 

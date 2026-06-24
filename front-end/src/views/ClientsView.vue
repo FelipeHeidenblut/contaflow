@@ -14,17 +14,17 @@ const isSubmitting = ref(false)
 
 // Estado da busca por texto e Filtro de Tipo
 const searchQuery = ref('')
-const filtroNatureza = ref('Todos') // Novo filtro
+const filtroNatureza = ref('Todos')
 
 // Dados do novo cliente
 const newClient = ref({
-  tipo_pessoa: 'PJ', // 'PJ' para Jurídica, 'PF' para Física
+  tipo_pessoa: 'PJ',
   razao_social: '',
   cnpj: '',
-  nome: '', // Novo campo para PF
-  cpf: '', // Novo campo para PF
+  nome: '',
+  cpf: '',
   regime_tributario: 'Simples Nacional',
-  natureza_operacao: 'Serviços', // Novo campo
+  natureza_operacao: 'Serviços',
 })
 
 // Validação de erro no formulário
@@ -35,18 +35,85 @@ const formErrors = ref({
   cpf: '',
 })
 
+// ==========================================
+// LÓGICA DO DOSSIÊ DO CLIENTE (NOVO)
+// ==========================================
+const isDossierOpen = ref(false)
+const selectedClient = ref<any>(null)
+const clientTasks = ref<any[]>([])
+const clientDocuments = ref<any[]>([])
+const isLoadingDossier = ref(false)
+const activeTab = ref('info')
+
+const abrirDossier = async (client: any) => {
+  selectedClient.value = client
+  activeTab.value = 'info'
+  isDossierOpen.value = true
+  isLoadingDossier.value = true
+  
+  try {
+    // Busca tarefas e documentos do cliente específico
+    const [tasksRes, docsRes] = await Promise.all([
+      api.get('/api/v1/obrigacoes'),
+      api.get('/api/v1/documentos')
+    ])
+    
+    // Filtra e ordena as tarefas (mais recentes primeiro)
+    clientTasks.value = tasksRes.data
+      .filter((t: any) => t.client_id === client.id)
+      .sort((a: any, b: any) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
+      .slice(0, 5)
+      
+    // Filtra e ordena os documentos
+    clientDocuments.value = docsRes.data
+      .filter((d: any) => d.client_id === client.id)
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 5)
+      
+  } catch (error) {
+    toast.error('Erro ao carregar o dossiê do cliente.')
+  } finally {
+    isLoadingDossier.value = false
+  }
+}
+
+// Helpers do Dossiê
+const formatDocDate = (dateString: string) => {
+  if (!dateString) return '-'
+  const [year, month, day] = dateString.split('-')
+  return `${day}/${month}/${year}`
+}
+
+const getStatusColor = (status: string) => {
+  if (status === 'concluida') return 'bg-emerald-100 text-emerald-800'
+  if (status === 'em_andamento') return 'bg-blue-100 text-blue-800'
+  if (status === 'aguardando_cliente') return 'bg-orange-100 text-orange-800'
+  return 'bg-yellow-100 text-yellow-800'
+}
+
+const baixarDocDossier = async (docId: string, nomeArquivo: string) => {
+  try {
+    const response = await api.get(`/api/v1/documentos/${docId}/download`, { responseType: 'blob' })
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', nomeArquivo)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    toast.error('Erro ao baixar arquivo.')
+  }
+}
+
 // O MOTOR DE BUSCA: Filtra por nome, razão social, CNPJ, CPF e Tipo
 const clientsFiltrados = computed(() => {
   let listaFiltrada = clients.value
 
-  // 1. Filtro por Natureza (Comércio/Serviço)
   if (filtroNatureza.value !== 'Todos') {
-    listaFiltrada = listaFiltrada.filter(
-      (client) => client.natureza_operacao === filtroNatureza.value
-    )
+    listaFiltrada = listaFiltrada.filter((client) => client.natureza_operacao === filtroNatureza.value)
   }
 
-  // 2. Filtro por Texto
   const termo = searchQuery.value.trim().toLowerCase()
   if (!termo) return listaFiltrada
 
@@ -134,7 +201,6 @@ const handleCreateClient = async () => {
     const response = await api.post('/api/v1/clientes', newClient.value)
     clients.value.unshift(response.data)
 
-    // Limpa o formulário
     newClient.value = {
       tipo_pessoa: 'PJ',
       razao_social: '',
@@ -174,19 +240,17 @@ const isImportModalOpen = ref(false)
 const isUploadingCsv = ref(false)
 const csvFile = ref<File | null>(null)
 
-// Captura o arquivo
 const handleCsvChange = (event: any) => {
   const file = event.target.files[0]
   if (file && file.name.endsWith('.csv')) {
     csvFile.value = file
   } else {
     toast.error("Por favor, selecione apenas arquivos .csv")
-    event.target.value = '' // Reseta o input visualmente
+    event.target.value = ''
     csvFile.value = null
   }
 }
 
-// Envia o arquivo para o Back-end
 const handleUploadCsv = async () => {
   if (!csvFile.value) return
   isUploadingCsv.value = true
@@ -203,7 +267,7 @@ const handleUploadCsv = async () => {
     
     if (importados > 0) {
       toast.success(`${importados} clientes importados com sucesso!`)
-      fetchClients() // Sincroniza a tabela na mesma hora
+      fetchClients()
     }
     if (erros > 0) {
       toast.warning(`${erros} linhas ignoradas por dados incompletos.`)
@@ -219,7 +283,6 @@ const handleUploadCsv = async () => {
   }
 }
 
-// Gera o Template CSV no navegador para download (Atualizado com a nova coluna)
 const baixarTemplate = () => {
   const cabecalhos = "TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO;NATUREZA_OPERACAO\n"
   const exemplo1 = "PJ;Transportes LTDA;12.345.678/0001-90;Simples Nacional;Comércio\n"
@@ -243,16 +306,13 @@ onMounted(() => {
 
 <template>
   <Layout title="Gerenciar Clientes">
-    <!-- Filtros e Botões Superiores -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
       <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-        <!-- Busca Texto -->
         <div class="relative w-full sm:w-72">
           <input v-model="searchQuery" type="text" placeholder="Buscar cliente..."
             class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white" />
         </div>
         
-        <!-- Filtro Natureza (Comércio/Serviço) -->
         <select v-model="filtroNatureza" class="w-full sm:w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white">
           <option value="Todos">Todas as Naturezas</option>
           <option value="Comércio">Comércio</option>
@@ -278,7 +338,6 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Tabela de Clientes -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
       <div v-if="isLoading" class="p-8 text-center text-[#2a2a2a]/50">
         Carregando carteira de clientes...
@@ -304,12 +363,15 @@ onMounted(() => {
           <tbody class="bg-white divide-y divide-gray-100">
             <tr v-for="client in clientsFiltrados" :key="client.id" class="hover:bg-[#f8f8f8]/50 transition-colors">
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-sm font-semibold text-[#19341a]">
-                  {{ client.razao_social || client.nome }}
-                </div>
-                <div class="text-xs text-[#2a2a2a]/40 mt-0.5">
-                  {{ client.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }}
-                </div>
+                <!-- NOME VIROU UM BOTÃO PARA ABRIR O DOSSIÊ -->
+                <button @click="abrirDossier(client)" class="text-left hover:text-[#ff8a65] transition-colors">
+                  <div class="text-sm font-semibold text-[#19341a]">
+                    {{ client.razao_social || client.nome }}
+                  </div>
+                  <div class="text-xs text-[#2a2a2a]/40 mt-0.5">
+                    {{ client.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }} · Clique para ver detalhes
+                  </div>
+                </button>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-[#2a2a2a]/70">
                 {{ client.cnpj || client.cpf }}
@@ -319,7 +381,6 @@ onMounted(() => {
                   {{ client.regime_tributario }}
                 </span>
               </td>
-              <!-- Badge de Natureza (Comércio/Serviço) -->
               <td class="px-6 py-4 whitespace-nowrap text-sm">
                 <span 
                   class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-lg"
@@ -340,7 +401,82 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- Modal de Cadastro -->
+    <!-- MODAL DO DOSSIÊ DO CLIENTE (NOVO) -->
+    <div v-if="isDossierOpen && selectedClient" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        
+        <!-- Cabeçalho do Dossiê -->
+        <div class="bg-[#19341a] px-6 py-5 flex justify-between items-center">
+          <div>
+            <h3 class="text-xl font-bold text-white tracking-tight">{{ selectedClient.razao_social || selectedClient.nome }}</h3>
+            <p class="text-white/50 text-sm">{{ selectedClient.cnpj || selectedClient.cpf }}</p>
+          </div>
+          <button @click="isDossierOpen = false" class="text-white/50 hover:text-white text-2xl font-bold">&times;</button>
+        </div>
+
+        <!-- Tabs de Navegação -->
+        <div class="flex border-b border-gray-200 bg-[#f8f8f8]">
+          <button @click="activeTab = 'info'" :class="activeTab === 'info' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+            Dados Cadastrais
+          </button>
+          <button @click="activeTab = 'tasks'" :class="activeTab === 'tasks' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+            Tarefas Recentes
+          </button>
+          <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+            Documentos
+          </button>
+        </div>
+
+        <!-- Conteúdo do Dossiê -->
+        <div class="p-6 overflow-y-auto">
+          <div v-if="isLoadingDossier" class="text-center py-8 text-gray-400">Carregando dados...</div>
+
+          <!-- Tab 1: Dados -->
+          <div v-else-if="activeTab === 'info'" class="grid grid-cols-2 gap-4">
+            <div><span class="text-xs text-gray-400 block">Tipo de Pessoa</span><span class="text-sm font-semibold">{{ selectedClient.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }}</span></div>
+            <div><span class="text-xs text-gray-400 block">Natureza da Operação</span><span class="text-sm font-semibold">{{ selectedClient.natureza_operacao || 'Não definido' }}</span></div>
+            <div><span class="text-xs text-gray-400 block">Regime Tributário</span><span class="text-sm font-semibold">{{ selectedClient.regime_tributario }}</span></div>
+            <div><span class="text-xs text-gray-400 block">Status no Sistema</span><span class="text-sm font-semibold text-emerald-600">Ativo</span></div>
+          </div>
+
+          <!-- Tab 2: Tarefas -->
+          <div v-else-if="activeTab === 'tasks'">
+            <div v-if="clientTasks.length === 0" class="text-center py-8 text-gray-400 text-sm">Nenhuma tarefa encontrada para este cliente.</div>
+            <div v-else class="space-y-3">
+              <div v-for="task in clientTasks" :key="task.id" class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100">
+                <div>
+                  <p class="text-sm font-bold text-[#19341a]">{{ task.title }}</p>
+                  <p class="text-xs text-gray-400">Prazo: {{ formatDocDate(task.due_date) }}</p>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-1 rounded-md" :class="getStatusColor(task.status)">
+                  {{ task.status.replace('_', ' ') }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab 3: Documentos -->
+          <div v-else-if="activeTab === 'docs'">
+            <div v-if="clientDocuments.length === 0" class="text-center py-8 text-gray-400 text-sm">Nenhum documento enviado para este cliente.</div>
+            <div v-else class="space-y-3">
+              <div v-for="doc in clientDocuments" :key="doc.id" class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100">
+                <div class="flex items-center gap-3">
+                  <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
+                  <div>
+                    <p class="text-sm font-bold text-[#19341a]">{{ doc.nome_arquivo }}</p>
+                    <p class="text-xs text-gray-400">Enviado em: {{ formatDocDate(doc.created_at) }}</p>
+                  </div>
+                </div>
+                <button @click="baixarDocDossier(doc.id, doc.nome_arquivo)" class="text-xs font-bold text-[#ff8a65] hover:underline">Baixar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Modal de Cadastro (Original) -->
     <div v-if="isModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">

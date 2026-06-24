@@ -16,10 +16,16 @@ interface TaskData {
   description?: string
   status: string
   due_date?: string
-  date?: string // Usado pelas obrigações da Receita Federal
+  date?: string
   type: 'task' | 'receita_federal'
   grau_importancia?: string
   client_id?: string | number
+  assigned_to?: string | number | null // Adicionado
+}
+
+interface Membro {
+  id: string | number
+  name: string
 }
 
 // ==========================================
@@ -34,6 +40,7 @@ const dashData = ref({
 })
 
 const tasks = ref<TaskData[]>([])
+const membros = ref<Membro[]>([]) // NOVO: Para a distribuição de equipe
 
 // ==========================================
 // 3. MÁGICA DOS DADOS (COMPUTED PROPERTIES)
@@ -52,7 +59,6 @@ const countAguardandoCliente = computed(() =>
 
 const totalStatus = computed(() => dashData.value.tarefas_abertas + countConcluidas.value)
 
-// Percentagens para a Barra de "Saúde dos Prazos"
 const percConcluidas = computed(() => totalStatus.value > 0 ? (countConcluidas.value / totalStatus.value) * 100 : 0)
 const percAtrasadas = computed(() => totalStatus.value > 0 ? (dashData.value.tarefas_atrasadas / totalStatus.value) * 100 : 0)
 const percNoPrazo = computed(() => totalStatus.value > 0 ? ((dashData.value.tarefas_abertas - dashData.value.tarefas_atrasadas) / totalStatus.value) * 100 : 0)
@@ -60,13 +66,36 @@ const percNoPrazo = computed(() => totalStatus.value > 0 ? ((dashData.value.tare
 const tarefasNoPrazo = computed(() => dashData.value.tarefas_abertas - dashData.value.tarefas_atrasadas)
 
 // ==========================================
-// FOCO DO DIA: Apenas Atrasadas e de Hoje
+// 4. DISTRIBUIÇÃO DA EQUIPE (NOVO)
+// ==========================================
+const cargaEquipe = computed(() => {
+  const tarefasAtribuidas = officeTasks.value.filter(t => t.status !== 'concluida' && t.assigned_to)
+  
+  // Inicializa todos os membros com 0 tarefas
+  const carga: Record<string, { nome: string, count: number }> = {}
+  membros.value.forEach(m => {
+    carga[String(m.id)] = { nome: m.name, count: 0 }
+  })
+  
+  // Conta as tarefas de cada um
+  tarefasAtribuidas.forEach(t => {
+    const id = String(t.assigned_to)
+    if (carga[id]) {
+      carga[id].count++
+    }
+  })
+  
+  // Retorna como array ordenado por quem tem mais tarefas
+  return Object.values(carga).sort((a, b) => b.count - a.count)
+})
+
+// ==========================================
+// 5. FOCO DO DIA E PRÓXIMOS PRAZOS
 // ==========================================
 const focoDoDiaTasks = computed(() => {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   
-  // Pega apenas tarefas internas não concluídas com data de hoje ou anterior
   const abertas = officeTasks.value.filter(t => 
     t.status !== 'concluida' && t.due_date && t.due_date <= todayStr
   );
@@ -80,12 +109,9 @@ const focoDoDiaTasks = computed(() => {
     const dataA = a.due_date ? new Date(a.due_date).getTime() : 0
     const dataB = b.due_date ? new Date(b.due_date).getTime() : 0
     return dataA - dataB
-  }).slice(0, 3) // Mostra apenas as 3 maiores urgências
+  }).slice(0, 3)
 })
 
-// ==========================================
-// PRÓXIMOS PRAZOS: Apenas de Amanhã a 7 dias
-// ==========================================
 const proximosPrazos = computed(() => {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -97,25 +123,27 @@ const proximosPrazos = computed(() => {
   return tasks.value
     .filter(t => {
       const date = t.due_date || t.date;
-      // Pega apenas as que são estritamente MAIORES que hoje (Amanhã em diante)
       return date && date > todayStr && date <= nextWeekStr;
     })
     .sort((a, b) => (a.due_date || a.date || '').localeCompare(b.due_date || b.date || ''))
-    .slice(0, 6); // Mostra no máximo 6 prazos futuros
+    .slice(0, 6);
 });
 
 // ==========================================
-// 5. CHAMADAS À API E NAVEGAÇÃO
+// 6. CHAMADAS À API E NAVEGAÇÃO
 // ==========================================
 const fetchData = async () => {
   isLoading.value = true
   try {
-    const [dashRes, tasksRes] = await Promise.all([
+    // Busca membros também
+    const [dashRes, tasksRes, membrosRes] = await Promise.all([
       api.get('/api/v1/dashboard'),
       api.get('/api/v1/obrigacoes'),
+      api.get('/api/v1/membros')
     ])
 
     dashData.value = dashRes.data
+    membros.value = membrosRes.data
     const apiTasks: TaskData[] = tasksRes.data.map((t: any) => ({ ...t, type: 'task' }))
 
     let federalTasks: TaskData[] = []
@@ -138,12 +166,11 @@ const fetchData = async () => {
   }
 }
 
-// Funções de Navegação Rápida (UX)
 const goToClients = () => router.push('/clientes')
 const goToTasks = () => router.push('/obrigacoes')
 
 // ==========================================
-// 6. HELPERS FORMATAÇÃO
+// 7. HELPERS FORMATAÇÃO
 // ==========================================
 const getStatusColor = (status: string) => {
   if (status === 'concluida') return 'bg-[#19341a]' 
@@ -159,11 +186,21 @@ const formatDate = (dateString?: string) => {
   return `${day}/${month}`
 }
 
-// Helper para pegar o dia da semana (Ex: "Seg")
 const getDayName = (dateString?: string) => {
   if (!dateString) return '-'
-  const date = new Date(dateString + 'T00:00:00') // T00:00:00 evita bug de fuso
+  const date = new Date(dateString + 'T00:00:00')
   return date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '')
+}
+
+// Helper para as iniciais dos membros
+const getIniciaisMembro = (nome: string) => {
+  if (!nome) return '?'
+  const partes = nome.trim().split(' ').filter(p => p)
+  if (partes.length === 0) return '?'
+  if (partes.length === 1) return (partes[0]?.charAt(0) || '?').toUpperCase()
+  const primeiraLetra = partes[0]?.charAt(0) || ''
+  const ultimaLetra = partes[partes.length - 1]?.charAt(0) || ''
+  return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
 }
 
 onMounted(() => fetchData())
@@ -181,7 +218,6 @@ onMounted(() => fetchData())
     <div v-else>
       <!-- Linha de Cards Clicáveis -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <!-- Clientes -->
         <div @click="goToClients" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
           <div class="h-14 w-14 rounded-xl bg-[#eaf3ea] flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
@@ -192,7 +228,6 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Abertas -->
         <div @click="goToTasks" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
           <div class="h-14 w-14 rounded-xl bg-[#fff3e0] flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -203,7 +238,6 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Urgentes -->
         <div @click="goToTasks" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
           <div class="h-14 w-14 rounded-xl bg-yellow-50 flex items-center justify-center flex-shrink-0">
             <svg class="w-7 h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -214,7 +248,6 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Atrasadas -->
         <div @click="goToTasks" class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer">
           <div class="h-14 w-14 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
              <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -226,10 +259,10 @@ onMounted(() => fetchData())
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="lg:col-span-1 space-y-6">
           
-          <!-- Saúde dos Prazos (Com Aguardando Cliente) -->
+          <!-- Saúde dos Prazos -->
           <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
             <h3 class="text-lg font-bold text-[#19341a] mb-6">Saúde dos Prazos</h3>
             <div v-if="totalStatus === 0" class="text-center text-[#2a2a2a]/40 py-8">
@@ -247,7 +280,6 @@ onMounted(() => fetchData())
                   <div :style="{ width: percAtrasadas + '%' }" class="bg-red-500 h-4 transition-all duration-500" title="Atrasadas"></div>
                 </div>
               </div>
-              <!-- Grid de 4 Status para mostrar o Aguardando Cliente -->
               <div class="grid grid-cols-2 gap-2">
                 <div class="flex flex-col items-center bg-[#eaf3ea] p-2 rounded-lg">
                   <p class="text-[10px] uppercase font-bold text-[#19341a]/60">Concluídas</p>
@@ -258,7 +290,7 @@ onMounted(() => fetchData())
                   <p class="text-lg font-extrabold text-gray-700">{{ tarefasNoPrazo }}</p>
                 </div>
                 <div class="flex flex-col items-center bg-yellow-50 p-2 rounded-lg border border-yellow-100">
-                  <p class="text-[10px] uppercase font-bold text-yellow-600">Aguardando Cliente</p>
+                  <p class="text-[10px] uppercase font-bold text-yellow-600">Aguard. Cliente</p>
                   <p class="text-lg font-extrabold text-yellow-700">{{ countAguardandoCliente }}</p>
                 </div>
                 <div class="flex flex-col items-center bg-red-50 p-2 rounded-lg">
@@ -302,10 +334,10 @@ onMounted(() => fetchData())
           </div>
         </div>
 
-        <!-- Substitua o bloco do calendário por esta Lista de Próximos Prazos -->
+        <!-- Próximos 7 Dias -->
         <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
           <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-[#19341a]">Próximos Prazos</h3>
+            <h3 class="text-lg font-bold text-[#19341a]">Próximos 7 Dias</h3>
             <RouterLink to="/calendario" class="text-sm font-bold text-[#ff8a65] hover:text-[#f07047] transition-colors">
               Ver Calendário Completo →
             </RouterLink>
@@ -330,8 +362,34 @@ onMounted(() => fetchData())
             </div>
           </div>
         </div>
-
       </div>
+
+      <!-- NOVA LINHA: DISTRIBUIÇÃO DA EQUIPE -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
+        <div class="flex items-center justify-between mb-6">
+          <h3 class="text-lg font-bold text-[#19341a]">Distribuição da Equipe</h3>
+          <span class="text-xs text-gray-400 font-medium">Tarefas em aberto por membro</span>
+        </div>
+
+        <div v-if="cargaEquipe.length === 0" class="text-center py-8 text-gray-400 text-sm">
+          Nenhum membro cadastrado ou sem tarefas atribuídas.
+        </div>
+
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div v-for="membro in cargaEquipe" :key="membro.nome" class="border border-gray-100 rounded-xl p-4 flex items-center gap-3 hover:border-[#ff8a65]/40 transition-colors">
+            <div class="w-10 h-10 rounded-full bg-[#19341a]/10 text-[#19341a] flex items-center justify-center font-bold flex-shrink-0">
+              {{ getIniciaisMembro(membro.nome) }}
+            </div>
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-[#19341a] truncate">{{ membro.nome }}</p>
+              <p class="text-xs font-medium" :class="membro.count > 5 ? 'text-orange-500' : 'text-gray-500'">
+                {{ membro.count }} {{ membro.count === 1 ? 'tarefa em aberto' : 'tarefas em aberto' }}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </Layout>
 </template>

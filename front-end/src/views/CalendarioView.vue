@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 
-// Tipagens (Copiadas do Dashboard)
+// ==========================================
+// 1. TIPAGENS
+// ==========================================
 interface TaskData {
   id: string | number
   title: string
@@ -13,6 +16,7 @@ interface TaskData {
   due_date?: string
   date?: string
   type: 'task' | 'receita_federal'
+  grau_importancia?: string
 }
 
 interface CalendarDay {
@@ -20,11 +24,21 @@ interface CalendarDay {
   tasks: TaskData[]
 }
 
+// ==========================================
+// 2. ESTADOS
+// ==========================================
 const isLoading = ref(true)
 const tasks = ref<TaskData[]>([])
 const currentDate = ref(new Date())
 
-// Próximos meses
+// Controle do Modal do Dia
+const isDayModalOpen = ref(false)
+const selectedDayTasks = ref<TaskData[]>([])
+const selectedDayTitle = ref('')
+
+// ==========================================
+// 3. LÓGICA DO CALENDÁRIO
+// ==========================================
 const currentMonth = computed(() => currentDate.value.toLocaleDateString('pt-BR', { month: 'long' }))
 const currentYear = computed(() => currentDate.value.getFullYear())
 
@@ -54,6 +68,22 @@ const nextMonth = () => {
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
 }
 
+// ==========================================
+// 4. MODAL DO DIA (NOVO)
+// ==========================================
+const openDayModal = (day: CalendarDay) => {
+  // Só abre se o dia tiver tarefas
+  if (day.date && day.tasks.length > 0) {
+    const dateObj = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth(), day.date)
+    selectedDayTitle.value = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+    selectedDayTasks.value = day.tasks
+    isDayModalOpen.value = true
+  }
+}
+
+// ==========================================
+// 5. CHAMADAS À API
+// ==========================================
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -80,11 +110,24 @@ const fetchData = async () => {
   }
 }
 
+// ==========================================
+// 6. HELPERS VISUAIS
+// ==========================================
 const getStatusColor = (status: string) => {
   if (status === 'concluida') return 'bg-[#19341a]' 
   if (status === 'em_andamento') return 'bg-[#ff8a65]' 
   if (status === 'aguardando_cliente') return 'bg-yellow-400'
   return 'bg-gray-400'
+}
+
+const getStatusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    'concluida': 'Concluída',
+    'em_andamento': 'Em Andamento',
+    'aguardando_cliente': 'Aguardando Cliente',
+    'pendente': 'Pendente'
+  }
+  return labels[status] || 'Pendente'
 }
 
 const isToday = (day: number) => {
@@ -132,13 +175,17 @@ onMounted(() => fetchData())
           <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Sáb</div>
         </div>
 
-        <!-- Grid do Calendário (Mais espaçado e bonito) -->
+        <!-- Grid do Calendário -->
         <div class="grid grid-cols-7 gap-2">
           <div
             v-for="(day, index) in calendarDays"
             :key="index"
-            class="min-h-[110px] border rounded-xl p-2 transition-colors flex flex-col"
-            :class="day.date ? 'bg-white border-gray-100 hover:border-[#ff8a65]/40 hover:shadow-sm' : 'bg-gray-50/30 border-transparent'"
+            @click="openDayModal(day)"
+            class="min-h-[110px] border rounded-xl p-2 transition-all flex flex-col"
+            :class="[
+              day.date ? 'bg-white border-gray-100 hover:border-[#ff8a65]/40 hover:shadow-sm' : 'bg-gray-50/30 border-transparent',
+              day.tasks.length > 0 ? 'cursor-pointer hover:bg-[#f8f8f8]' : ''
+            ]"
           >
             <template v-if="day.date">
               <div class="text-right mb-1">
@@ -152,7 +199,7 @@ onMounted(() => fetchData())
                 <template v-for="(task, tIndex) in day.tasks" :key="task.id">
                   <div v-if="tIndex < 3"
                     class="flex items-center gap-1.5 group cursor-pointer rounded-md px-1.5 py-1 transition-colors"
-                    :class="task.type === 'receita_federal' ? 'bg-[#fff3e0] hover:bg-[#ffe0b2]' : 'bg-gray-50 hover:bg-gray-100'"
+                    :class="task.type === 'receita_federal' ? 'bg-[#fff3e0]' : 'bg-gray-50'"
                     :title="task.description || task.title"
                   >
                     <template v-if="task.type === 'receita_federal'">
@@ -166,8 +213,8 @@ onMounted(() => fetchData())
                   </div>
                 </template>
                 
-                <div v-if="day.tasks.length > 3" class="mt-1 text-[10px] font-bold text-center text-gray-500 bg-gray-100 rounded-md py-0.5">
-                  + {{ day.tasks.length - 3 }} tarefas
+                <div v-if="day.tasks.length > 3" class="mt-1 text-[10px] font-bold text-center text-[#ff8a65] bg-[#fff3e0] rounded-md py-0.5 border border-[#ffe0b2]">
+                  + {{ day.tasks.length - 3 }} tarefas (Clique para ver)
                 </div>
               </div>
             </template>
@@ -183,5 +230,59 @@ onMounted(() => fetchData())
         </div>
       </div>
     </div>
+
+    <!-- ========================================== -->
+    <!-- MODAL DE DETALHES DO DIA (NOVO)            -->
+    <!-- ========================================== -->
+    <div v-if="isDayModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" @click="isDayModalOpen = false">
+      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" @click.stop>
+        
+        <!-- Cabeçalho do Modal -->
+        <div class="bg-[#19341a] px-6 py-5 flex justify-between items-center">
+          <div>
+            <p class="text-white/50 text-xs font-bold uppercase tracking-wider">Prazos do Dia</p>
+            <h3 class="text-xl font-bold text-white capitalize tracking-tight">{{ selectedDayTitle }}</h3>
+          </div>
+          <button @click="isDayModalOpen = false" class="text-white/50 hover:text-white text-2xl font-bold">&times;</button>
+        </div>
+
+        <!-- Lista de Tarefas do Dia -->
+        <div class="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
+          <div v-for="task in selectedDayTasks" :key="task.id" 
+               class="flex items-start gap-3 p-4 rounded-xl border transition-colors"
+               :class="task.type === 'receita_federal' ? 'bg-[#fff3e0] border-[#ffe0b2]' : 'bg-[#f8f8f8] border-gray-100'">
+            
+            <div class="flex-shrink-0 mt-1">
+              <span v-if="task.type === 'receita_federal'" class="text-xl">🏛️</span>
+              <div v-else class="w-3 h-3 rounded-full" :class="getStatusColor(task.status)"></div>
+            </div>
+
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold text-[#19341a]">{{ task.title }}</p>
+              <p v-if="task.description" class="text-xs text-gray-500 mt-1 truncate">{{ task.description }}</p>
+              
+              <div class="flex items-center gap-3 mt-2">
+                <span v-if="task.type !== 'receita_federal'" 
+                      class="text-[10px] font-bold px-2 py-0.5 rounded-md" 
+                      :class="getStatusColor(task.status) + ' text-white'">
+                  {{ getStatusLabel(task.status) }}
+                </span>
+                <span v-if="task.grau_importancia" class="text-[10px] font-bold text-gray-400 uppercase">
+                  ⚡ {{ task.grau_importancia }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rodapé do Modal -->
+        <div class="px-6 py-4 bg-[#f8f8f8] border-t border-gray-100 flex justify-end">
+          <RouterLink to="/obrigacoes" class="px-5 py-2.5 bg-[#ff8a65] text-white text-sm font-bold rounded-xl hover:bg-[#f07047] transition-colors">
+            Gerenciar Tarefas →
+          </RouterLink>
+        </div>
+      </div>
+    </div>
+
   </Layout>
 </template>

@@ -33,3 +33,5 @@ Thumbs.db
 # ARQUIVOS LOCAIS DE UPLOAD (Se tiver criado a pasta)
 # ==========================
 backend/uploads/
+front-end/src/views/AdminEscritoriosView.vue
+front-end/src/views/AdminFinanceiroView.vue

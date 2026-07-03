@@ -78,16 +78,6 @@ const routes = [
     component: () => import('@/views/AdminView.vue'),
     meta: { requiresAuth: true, requiresSuperAdmin: true },
   },
-  {
-    path: '/admin/escritorios',
-    component: () => import('../views/AdminEscritoriosView.vue'),
-    meta: { requiresAuth: true, requiresSuperAdmin: true },
-  },
-  {
-    path: '/admin/financeiro',
-    component: () => import('../views/AdminFinanceiroView.vue'),
-    meta: { requiresAuth: true, requiresSuperAdmin: true },
-  },
 ]
 
 const router = createRouter({

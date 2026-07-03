@@ -151,10 +151,8 @@ def criar_assinatura(
 async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Rota pública que o Asaas chama quando um pagamento muda de status.
-    Em produção, validamos o token de segurança enviado no header.
     """
-    # 1. Segurança: Validação do Token do Webhook (Vital em Produção)
-    # O Asaas envia o token no header 'asaas-access-token'
+    # 1. Segurança: Validação do Token do Webhook
     incoming_token = request.headers.get("asaas-access-token")
     if ASAAS_WEBHOOK_TOKEN and incoming_token != ASAAS_WEBHOOK_TOKEN:
         logger.warning("[WEBHOOK] Tentativa de acesso não autorizada ao webhook.")
@@ -196,10 +194,16 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                         f"[WEBHOOK AVISO] Cliente do Asaas {customer_id} não encontrado no banco."
                     )
 
-        # 3. Bloqueio Automático (Inadimplência ou Estorno)
-        elif event in ["PAYMENT_OVERDUE", "PAYMENT_REFUNDED", "PAYMENT_DELETED"]:
-            payment_data = payload.get("payment", payload)
-            customer_id = payment_data.get("customer") or payload.get("customer")
+        # 3. Bloqueio Automático (Inadimplência, Estorno ou Cancelamento)
+        elif event in [
+            "PAYMENT_OVERDUE",
+            "PAYMENT_REFUNDED",
+            "PAYMENT_DELETED",
+            "SUBSCRIPTION_DELETED",
+        ]:
+            # O Asaas pode mandar o objeto em "payment" ou "subscription"
+            data = payload.get("payment", payload.get("subscription", payload))
+            customer_id = data.get("customer") or payload.get("customer")
 
             if customer_id:
                 tenant = (
@@ -215,9 +219,10 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                     )
                     db.commit()
                     logger.warning(
-                        f"[WEBHOOK AVISO] Pagamento atrasado/estornado. Escritório {tenant.razao_social} bloqueado."
+                        f"[WEBHOOK AVISO] Evento {event}. Escritório {tenant.razao_social} bloqueado."
                     )
 
+        # Responde 200 OK rapidamente para evitar Timeout (Erro 408)
         return {"status": "received"}
 
     except Exception as e:

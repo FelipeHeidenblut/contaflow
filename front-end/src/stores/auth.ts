@@ -3,24 +3,43 @@ import { ref } from 'vue'
 import { supabase } from '../services/supabase'
 
 export const useAuthStore = defineStore('auth', () => {
-  const isSuperAdmin = ref(false)
-  const session = ref<any>(null)
+  // Estados
+  const isSuperAdmin = ref(localStorage.getItem('is_superadmin') === 'true')
+  const role = ref(localStorage.getItem('user_role') || 'colaborador')
+
+  // Ações
+  const setSuperAdmin = (val: boolean) => {
+    isSuperAdmin.value = val
+    localStorage.setItem('is_superadmin', val ? 'true' : 'false')
+  }
+
+  const setRole = (val: string) => {
+    role.value = val
+    localStorage.setItem('user_role', val)
+  }
 
   const checkSession = async () => {
     const { data } = await supabase.auth.getSession()
-    session.value = data.session
-    return data.session
-  }
-
-  const setSuperAdmin = (status: boolean) => {
-    isSuperAdmin.value = status
+    if (!data.session) {
+      setSuperAdmin(false)
+      setRole('colaborador')
+    }
+    return !!data.session
   }
 
   const logout = async () => {
     await supabase.auth.signOut()
-    session.value = null
-    isSuperAdmin.value = false
+    setSuperAdmin(false)
+    setRole('colaborador')
   }
 
-  return { session, isSuperAdmin, checkSession, setSuperAdmin, logout }
+  // O RETURN ABAIXO É OBRIGATÓRIO para o Vue saber que essas variáveis existem!
+  return {
+    isSuperAdmin,
+    role,
+    setSuperAdmin,
+    setRole,
+    checkSession,
+    logout,
+  }
 })

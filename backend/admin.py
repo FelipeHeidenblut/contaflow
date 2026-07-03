@@ -1,8 +1,11 @@
+from typing import List, Optional
+from uuid import UUID
+
 import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from security import get_current_user, get_super_admin  # Importando do security.py
+from security import get_current_user, get_super_admin
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -10,7 +13,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["Super Admin Backoffice"])
 
 
 # ==========================================
-# SCHEMA (Pydantic)
+# SCHEMAS (Pydantic)
 # ==========================================
 class AdminDashboardStats(BaseModel):
     mrr_estimado: float
@@ -21,13 +24,21 @@ class AdminDashboardStats(BaseModel):
     total_clientes_finais: int
 
 
+class TenantListResponse(BaseModel):
+    id: UUID
+    razao_social: str
+    plano: str
+    status_pagamento: str
+    admin_email: Optional[str] = None
+
+
 # ==========================================
 # ROTA DE ESTATÍSTICAS DO SAAS
 # ==========================================
 @router.get("/dashboard-stats", response_model=AdminDashboardStats)
 def get_saas_metrics(
     db: Session = Depends(get_db),
-    admin_user: dict = Depends(get_super_admin),  # Usando a dependência correta
+    admin_user: dict = Depends(get_super_admin),
 ):
     # 1. Agregações de Tenants (Escritórios)
     total_escritorios = db.query(func.count(models.Tenant.id)).scalar() or 0
@@ -50,7 +61,7 @@ def get_saas_metrics(
     total_usuarios = db.query(func.count(models.Profile.id)).scalar() or 0
     total_clientes_finais = db.query(func.count(models.Client.id)).scalar() or 0
 
-    # 3. Cálculo de MRR
+    # 3. Cálculo de MRR (Removido o Starter, adicionado o Free como R$ 0)
     planos_ativos = (
         db.query(models.Tenant.plano, func.count(models.Tenant.id))
         .filter(models.Tenant.status_pagamento == "ativo")
@@ -59,7 +70,7 @@ def get_saas_metrics(
     )
 
     valores_planos = {
-        "starter": 79.00,
+        "free": 0.00,
         "basico": 149.00,
         "profissional": 197.00,
         "business": 449.00,
@@ -77,4 +88,52 @@ def get_saas_metrics(
         "escritorios_inadimplentes": escritorios_inadimplentes,
         "total_usuarios": total_usuarios,
         "total_clientes_finais": total_clientes_finais,
+    }
+
+
+# ==========================================
+# GESTÃO DE ESCRITÓRIOS
+# ==========================================
+@router.get("/tenants", response_model=List[TenantListResponse])
+def list_tenants(
+    db: Session = Depends(get_db), admin_user: dict = Depends(get_super_admin)
+):
+    tenants = db.query(models.Tenant).order_by(models.Tenant.created_at.desc()).all()
+    result = []
+    for t in tenants:
+        # Busca o e-mail do admin daquele escritório
+        admin_profile = (
+            db.query(models.Profile)
+            .filter(models.Profile.tenant_id == t.id, models.Profile.role == "admin")
+            .first()
+        )
+
+        result.append(
+            TenantListResponse(
+                id=t.id,
+                razao_social=t.razao_social,
+                plano=t.plano,
+                status_pagamento=t.status_pagamento,
+                admin_email=admin_profile.email if admin_profile else "N/A",
+            )
+        )
+    return result
+
+
+@router.patch("/tenants/{tenant_id}/status")
+def update_tenant_status(
+    tenant_id: UUID,
+    novo_status: str,  # "ativo" ou "inadimplente"
+    db: Session = Depends(get_db),
+    admin_user: dict = Depends(get_super_admin),
+):
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Escritório não encontrado.")
+
+    tenant.status_pagamento = novo_status  # type: ignore
+    db.commit()
+    return {
+        "status": "success",
+        "message": f"Escritório {tenant.razao_social} atualizado para {novo_status}.",
     }

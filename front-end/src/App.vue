@@ -24,11 +24,13 @@ onMounted(async () => {
     class="h-screen w-screen flex flex-col items-center justify-center bg-[#19341a] relative overflow-hidden"
   >
     <!-- Efeito de luz de fundo (igual as outras telas) -->
-    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px] z-0"></div>
-    
+    <div
+      class="absolute top-1/3 left-1/2 -translate-x-1/2 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px] z-0"
+    ></div>
+
     <div class="text-center relative z-10">
       <h1 class="text-5xl font-extrabold tracking-tight text-white mb-8">
-        Conta<span class="text-[#ff8a65]">Flow</span>.
+        Contably<span class="text-[#ff8a65]">Task</span>.
       </h1>
       <!-- Spinner de Carregamento com as cores da marca -->
       <div

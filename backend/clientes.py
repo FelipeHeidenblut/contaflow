@@ -120,6 +120,13 @@ def desativar_cliente(
 ):
     tenant_id = current_user.get("tenant_id")
 
+    # NOVA REGRA RBAC: Apenas admin pode arquivar
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Apenas administradores podem arquivar clientes.",
+        )
+
     cliente = (
         db.query(models.Client)
         .filter(models.Client.id == cliente_id, models.Client.tenant_id == tenant_id)
@@ -129,7 +136,6 @@ def desativar_cliente(
     if not cliente:
         raise HTTPException(status_code=404, detail="Cliente não encontrado.")
 
-    # Soft Delete: Apenas marca como inativo
     cliente.ativo = False
     db.commit()
     db.refresh(cliente)

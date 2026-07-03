@@ -75,7 +75,7 @@ const routes = [
   },
   {
     path: '/admin',
-    component: () => import('@/views/AdminView.vue'),
+    component: () => import('@/views/AdminDashboardView.vue'),
     meta: { requiresAuth: true, requiresSuperAdmin: true },
   },
 ]

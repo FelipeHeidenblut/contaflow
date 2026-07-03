@@ -33,6 +33,7 @@ class ProfileCreate(BaseModel):
     name: str
     email: str
     role: str
+    password: str
 
 
 class ProfileResponse(BaseModel):
@@ -90,19 +91,6 @@ def adicionar_membro(
 ):
     tenant_id = admin_user.get("tenant_id")
 
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    limite = LIMITES_MEMBROS.get(tenant.plano, 1)  # Padrão é 1 se for Free
-
-    total_membros = (
-        db.query(models.Profile).filter(models.Profile.tenant_id == tenant_id).count()
-    )
-
-    if total_membros >= limite:
-        raise HTTPException(
-            status_code=403,
-            detail=f"Seu plano {tenant.plano.capitalize()} permite apenas {limite} usuário(s). Faça upgrade para convidar sua equipe!",
-        )
-
     # 1. Verifica no banco se o e-mail já existe
     existe = (
         db.query(models.Profile).filter(models.Profile.email == membro_in.email).first()
@@ -112,26 +100,23 @@ def adicionar_membro(
             status_code=400, detail="Este e-mail já está cadastrado no sistema."
         )
 
-    # 2. Prepara as variáveis para a API do Supabase
-    url_invite = f"{SUPABASE_URL.rstrip('/')}/auth/v1/invite"
+    # 2. Cria o usuário direto no Supabase Auth com a senha definida
+    url_create = f"{SUPABASE_URL.rstrip('/')}/auth/v1/admin/users"
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
         "Content-Type": "application/json",
     }
-
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-
-    payload_invite = {
+    payload_create = {
         "email": membro_in.email,
-        "data": {"name": membro_in.name, "tenant_id": str(tenant_id)},
-        "redirect_to": f"{frontend_url}/redefinir-senha",
+        "password": membro_in.password,
+        "email_confirm": True,  # Já deixa o e-mail confirmado, não precisa de link!
+        "user_metadata": {"name": membro_in.name, "tenant_id": str(tenant_id)},
     }
 
     try:
         with httpx.Client() as client:
-            # Chama o endpoint de Convite Oficial
-            response = client.post(url_invite, json=payload_invite, headers=headers)
+            response = client.post(url_create, json=payload_create, headers=headers)
 
             if response.status_code not in [200, 201]:
                 raise HTTPException(
@@ -161,7 +146,7 @@ def adicionar_membro(
             db.refresh(perfil_criado)
             return perfil_criado
         else:
-            # FALLBACK: Caso a trigger não exista, cria o perfil manualmente
+            # FALLBACK
             try:
                 novo_perfil = models.Profile(
                     id=novo_user_id,
@@ -177,7 +162,7 @@ def adicionar_membro(
             except Exception as e:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Convite enviado, mas falha ao criar Profile local: {str(e)}",
+                    detail=f"Usuário criado, mas falha ao criar Profile local: {str(e)}",
                 )
 
     except httpx.RequestError as e:

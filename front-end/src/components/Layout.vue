@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { supabase } from '../services/supabase'
+import { useAuthStore } from '../stores/auth'
+import api from '../services/api'
+
+const authStore = useAuthStore()
 
 // Definição das Props
 const props = defineProps<{
@@ -48,15 +52,20 @@ const handleLogout = async () => {
 }
 
 // Links de navegação
-const navLinks = [
+const allNavLinks = [
   { name: 'Dashboard', path: '/dashboard', icon: 'home' },
   { name: 'Clientes', path: '/clientes', icon: 'users' },
   { name: 'Obrigações', path: '/obrigacoes', icon: 'clock' },
   { name: 'Calendário', path: '/calendario', icon: 'calendar' },
   { name: 'Documentos', path: '/documentos', icon: 'folder' },
-  { name: 'Membros', path: '/membros', icon: 'team' },
-  { name: 'Planos', path: '/faturamento', icon: 'card' },
+  { name: 'Membros', path: '/membros', icon: 'team', adminOnly: true },
+  { name: 'Planos', path: '/faturamento', icon: 'card', adminOnly: true },
 ]
+
+const navLinks = computed(() => {
+  if (authStore.role === 'admin') return allNavLinks
+  return allNavLinks.filter((link) => !link.adminOnly)
+})
 
 // ==========================================
 // DADOS DO USUÁRIO LOGADO (Dinâmico)
@@ -91,6 +100,14 @@ onMounted(async () => {
       email: data.user.email || '',
       initials: gerarIniciais(nomeReal),
     }
+  }
+
+  // NOVO: Busca a role no backend e salva na store
+  try {
+    const res = await api.get('/api/v1/auth/me')
+    authStore.setRole(res.data.role)
+  } catch (e) {
+    console.error('Erro ao buscar permissões:', e)
   }
 })
 </script>

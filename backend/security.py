@@ -135,6 +135,7 @@ def get_current_user(
         "user_id": user_id,
         "email": payload.get("email"),
         "tenant_id": str(profile.tenant_id),
+        "role": profile.role,
         "is_superadmin": profile.is_superadmin,
     }
 

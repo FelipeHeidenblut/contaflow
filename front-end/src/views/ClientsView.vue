@@ -4,7 +4,9 @@ import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { vMaska } from 'maska/vue'
+import { useAuthStore } from '../stores/auth'
 
+const authStore = useAuthStore()
 const clients = ref<any[]>([])
 const isLoading = ref(true)
 
@@ -50,26 +52,25 @@ const abrirDossier = async (client: any) => {
   activeTab.value = 'info'
   isDossierOpen.value = true
   isLoadingDossier.value = true
-  
+
   try {
     // Busca tarefas e documentos do cliente específico
     const [tasksRes, docsRes] = await Promise.all([
       api.get('/api/v1/obrigacoes'),
-      api.get('/api/v1/documentos')
+      api.get('/api/v1/documentos'),
     ])
-    
+
     // Filtra e ordena as tarefas (mais recentes primeiro)
     clientTasks.value = tasksRes.data
       .filter((t: any) => t.client_id === client.id)
       .sort((a: any, b: any) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
       .slice(0, 5)
-      
+
     // Filtra e ordena os documentos
     clientDocuments.value = docsRes.data
       .filter((d: any) => d.client_id === client.id)
       .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5)
-      
   } catch (error) {
     toast.error('Erro ao carregar o dossiê do cliente.')
   } finally {
@@ -111,7 +112,9 @@ const clientsFiltrados = computed(() => {
   let listaFiltrada = clients.value
 
   if (filtroNatureza.value !== 'Todos') {
-    listaFiltrada = listaFiltrada.filter((client) => client.natureza_operacao === filtroNatureza.value)
+    listaFiltrada = listaFiltrada.filter(
+      (client) => client.natureza_operacao === filtroNatureza.value,
+    )
   }
 
   const termo = searchQuery.value.trim().toLowerCase()
@@ -222,7 +225,12 @@ const handleCreateClient = async () => {
 
 // 4. Arquivar (Soft Delete)
 const handleDesativar = async (clientId: string) => {
-  if (!window.confirm('Tem certeza que deseja arquivar este cliente? Ele não aparecerá mais na listagem principal.')) return
+  if (
+    !window.confirm(
+      'Tem certeza que deseja arquivar este cliente? Ele não aparecerá mais na listagem principal.',
+    )
+  )
+    return
 
   try {
     await api.patch(`/api/v1/clientes/${clientId}/desativar`)
@@ -245,7 +253,7 @@ const handleCsvChange = (event: any) => {
   if (file && file.name.endsWith('.csv')) {
     csvFile.value = file
   } else {
-    toast.error("Por favor, selecione apenas arquivos .csv")
+    toast.error('Por favor, selecione apenas arquivos .csv')
     event.target.value = ''
     csvFile.value = null
   }
@@ -260,11 +268,11 @@ const handleUploadCsv = async () => {
     formData.append('file', csvFile.value)
 
     const response = await api.post('/api/v1/clientes/importar-csv', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
 
     const { importados, erros } = response.data
-    
+
     if (importados > 0) {
       toast.success(`${importados} clientes importados com sucesso!`)
       fetchClients()
@@ -284,16 +292,18 @@ const handleUploadCsv = async () => {
 }
 
 const baixarTemplate = () => {
-  const cabecalhos = "TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO;NATUREZA_OPERACAO\n"
-  const exemplo1 = "PJ;Transportes LTDA;12.345.678/0001-90;Simples Nacional;Comércio\n"
-  const exemplo2 = "PJ;Contabilidade XYZ;12.345.678/0001-91;Lucro Presumido;Serviços\n"
-  const exemplo3 = "PF;João da Silva;123.456.789-00;MEI;Serviços\n"
-  
-  const blob = new Blob([cabecalhos + exemplo1 + exemplo2 + exemplo3], { type: 'text/csv;charset=utf-8;' })
+  const cabecalhos = 'TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO;NATUREZA_OPERACAO\n'
+  const exemplo1 = 'PJ;Transportes LTDA;12.345.678/0001-90;Simples Nacional;Comércio\n'
+  const exemplo2 = 'PJ;Contabilidade XYZ;12.345.678/0001-91;Lucro Presumido;Serviços\n'
+  const exemplo3 = 'PF;João da Silva;123.456.789-00;MEI;Serviços\n'
+
+  const blob = new Blob([cabecalhos + exemplo1 + exemplo2 + exemplo3], {
+    type: 'text/csv;charset=utf-8;',
+  })
   const url = URL.createObjectURL(blob)
-  const link = document.createElement("a")
-  link.setAttribute("href", url)
-  link.setAttribute("download", "template_clientes.csv")
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', 'template_clientes.csv')
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -309,29 +319,52 @@ onMounted(() => {
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
       <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
         <div class="relative w-full sm:w-72">
-          <input v-model="searchQuery" type="text" placeholder="Buscar cliente..."
-            class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Buscar cliente..."
+            class="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white"
+          />
         </div>
-        
-        <select v-model="filtroNatureza" class="w-full sm:w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white">
+
+        <select
+          v-model="filtroNatureza"
+          class="w-full sm:w-56 px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm bg-white"
+        >
           <option value="Todos">Todas as Naturezas</option>
           <option value="Comércio">Comércio</option>
           <option value="Serviços">Serviços</option>
           <option value="Indústria">Indústria</option>
         </select>
       </div>
-      
+
       <div class="flex gap-3 w-full sm:w-auto">
-        <button @click="isImportModalOpen = true"
-          class="w-full sm:w-auto bg-white border border-gray-200 text-[#2a2a2a]/80 font-bold py-2.5 px-5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        <button
+          @click="isImportModalOpen = true"
+          class="w-full sm:w-auto bg-white border border-gray-200 text-[#2a2a2a]/80 font-bold py-2.5 px-5 rounded-xl hover:bg-gray-50 transition-all flex items-center justify-center gap-2 shadow-sm"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+            ></path>
+          </svg>
           <span>Importar CSV</span>
         </button>
 
-        <button @click="isModalOpen = true"
-          class="w-full sm:w-auto bg-[#ff8a65] hover:bg-[#f07047] text-white font-bold py-2.5 px-5 rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-sm">
+        <button
+          @click="isModalOpen = true"
+          class="w-full sm:w-auto bg-[#ff8a65] hover:bg-[#f07047] text-white font-bold py-2.5 px-5 rounded-xl transition-all flex items-center justify-center gap-2 whitespace-nowrap shadow-sm"
+        >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            ></path>
           </svg>
           <span>Novo Cliente</span>
         </button>
@@ -353,23 +386,51 @@ onMounted(() => {
         <table class="min-w-full divide-y divide-gray-100">
           <thead class="bg-[#f8f8f8]">
             <tr>
-              <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Identificação</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Documento</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Regime</th>
-              <th class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Natureza</th>
-              <th class="px-6 py-4 text-center text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider">Ações</th>
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider"
+              >
+                Identificação
+              </th>
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider"
+              >
+                Documento
+              </th>
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider"
+              >
+                Regime
+              </th>
+              <th
+                class="px-6 py-4 text-left text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider"
+              >
+                Natureza
+              </th>
+              <th
+                class="px-6 py-4 text-center text-xs font-bold text-[#2a2a2a]/50 uppercase tracking-wider"
+              >
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody class="bg-white divide-y divide-gray-100">
-            <tr v-for="client in clientsFiltrados" :key="client.id" class="hover:bg-[#f8f8f8]/50 transition-colors">
+            <tr
+              v-for="client in clientsFiltrados"
+              :key="client.id"
+              class="hover:bg-[#f8f8f8]/50 transition-colors"
+            >
               <td class="px-6 py-4 whitespace-nowrap">
                 <!-- NOME VIROU UM BOTÃO PARA ABRIR O DOSSIÊ -->
-                <button @click="abrirDossier(client)" class="text-left hover:text-[#ff8a65] transition-colors">
+                <button
+                  @click="abrirDossier(client)"
+                  class="text-left hover:text-[#ff8a65] transition-colors"
+                >
                   <div class="text-sm font-semibold text-[#19341a]">
                     {{ client.razao_social || client.nome }}
                   </div>
                   <div class="text-xs text-[#2a2a2a]/40 mt-0.5">
-                    {{ client.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }} · Clique para ver detalhes
+                    {{ client.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }} · Clique para
+                    ver detalhes
                   </div>
                 </button>
               </td>
@@ -377,23 +438,36 @@ onMounted(() => {
                 {{ client.cnpj || client.cpf }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-lg bg-[#eaf3ea] text-[#19341a]">
+                <span
+                  class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-lg bg-[#eaf3ea] text-[#19341a]"
+                >
                   {{ client.regime_tributario }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm">
-                <span 
+                <span
                   class="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-lg"
-                  :class="client.natureza_operacao === 'Comércio' ? 'bg-blue-50 text-blue-700' : (client.natureza_operacao === 'Indústria' ? 'bg-purple-50 text-purple-700' : 'bg-amber-50 text-amber-700')"
+                  :class="
+                    client.natureza_operacao === 'Comércio'
+                      ? 'bg-blue-50 text-blue-700'
+                      : client.natureza_operacao === 'Indústria'
+                        ? 'bg-purple-50 text-purple-700'
+                        : 'bg-amber-50 text-amber-700'
+                  "
                 >
                   {{ client.natureza_operacao || 'Não definido' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                <button @click="handleDesativar(client.id)"
-                  class="text-[#2a2a2a]/40 hover:text-red-500 font-semibold transition-colors">
+                <!-- SÓ APARECE SE FOR ADMIN -->
+                <button
+                  v-if="authStore.role === 'admin'"
+                  @click="handleDesativar(client.id)"
+                  class="text-[#2a2a2a]/40 hover:text-red-500 font-semibold transition-colors"
+                >
                   Arquivar
                 </button>
+                <span v-else class="text-xs text-gray-300 italic">Apenas leitura</span>
               </td>
             </tr>
           </tbody>
@@ -402,53 +476,115 @@ onMounted(() => {
     </div>
 
     <!-- MODAL DO DOSSIÊ DO CLIENTE (NOVO) -->
-    <div v-if="isDossierOpen && selectedClient" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        
+    <div
+      v-if="isDossierOpen && selectedClient"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+      >
         <!-- Cabeçalho do Dossiê -->
         <div class="bg-[#19341a] px-6 py-5 flex justify-between items-center">
           <div>
-            <h3 class="text-xl font-bold text-white tracking-tight">{{ selectedClient.razao_social || selectedClient.nome }}</h3>
+            <h3 class="text-xl font-bold text-white tracking-tight">
+              {{ selectedClient.razao_social || selectedClient.nome }}
+            </h3>
             <p class="text-white/50 text-sm">{{ selectedClient.cnpj || selectedClient.cpf }}</p>
           </div>
-          <button @click="isDossierOpen = false" class="text-white/50 hover:text-white text-2xl font-bold">&times;</button>
+          <button
+            @click="isDossierOpen = false"
+            class="text-white/50 hover:text-white text-2xl font-bold"
+          >
+            &times;
+          </button>
         </div>
 
         <!-- Tabs de Navegação -->
         <div class="flex border-b border-gray-200 bg-[#f8f8f8]">
-          <button @click="activeTab = 'info'" :class="activeTab === 'info' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+          <button
+            @click="activeTab = 'info'"
+            :class="
+              activeTab === 'info'
+                ? 'border-[#ff8a65] text-[#19341a]'
+                : 'border-transparent text-gray-400'
+            "
+            class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors"
+          >
             Dados Cadastrais
           </button>
-          <button @click="activeTab = 'tasks'" :class="activeTab === 'tasks' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+          <button
+            @click="activeTab = 'tasks'"
+            :class="
+              activeTab === 'tasks'
+                ? 'border-[#ff8a65] text-[#19341a]'
+                : 'border-transparent text-gray-400'
+            "
+            class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors"
+          >
             Tarefas Recentes
           </button>
-          <button @click="activeTab = 'docs'" :class="activeTab === 'docs' ? 'border-[#ff8a65] text-[#19341a]' : 'border-transparent text-gray-400'" class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors">
+          <button
+            @click="activeTab = 'docs'"
+            :class="
+              activeTab === 'docs'
+                ? 'border-[#ff8a65] text-[#19341a]'
+                : 'border-transparent text-gray-400'
+            "
+            class="flex-1 py-3 px-4 text-sm font-bold border-b-2 transition-colors"
+          >
             Documentos
           </button>
         </div>
 
         <!-- Conteúdo do Dossiê -->
         <div class="p-6 overflow-y-auto">
-          <div v-if="isLoadingDossier" class="text-center py-8 text-gray-400">Carregando dados...</div>
+          <div v-if="isLoadingDossier" class="text-center py-8 text-gray-400">
+            Carregando dados...
+          </div>
 
           <!-- Tab 1: Dados -->
           <div v-else-if="activeTab === 'info'" class="grid grid-cols-2 gap-4">
-            <div><span class="text-xs text-gray-400 block">Tipo de Pessoa</span><span class="text-sm font-semibold">{{ selectedClient.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física' }}</span></div>
-            <div><span class="text-xs text-gray-400 block">Natureza da Operação</span><span class="text-sm font-semibold">{{ selectedClient.natureza_operacao || 'Não definido' }}</span></div>
-            <div><span class="text-xs text-gray-400 block">Regime Tributário</span><span class="text-sm font-semibold">{{ selectedClient.regime_tributario }}</span></div>
-            <div><span class="text-xs text-gray-400 block">Status no Sistema</span><span class="text-sm font-semibold text-emerald-600">Ativo</span></div>
+            <div>
+              <span class="text-xs text-gray-400 block">Tipo de Pessoa</span
+              ><span class="text-sm font-semibold">{{
+                selectedClient.razao_social ? 'Pessoa Jurídica' : 'Pessoa Física'
+              }}</span>
+            </div>
+            <div>
+              <span class="text-xs text-gray-400 block">Natureza da Operação</span
+              ><span class="text-sm font-semibold">{{
+                selectedClient.natureza_operacao || 'Não definido'
+              }}</span>
+            </div>
+            <div>
+              <span class="text-xs text-gray-400 block">Regime Tributário</span
+              ><span class="text-sm font-semibold">{{ selectedClient.regime_tributario }}</span>
+            </div>
+            <div>
+              <span class="text-xs text-gray-400 block">Status no Sistema</span
+              ><span class="text-sm font-semibold text-emerald-600">Ativo</span>
+            </div>
           </div>
 
           <!-- Tab 2: Tarefas -->
           <div v-else-if="activeTab === 'tasks'">
-            <div v-if="clientTasks.length === 0" class="text-center py-8 text-gray-400 text-sm">Nenhuma tarefa encontrada para este cliente.</div>
+            <div v-if="clientTasks.length === 0" class="text-center py-8 text-gray-400 text-sm">
+              Nenhuma tarefa encontrada para este cliente.
+            </div>
             <div v-else class="space-y-3">
-              <div v-for="task in clientTasks" :key="task.id" class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100">
+              <div
+                v-for="task in clientTasks"
+                :key="task.id"
+                class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100"
+              >
                 <div>
                   <p class="text-sm font-bold text-[#19341a]">{{ task.title }}</p>
                   <p class="text-xs text-gray-400">Prazo: {{ formatDocDate(task.due_date) }}</p>
                 </div>
-                <span class="text-[10px] font-bold px-2 py-1 rounded-md" :class="getStatusColor(task.status)">
+                <span
+                  class="text-[10px] font-bold px-2 py-1 rounded-md"
+                  :class="getStatusColor(task.status)"
+                >
                   {{ task.status.replace('_', ' ') }}
                 </span>
               </div>
@@ -457,43 +593,83 @@ onMounted(() => {
 
           <!-- Tab 3: Documentos -->
           <div v-else-if="activeTab === 'docs'">
-            <div v-if="clientDocuments.length === 0" class="text-center py-8 text-gray-400 text-sm">Nenhum documento enviado para este cliente.</div>
+            <div v-if="clientDocuments.length === 0" class="text-center py-8 text-gray-400 text-sm">
+              Nenhum documento enviado para este cliente.
+            </div>
             <div v-else class="space-y-3">
-              <div v-for="doc in clientDocuments" :key="doc.id" class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100">
+              <div
+                v-for="doc in clientDocuments"
+                :key="doc.id"
+                class="flex items-center justify-between p-3 bg-[#f8f8f8] rounded-xl border border-gray-100"
+              >
                 <div class="flex items-center gap-3">
-                  <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
+                  <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path
+                      fill-rule="evenodd"
+                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                      clip-rule="evenodd"
+                    ></path>
+                  </svg>
                   <div>
                     <p class="text-sm font-bold text-[#19341a]">{{ doc.nome_arquivo }}</p>
-                    <p class="text-xs text-gray-400">Enviado em: {{ formatDocDate(doc.created_at) }}</p>
+                    <p class="text-xs text-gray-400">
+                      Enviado em: {{ formatDocDate(doc.created_at) }}
+                    </p>
                   </div>
                 </div>
-                <button @click="baixarDocDossier(doc.id, doc.nome_arquivo)" class="text-xs font-bold text-[#ff8a65] hover:underline">Baixar</button>
+                <button
+                  @click="baixarDocDossier(doc.id, doc.nome_arquivo)"
+                  class="text-xs font-bold text-[#ff8a65] hover:underline"
+                >
+                  Baixar
+                </button>
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
 
     <!-- Modal de Cadastro (Original) -->
-    <div v-if="isModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div
+      v-if="isModalOpen"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    >
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
           <h3 class="text-xl font-bold text-[#19341a]">Cadastrar Cliente</h3>
-          <button @click="isModalOpen = false" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+          <button
+            @click="isModalOpen = false"
+            class="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+          >
+            &times;
+          </button>
         </div>
 
         <form @submit.prevent="handleCreateClient" class="p-6 space-y-5">
           <div class="flex gap-2 bg-[#f8f8f8] p-1.5 rounded-xl">
-            <button type="button" @click="setTipoPessoa('PJ')"
+            <button
+              type="button"
+              @click="setTipoPessoa('PJ')"
               class="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all"
-              :class="newClient.tipo_pessoa === 'PJ' ? 'bg-white text-[#19341a] shadow-sm' : 'text-[#2a2a2a]/50 hover:text-[#2a2a2a]'">
+              :class="
+                newClient.tipo_pessoa === 'PJ'
+                  ? 'bg-white text-[#19341a] shadow-sm'
+                  : 'text-[#2a2a2a]/50 hover:text-[#2a2a2a]'
+              "
+            >
               Pessoa Jurídica
             </button>
-            <button type="button" @click="setTipoPessoa('PF')"
+            <button
+              type="button"
+              @click="setTipoPessoa('PF')"
               class="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all"
-              :class="newClient.tipo_pessoa === 'PF' ? 'bg-white text-[#19341a] shadow-sm' : 'text-[#2a2a2a]/50 hover:text-[#2a2a2a]'">
+              :class="
+                newClient.tipo_pessoa === 'PF'
+                  ? 'bg-white text-[#19341a] shadow-sm'
+                  : 'text-[#2a2a2a]/50 hover:text-[#2a2a2a]'
+              "
+            >
               Pessoa Física
             </button>
           </div>
@@ -501,41 +677,76 @@ onMounted(() => {
           <template v-if="newClient.tipo_pessoa === 'PJ'">
             <div>
               <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Razão Social</label>
-              <input v-model="newClient.razao_social" type="text" required placeholder="Empresa LTDA"
+              <input
+                v-model="newClient.razao_social"
+                type="text"
+                required
+                placeholder="Empresa LTDA"
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors"
-                :class="formErrors.razao_social ? 'border-red-400 bg-red-50/30' : ''" />
-              <p v-if="formErrors.razao_social" class="text-red-500 text-xs mt-1.5">{{ formErrors.razao_social }}</p>
+                :class="formErrors.razao_social ? 'border-red-400 bg-red-50/30' : ''"
+              />
+              <p v-if="formErrors.razao_social" class="text-red-500 text-xs mt-1.5">
+                {{ formErrors.razao_social }}
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">CNPJ</label>
-              <input v-model="newClient.cnpj" v-maska="'##.###.###/####-##'" type="text" required placeholder="00.000.000/0000-00"
+              <input
+                v-model="newClient.cnpj"
+                v-maska="'##.###.###/####-##'"
+                type="text"
+                required
+                placeholder="00.000.000/0000-00"
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors"
-                :class="formErrors.cnpj ? 'border-red-400 bg-red-50/30' : ''" />
-              <p v-if="formErrors.cnpj" class="text-red-500 text-xs mt-1.5">{{ formErrors.cnpj }}</p>
+                :class="formErrors.cnpj ? 'border-red-400 bg-red-50/30' : ''"
+              />
+              <p v-if="formErrors.cnpj" class="text-red-500 text-xs mt-1.5">
+                {{ formErrors.cnpj }}
+              </p>
             </div>
           </template>
 
           <template v-if="newClient.tipo_pessoa === 'PF'">
             <div>
-              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Nome Completo</label>
-              <input v-model="newClient.nome" type="text" required placeholder="João da Silva"
+              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
+                >Nome Completo</label
+              >
+              <input
+                v-model="newClient.nome"
+                type="text"
+                required
+                placeholder="João da Silva"
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors"
-                :class="formErrors.nome ? 'border-red-400 bg-red-50/30' : ''" />
-              <p v-if="formErrors.nome" class="text-red-500 text-xs mt-1.5">{{ formErrors.nome }}</p>
+                :class="formErrors.nome ? 'border-red-400 bg-red-50/30' : ''"
+              />
+              <p v-if="formErrors.nome" class="text-red-500 text-xs mt-1.5">
+                {{ formErrors.nome }}
+              </p>
             </div>
             <div>
               <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">CPF</label>
-              <input v-model="newClient.cpf" v-maska="'###.###.###-##'" type="text" required placeholder="000.000.000-00"
+              <input
+                v-model="newClient.cpf"
+                v-maska="'###.###.###-##'"
+                type="text"
+                required
+                placeholder="000.000.000-00"
                 class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors"
-                :class="formErrors.cpf ? 'border-red-400 bg-red-50/30' : ''" />
+                :class="formErrors.cpf ? 'border-red-400 bg-red-50/30' : ''"
+              />
               <p v-if="formErrors.cpf" class="text-red-500 text-xs mt-1.5">{{ formErrors.cpf }}</p>
             </div>
           </template>
 
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Regime Tributário</label>
-              <select v-model="newClient.regime_tributario" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm">
+              <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
+                >Regime Tributário</label
+              >
+              <select
+                v-model="newClient.regime_tributario"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm"
+              >
                 <option value="Simples Nacional">Simples Nacional</option>
                 <option value="Lucro Presumido">Lucro Presumido</option>
                 <option value="Lucro Real">Lucro Real</option>
@@ -544,7 +755,10 @@ onMounted(() => {
             </div>
             <div>
               <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Natureza</label>
-              <select v-model="newClient.natureza_operacao" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm">
+              <select
+                v-model="newClient.natureza_operacao"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent bg-white text-sm"
+              >
                 <option value="Serviços">Serviços</option>
                 <option value="Comércio">Comércio</option>
                 <option value="Indústria">Indústria</option>
@@ -553,10 +767,18 @@ onMounted(() => {
           </div>
 
           <div class="mt-8 flex justify-end gap-3">
-            <button type="button" @click="isModalOpen = false" class="px-5 py-2.5 text-[#2a2a2a]/60 font-semibold hover:bg-gray-100 rounded-xl transition-colors">
+            <button
+              type="button"
+              @click="isModalOpen = false"
+              class="px-5 py-2.5 text-[#2a2a2a]/60 font-semibold hover:bg-gray-100 rounded-xl transition-colors"
+            >
               Cancelar
             </button>
-            <button type="submit" :disabled="isSubmitting" class="px-6 py-2.5 bg-[#ff8a65] text-white font-semibold hover:bg-[#f07047] rounded-xl transition-colors disabled:opacity-50 shadow-sm">
+            <button
+              type="submit"
+              :disabled="isSubmitting"
+              class="px-6 py-2.5 bg-[#ff8a65] text-white font-semibold hover:bg-[#f07047] rounded-xl transition-colors disabled:opacity-50 shadow-sm"
+            >
               {{ isSubmitting ? 'Salvando...' : 'Salvar Cliente' }}
             </button>
           </div>
@@ -565,11 +787,21 @@ onMounted(() => {
     </div>
 
     <!-- Modal de Importação CSV -->
-    <div v-if="isImportModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div
+      v-if="isImportModalOpen"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+    >
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-[#f8f8f8]">
+        <div
+          class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-[#f8f8f8]"
+        >
           <h3 class="text-xl font-bold text-[#19341a]">Importar Clientes</h3>
-          <button @click="isImportModalOpen = false" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+          <button
+            @click="isImportModalOpen = false"
+            class="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+          >
+            &times;
+          </button>
         </div>
 
         <div class="p-6 space-y-6">
@@ -581,8 +813,18 @@ onMounted(() => {
               <li>Salve como "CSV (separado por vírgulas)".</li>
               <li>Faça o upload do arquivo aqui.</li>
             </ol>
-            <button @click="baixarTemplate" class="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            <button
+              @click="baixarTemplate"
+              class="mt-3 text-xs font-bold text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                ></path>
+              </svg>
               Baixar Template CSV
             </button>
           </div>
@@ -598,7 +840,10 @@ onMounted(() => {
           </div>
 
           <div class="mt-8 flex justify-end gap-3">
-            <button @click="isImportModalOpen = false" class="px-5 py-2.5 text-[#2a2a2a]/60 font-bold hover:bg-gray-100 rounded-xl transition-colors">
+            <button
+              @click="isImportModalOpen = false"
+              class="px-5 py-2.5 text-[#2a2a2a]/60 font-bold hover:bg-gray-100 rounded-xl transition-colors"
+            >
               Cancelar
             </button>
             <button
@@ -612,6 +857,5 @@ onMounted(() => {
         </div>
       </div>
     </div>
-
   </Layout>
 </template>

@@ -5,6 +5,7 @@ import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from security import get_current_user
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -104,3 +105,12 @@ def sincronizar_cadastro(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno ao persistir a estrutura do escritório.",
         )
+
+
+@router.get("/me", tags=["Autenticação e Sincronização"])
+def get_me(current_user: dict = Depends(get_current_user)):
+    """Retorna os dados de permissão do usuário logado."""
+    return {
+        "role": current_user.get("role"),
+        "is_superadmin": current_user.get("is_superadmin"),
+    }

@@ -3,8 +3,8 @@ import { ref } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { supabase } from '../services/supabase'
 import { toast } from 'vue3-toastify'
+import api from '../services/api'
 import VueTurnstile from 'vue-turnstile'
-import api from '../services/api' // Garanta que o api está importado!
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -16,7 +16,19 @@ const senha = ref('')
 // Variável do CAPTCHA
 const captchaToken = ref('')
 
+// ==========================================
+// CONFIGURAÇÃO DE AMBIENTE (Shift-Left)
+// Capturamos a key aqui no JS para o compilador do Vue não quebrar no HTML
+// ==========================================
+const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+
 const handleLogin = async () => {
+  // Validação Shift-Left: Não deixa bater no backend sem o CAPTCHA
+  if (!captchaToken.value) {
+    erroMensagem.value = 'Por favor, aguarde a verificação de segurança (CAPTCHA).'
+    return
+  }
+
   erroMensagem.value = ''
   isLoading.value = true
 
@@ -32,26 +44,21 @@ const handleLogin = async () => {
     if (error) throw error
 
     if (data?.session) {
-      // ==========================================
-      // AUTO-CURA: Garante que o perfil existe no banco local
-      // Se o banco caiu durante o cadastro, isso recria o perfil agora
-      // ==========================================
       try {
         await api.post('/api/v1/auth/sincronizar-cadastro', {
           supabase_user_id: data.user.id,
           email: data.user.email,
           nome_completo: data.user.user_metadata?.full_name || data.user.email,
           nome_escritorio: data.user.user_metadata?.company_name || 'Meu Escritório',
+          documento: '00000000000', // Fallback para manter consistência de tipos
         })
       } catch (syncError: any) {
-        // Se der erro 400 (já existe), ignoramos. Se for 500, o banco está offline.
         console.warn(
           'Aviso na sincronização pós-login:',
           syncError.response?.data?.detail || syncError.message,
         )
       }
 
-      // Só redireciona depois de tentar sincronizar
       router.push('/dashboard')
     }
   } catch (error: any) {
@@ -63,6 +70,8 @@ const handleLogin = async () => {
     } else {
       erroMensagem.value = error.message || 'Ocorreu um erro ao tentar fazer login.'
     }
+    // Reseta o CAPTCHA em caso de erro para forçar uma nova validação
+    captchaToken.value = ''
   } finally {
     isLoading.value = false
   }
@@ -75,7 +84,6 @@ const handleLogin = async () => {
     <div
       class="hidden md:flex md:w-1/2 bg-[#19341a] text-white flex-col justify-center items-center p-12 relative overflow-hidden"
     >
-      <!-- Efeito de luzes sutis -->
       <div class="absolute inset-0 opacity-10">
         <div
           class="absolute top-1/4 left-1/4 w-64 h-64 bg-[#ff8a65] rounded-full filter blur-3xl"
@@ -99,7 +107,6 @@ const handleLogin = async () => {
     <!-- Lado Direito: Formulário (Fundo Claro) -->
     <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[#f8f8f8]">
       <div class="w-full max-w-md">
-        <!-- Logo no Mobile -->
         <div class="md:hidden text-center mb-8">
           <h1 class="text-4xl font-extrabold tracking-tight text-[#19341a]">
             Contably<span class="text-[#ff8a65]">Task</span>
@@ -179,8 +186,8 @@ const handleLogin = async () => {
           <div>
             <button
               type="submit"
-              :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 transition-all"
+              :disabled="isLoading || !captchaToken"
+              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {{ isLoading ? 'Autenticando...' : 'Entrar no Sistema' }}
             </button>

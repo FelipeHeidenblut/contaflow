@@ -22,6 +22,9 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")  # <--- ADICIONADO A ANON KEY
 
 router = APIRouter(prefix="/api/v1/membros", tags=["Equipe e Membros"])
 
+# Limites de membros por plano
+LIMITES_MEMBROS = {"free": 1, "basico": 5, "profissional": 10, "business": float("inf")}
+
 
 # ==========================================
 # SCHEMAS LOCAIS (Pydantic)
@@ -73,7 +76,9 @@ def listar_membros(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     tenant_id = current_user.get("tenant_id")
-    membros = db.query(models.Profile).filter(models.Profile.tenant_id == tenant_id).all()
+    membros = (
+        db.query(models.Profile).filter(models.Profile.tenant_id == tenant_id).all()
+    )
     return membros
 
 
@@ -85,8 +90,23 @@ def adicionar_membro(
 ):
     tenant_id = admin_user.get("tenant_id")
 
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    limite = LIMITES_MEMBROS.get(tenant.plano, 1)  # Padrão é 1 se for Free
+
+    total_membros = (
+        db.query(models.Profile).filter(models.Profile.tenant_id == tenant_id).count()
+    )
+
+    if total_membros >= limite:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Seu plano {tenant.plano.capitalize()} permite apenas {limite} usuário(s). Faça upgrade para convidar sua equipe!",
+        )
+
     # 1. Verifica no banco se o e-mail já existe
-    existe = db.query(models.Profile).filter(models.Profile.email == membro_in.email).first()
+    existe = (
+        db.query(models.Profile).filter(models.Profile.email == membro_in.email).first()
+    )
     if existe:
         raise HTTPException(
             status_code=400, detail="Este e-mail já está cadastrado no sistema."
@@ -97,20 +117,16 @@ def adicionar_membro(
     headers = {
         "apikey": SUPABASE_SERVICE_KEY,
         "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
-    
+
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
     payload_invite = {
-    "email": membro_in.email,
-    "data": {
-        "name": membro_in.name,
-        "tenant_id": str(tenant_id)
-    },
-    "redirect_to": f"{frontend_url}/redefinir-senha"
+        "email": membro_in.email,
+        "data": {"name": membro_in.name, "tenant_id": str(tenant_id)},
+        "redirect_to": f"{frontend_url}/redefinir-senha",
     }
-    
 
     try:
         with httpx.Client() as client:
@@ -120,18 +136,22 @@ def adicionar_membro(
             if response.status_code not in [200, 201]:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=f"Erro no Supabase Auth: {response.text}"
+                    detail=f"Erro no Supabase Auth: {response.text}",
                 )
 
             dados_supabase = response.json()
             novo_user_id = dados_supabase.get("id")
 
         if not novo_user_id:
-            raise HTTPException(status_code=500, detail="Supabase não retornou o ID do novo usuário.")
+            raise HTTPException(
+                status_code=500, detail="Supabase não retornou o ID do novo usuário."
+            )
 
         # 3. Busca o perfil que a sua Trigger do banco criou automaticamente
         db.expire_all()
-        perfil_criado = db.query(models.Profile).filter(models.Profile.id == novo_user_id).first()
+        perfil_criado = (
+            db.query(models.Profile).filter(models.Profile.id == novo_user_id).first()
+        )
 
         if perfil_criado:
             perfil_criado.name = membro_in.name  # type: ignore
@@ -148,17 +168,23 @@ def adicionar_membro(
                     name=membro_in.name,  # type: ignore
                     email=membro_in.email,
                     role=membro_in.role,  # type: ignore
-                    tenant_id=tenant_id   # type: ignore
+                    tenant_id=tenant_id,  # type: ignore
                 )
                 db.add(novo_perfil)
                 db.commit()
                 db.refresh(novo_perfil)
                 return novo_perfil
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"Convite enviado, mas falha ao criar Profile local: {str(e)}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Convite enviado, mas falha ao criar Profile local: {str(e)}",
+                )
 
     except httpx.RequestError as e:
-        raise HTTPException(status_code=500, detail=f"Falha de rede ao conectar com o Supabase: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Falha de rede ao conectar com o Supabase: {str(e)}",
+        )
 
 
 @router.delete("/{membro_id}", status_code=status.HTTP_204_NO_CONTENT)

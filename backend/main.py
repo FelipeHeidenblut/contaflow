@@ -1,18 +1,20 @@
 import os
 import uuid
-from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from typing import List
+from uuid import UUID
 
+import admin
+import asaas
 import auth
 import clientes
 import dashboard
-import fiscal_deadlines
 import documentos
+import fiscal_deadlines
+import membros
 import models
 import obrigacoes
 import schemas
-import membros
 from database import get_db
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +47,9 @@ app.include_router(dashboard.router)
 app.include_router(auth.router)
 app.include_router(fiscal_deadlines.router)
 app.include_router(membros.router)
+app.include_router(asaas.router)
+app.include_router(admin.router)
+
 
 @app.get("/")
 def read_root():
@@ -100,23 +105,3 @@ def dev_fake_login(db: Session = Depends(get_db)):
         "tenant_id": dev_tenant.id,
         "aviso": "Copie apenas o texto do access_token!",
     }
-    
-@app.get("/api/v1/fiscal-deadlines")
-def get_fiscal_deadlines(db: Session = Depends(get_db)):
-    # Busca todos os prazos fiscais (TaxDeadline) do banco
-    deadlines = db.query(models.fiscal_deadlines).all()
-    
-    # Formata a resposta para o Vue entender
-    resultados = []
-    for d in deadlines:
-        resultados.append({
-            "id": d.id,
-            "title": d.title,
-            "description": d.description,
-            # Garante que a data vá como string "YYYY-MM-DD"
-            "deadline_date": d.deadline_date.isoformat() if d.deadline_date else None,
-            "is_monthly": d.is_monthly,
-            "reference_link": d.reference_link
-        })
-        
-    return resultados

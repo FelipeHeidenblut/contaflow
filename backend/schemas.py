@@ -74,7 +74,6 @@ class TaskResponse(TaskBase):
     created_at: datetime
 
 
-
 # ================== DOCUMENTOS ==================
 class DocumentBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -100,4 +99,6 @@ class DashboardResponse(BaseModel):
     total_clientes: int
     tarefas_abertas: int
     tarefas_atrasadas: int
+    plano: str
+    status_pagamento: str
     model_config = ConfigDict(from_attributes=True)

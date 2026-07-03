@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { toast } from 'vue3-toastify'
-import VueTurnstile from 'vue-turnstile' // Importação do Captcha
+import VueTurnstile from 'vue-turnstile'
 
 const router = useRouter()
 const isLoading = ref(false)
@@ -14,6 +14,7 @@ const nomeCompleto = ref('')
 const email = ref('')
 const senha = ref('')
 const nomeEscritorio = ref('')
+const documentoRaw = ref('') // Armazena apenas os números
 
 // Termos de uso
 const acceptedTerms = ref(false)
@@ -21,12 +22,43 @@ const acceptedTerms = ref(false)
 // Variável do CAPTCHA
 const captchaToken = ref('')
 
+// Computed que aplica a máscara dinamicamente (CPF ou CNPJ)
+const documentoFormatado = computed({
+  get() {
+    let v = documentoRaw.value.replace(/\D/g, '') // Remove tudo que não é dígito
+    if (v.length <= 11) {
+      // Máscara de CPF: 000.000.000-00
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d)/, '$1.$2')
+      v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2')
+    } else {
+      // Máscara de CNPJ: 00.000.000/0001-00
+      v = v.replace(/^(\d{2})(\d)/, '$1.$2')
+      v = v.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+      v = v.replace(/\.(\d{3})(\d)/, '.$1/$2')
+      v = v.replace(/(\d{4})(\d)/, '$1-$2')
+    }
+    return v
+  },
+  set(novoValor) {
+    // Limita o tamanho máximo para 14 números (CNPJ)
+    documentoRaw.value = novoValor.replace(/\D/g, '').slice(0, 14)
+  },
+})
+
 const handleRegister = async () => {
   if (!acceptedTerms.value) {
     erroMensagem.value =
       'Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar uma conta.'
     return
   }
+
+  // Validação shift-left de documento no Front-end
+  if (documentoRaw.value.length !== 11 && documentoRaw.value.length !== 14) {
+    erroMensagem.value = 'O documento deve ser um CPF (11 dígitos) ou CNPJ (14 dígitos) válido.'
+    return
+  }
+
   erroMensagem.value = ''
   isLoading.value = true
 
@@ -51,6 +83,7 @@ const handleRegister = async () => {
           email: email.value,
           nome_completo: nomeCompleto.value,
           nome_escritorio: nomeEscritorio.value,
+          documento: documentoRaw.value, // Envia o dado limpo para o backend
         })
 
         if (data.session) {
@@ -159,6 +192,21 @@ const handleRegister = async () => {
             />
           </div>
 
+          <!-- Novo Campo: Documento -->
+          <div>
+            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">CPF ou CNPJ</label>
+            <input
+              v-model="documentoFormatado"
+              type="text"
+              required
+              placeholder="000.000.000-00 ou 00.000.000/0001-00"
+              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-colors bg-white"
+            />
+            <p class="mt-1 text-xs text-gray-400">
+              Usado para emitir as notas fiscais da sua assinatura.
+            </p>
+          </div>
+
           <div>
             <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5"
               >E-mail Corporativo</label
@@ -225,10 +273,11 @@ const handleRegister = async () => {
           <div class="pt-2">
             <button
               type="submit"
-              :disabled="!acceptedTerms"
+              :disabled="!acceptedTerms || isLoading"
               class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-bold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              Criar minha conta
+              <span v-if="isLoading">Criando conta...</span>
+              <span v-else>Criar minha conta</span>
             </button>
           </div>
         </form>

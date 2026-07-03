@@ -1,52 +1,92 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth' // Importação da sua Store de Autenticação
+
+// ==========================================
+// IMPORTAÇÕES ESTÁTICAS (Apenas rotas públicas para Fast Load)
+// ==========================================
+import LandingView from '../views/LandingView.vue'
 import LoginView from '../views/LoginView.vue'
 import CadastroView from '../views/CadastroView.vue'
-import DashboardView from '../views/DashboardView.vue'
-import ClientsView from '@/views/ClientsView.vue'
-import ObrigacoesView from '@/views/ObrigacoesView.vue'
-import DocumentosView from '@/views/DocumentosView.vue'
 import ForgotPasswordView from '../views/ForgotPasswordView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
-import LandingView from '../views/LandingView.vue'
 import PrivacidadeView from '../views/PrivacidadeView.vue'
 import TermosView from '../views/TermosView.vue'
-import MembrosView from '@/views/MembrosView.vue'
-import CalendarioView from '@/views/CalendarioView.vue'
 
-import { supabase } from '../services/supabase'
+// As rotas privadas serão carregadas via Lazy Loading abaixo para otimizar performance.
 
 const routes = [
-  // Rotas Públicas
+  // ==========================================
+  // ROTAS PÚBLICAS
+  // ==========================================
   { path: '/', component: LandingView },
-  { path: '/login', component: LoginView }, // ROTA ADICIONADA AQUI!
-  { path: '/cadastro', component: CadastroView },
-  { path: '/esqueceu-senha', component: ForgotPasswordView },
-  { path: '/redefinir-senha', component: ResetPasswordView },
+  { path: '/login', component: LoginView, meta: { guestOnly: true } },
+  { path: '/cadastro', component: CadastroView, meta: { guestOnly: true } },
+  { path: '/esqueceu-senha', component: ForgotPasswordView, meta: { guestOnly: true } },
+  { path: '/redefinir-senha', component: ResetPasswordView, meta: { guestOnly: true } },
   { path: '/privacidade', component: PrivacidadeView },
   { path: '/termos', component: TermosView },
-  { path: '/membros', component: MembrosView },
-  { path: '/calendario', component: CalendarioView },
 
-  // Rotas Privadas (Blindadas)
+  // ==========================================
+  // ROTAS PRIVADAS (Painel do Cliente SaaS)
+  // ==========================================
   {
     path: '/dashboard',
-    component: DashboardView,
+    component: () => import('../views/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/clientes',
-    component: ClientsView,
+    component: () => import('@/views/ClientsView.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/obrigacoes',
-    component: ObrigacoesView,
+    component: () => import('@/views/ObrigacoesView.vue'),
     meta: { requiresAuth: true },
   },
   {
     path: '/documentos',
-    component: DocumentosView,
+    component: () => import('@/views/DocumentosView.vue'),
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/membros',
+    component: () => import('@/views/MembrosView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/calendario',
+    component: () => import('@/views/CalendarioView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/faturamento',
+    component: () => import('@/views/FaturamentoView.vue'),
+    meta: { requiresAuth: true },
+  },
+
+  // ==========================================
+  // ROTAS DO BACKOFFICE (SaaS Admin)
+  // ==========================================
+  {
+    path: '/ops-login',
+    component: () => import('@/views/AdminLoginView.vue'),
+    meta: { guestOnly: true },
+  },
+  {
+    path: '/admin',
+    component: () => import('@/views/AdminView.vue'),
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
+  },
+  {
+    path: '/admin/escritorios',
+    component: () => import('../views/AdminEscritoriosView.vue'),
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
+  },
+  {
+    path: '/admin/financeiro',
+    component: () => import('../views/AdminFinanceiroView.vue'),
+    meta: { requiresAuth: true, requiresSuperAdmin: true },
   },
 ]
 
@@ -55,20 +95,38 @@ const router = createRouter({
   routes,
 })
 
-// O Leão de Chácara (Route Guard)
-router.beforeEach(async (to, from) => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+// ==========================================
+// GUARDIÃO DE ROTAS (Shift-Left Security)
+// ==========================================
+router.beforeEach(async (to) => {
+  // Instanciamos a store AQUI DENTRO para evitar erros de ciclo de vida do Vue/Pinia
+  const authStore = useAuthStore()
 
-  if (to.meta.requiresAuth && !session) {
+  // Sincroniza o estado local com a sessão real do Supabase
+  const activeSession = await authStore.checkSession()
+
+  const requiresAuth = to.meta.requiresAuth
+  const requiresSuperAdmin = to.meta.requiresSuperAdmin
+  const guestOnly = to.meta.guestOnly
+
+  // 1. Regra de Proteção Padrão: Tentar acessar área logada sem estar logado
+  if (requiresAuth && !activeSession) {
     return '/login'
   }
 
-  // BÔNUS: Se o usuário já estiver logado e tentar acessar o login, manda pro dashboard
-  if ((to.path === '/login' || to.path === '/cadastro') && session) {
+  // 2. Regra RBAC (Role-Based Access Control): Cliente tentando acessar o painel Admin
+  if (requiresSuperAdmin && !authStore.isSuperAdmin) {
     return '/dashboard'
   }
+
+  // 3. Regra de UX: Usuário logado tentando acessar telas de Login/Cadastro
+  if (guestOnly && activeSession) {
+    // Se for o dono do SaaS, manda pro backoffice. Se for contador, manda pro app.
+    return authStore.isSuperAdmin ? '/admin' : '/dashboard'
+  }
+
+  // Se passou por todas as barreiras, caminho livre! (return true ou apenas return vazio)
+  return true
 })
 
 export default router

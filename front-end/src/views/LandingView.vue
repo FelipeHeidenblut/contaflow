@@ -76,29 +76,29 @@ const testimonials = [
 
 const plans = [
   {
-    name: 'Starter',
-    price: '79',
+    name: 'Free',
+    price: '0',
     featured: false,
-    desc: 'Para contadores autônomos.',
-    cta: 'Começar grátis',
+    desc: 'Para testar a plataforma.',
+    cta: 'Começar Grátis',
     features: [
-      'Até 20 clientes',
-      '2 usuários',
+      'Até 5 clientes',
+      '1 usuário (Admin)',
       'Calendário de obrigações',
-      'Alertas por e-mail',
-      'Suporte por chat',
+      'Gestão de documentos',
+      'Suporte por e-mail',
     ],
   },
   {
     name: 'Básico',
     price: '149',
     featured: false,
-    desc: 'Para contadores em transição.',
-    cta: 'Começar grátis',
+    desc: 'Para contadores autônomos.',
+    cta: 'Assinar Básico',
     features: [
       'Até 40 clientes',
-      '5 usuários',
-      'Calendário de obrigações',
+      'Até 5 usuários',
+      'Tudo do Free',
       'Alertas por e-mail',
       'Suporte por chat',
     ],
@@ -108,15 +108,14 @@ const plans = [
     price: '197',
     featured: true,
     desc: 'Para escritórios em crescimento.',
-    cta: 'Testar 7 dias grátis',
+    cta: 'Assinar Profissional',
     features: [
       'Até 100 clientes',
-      '10 usuários',
-      'Tudo do Starter',
-      'Painel de produtividade',
-      'Alertas por WhatsApp',
-      'Documentos por tarefa',
-      'Relatórios por cliente',
+      'Até 10 usuários',
+      'Tudo do Básico',
+      'Distribuição de equipe',
+      'Relatórios avançados',
+      'Suporte prioritário',
     ],
   },
   {
@@ -145,7 +144,6 @@ const handleCTA = () => {
     ctaMsg.value = 'Por favor, insira um e-mail válido.'
     return
   }
-  // Aqui você deve chamar sua API para registrar o e-mail na lista de espera / newsletter
   ctaMsg.value = '✅ Ótimo! Você será o primeiro a saber quando abrirmos o acesso.'
   email.value = ''
 }
@@ -195,9 +193,21 @@ const vFadeIn = {
         </span>
       </div>
       <div class="hidden md:flex items-center gap-8">
-        <a href="#features" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Funcionalidades</a>
-        <a href="#how" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Como funciona</a>
-        <a href="#pricing" class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors">Planos</a>
+        <a
+          href="#features"
+          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          >Funcionalidades</a
+        >
+        <a
+          href="#how"
+          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          >Como funciona</a
+        >
+        <a
+          href="#pricing"
+          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          >Planos</a
+        >
         <RouterLink
           to="/login"
           class="inline-flex items-center bg-transparent text-[#19341a] border border-gray-200 rounded-lg py-2 px-5 font-semibold text-[0.9rem] cursor-pointer hover:bg-gray-50 transition-all"
@@ -226,22 +236,26 @@ const vFadeIn = {
         <div
           class="inline-flex items-center gap-2 bg-[#eaf3ea] text-[#19341a] rounded-full py-1.5 px-4 text-[0.8rem] font-semibold tracking-wide mb-6 border border-[#19341a]/10"
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-[#ff8a65]"></span> Feito para escritórios contábeis e contadores autônomos
+          <span class="w-1.5 h-1.5 rounded-full bg-[#ff8a65]"></span> Feito para escritórios
+          contábeis e contadores autônomos
         </div>
-        <h1 class="text-4xl lg:text-[3.5rem] font-extrabold text-[#19341a] leading-[1.1] tracking-tight mb-6">
+        <h1
+          class="text-4xl lg:text-[3.5rem] font-extrabold text-[#19341a] leading-[1.1] tracking-tight mb-6"
+        >
           Organize seu escritório.<br />Entregue com
           <span class="text-[#ff8a65]">precisão.</span>
         </h1>
         <p class="text-[1.1rem] text-gray-500 max-w-[520px] mb-9 leading-relaxed">
-          Gestão de tarefas e prazos para escritórios contábeis e contadores autônomos.
-          Centralize clientes, obrigações fiscais e documentos. Acabe com o caos das planilhas e garanta a conformidade do seu escritório sem perder prazos.
+          Gestão de tarefas e prazos para escritórios contábeis e contadores autônomos. Centralize
+          clientes, obrigações fiscais e documentos. Acabe com o caos das planilhas e garanta a
+          conformidade do seu escritório sem perder prazos.
         </p>
         <div class="flex gap-4 flex-wrap">
           <RouterLink
             to="/cadastro"
             class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-3 px-6 font-semibold text-[0.95rem] cursor-pointer hover:bg-[#f07047] hover:shadow-xl hover:shadow-[#ff8a65]/30 hover:-translate-y-0.5 transition-all"
           >
-            Testar 7 dias grátis
+            Criar conta grátis
           </RouterLink>
           <button
             @click="scrollTo('how')"
@@ -254,7 +268,12 @@ const vFadeIn = {
         <!-- Selos de Confiança -->
         <div class="mt-10 flex items-center gap-6 text-gray-400">
           <div class="flex items-center gap-2 text-xs font-medium">
-            <svg class="w-5 h-5 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="w-5 h-5 text-[#19341a]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -265,7 +284,12 @@ const vFadeIn = {
             Criptografia em trânsito (HTTPS)
           </div>
           <div class="flex items-center gap-2 text-xs font-medium">
-            <svg class="w-5 h-5 text-[#19341a]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              class="w-5 h-5 text-[#19341a]"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -294,44 +318,84 @@ const vFadeIn = {
         <div class="grid grid-cols-3 gap-3">
           <!-- Coluna A Fazer -->
           <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
-            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">A fazer</div>
-            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm">
-              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">SPED Fiscal — Cliente A</div>
-              <div class="text-[0.65rem] text-gray-400 mb-2">Vence 20/06</div>
-              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Fiscal</div>
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">
+              A fazer
             </div>
-            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm border-l-[3px] border-l-[#ff8a65]">
+            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm">
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">
+                SPED Fiscal — Cliente A
+              </div>
+              <div class="text-[0.65rem] text-gray-400 mb-2">Vence 20/06</div>
+              <div
+                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                Fiscal
+              </div>
+            </div>
+            <div
+              class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm border-l-[3px] border-l-[#ff8a65]"
+            >
               <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">Folha de pagamento</div>
               <div class="text-[0.65rem] text-gray-400 mb-2">Vence 18/06</div>
-              <div class="inline-block bg-[#fff3e0] text-[#e65100] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Urgente</div>
+              <div
+                class="inline-block bg-[#fff3e0] text-[#e65100] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                Urgente
+              </div>
             </div>
           </div>
           <!-- Coluna Em andamento -->
           <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
-            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">Em andamento</div>
-            <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm animate-pulse-border">
-              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">DCTF Web — Cliente B</div>
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">
+              Em andamento
+            </div>
+            <div
+              class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm animate-pulse-border"
+            >
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">
+                DCTF Web — Cliente B
+              </div>
               <div class="text-[0.65rem] text-gray-400 mb-2">Atribuído: Ana</div>
-              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">eSocial</div>
+              <div
+                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                eSocial
+              </div>
             </div>
             <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm">
               <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">Balanço anual — C</div>
               <div class="text-[0.65rem] text-gray-400 mb-2">85% concluído</div>
-              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Contábil</div>
+              <div
+                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                Contábil
+              </div>
             </div>
           </div>
           <!-- Coluna Concluído -->
           <div class="bg-[#f8f8f8] rounded-xl p-2.5 space-y-2.5">
-            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">Concluído</div>
+            <div class="text-[0.7rem] font-bold tracking-wider uppercase text-gray-400 px-1 pb-1.5">
+              Concluído
+            </div>
             <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm opacity-60">
-              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">ECF 2024 — 5 clientes</div>
+              <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">
+                ECF 2024 — 5 clientes
+              </div>
               <div class="text-[0.65rem] text-gray-400 mb-2">Enviado em 12/06</div>
-              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">IRPJ</div>
+              <div
+                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                IRPJ
+              </div>
             </div>
             <div class="bg-white rounded-lg p-2.5 border border-gray-100 shadow-sm opacity-60">
               <div class="text-[0.75rem] font-semibold text-[#2a2a2a] mb-1">PGDAS-D — Maio</div>
               <div class="text-[0.65rem] text-gray-400 mb-2">Enviado em 08/06</div>
-              <div class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold">Simples</div>
+              <div
+                class="inline-block bg-[#eaf3ea] text-[#19341a] rounded px-1.5 py-0.5 text-[0.6rem] font-bold"
+              >
+                Simples
+              </div>
             </div>
           </div>
         </div>
@@ -343,30 +407,38 @@ const vFadeIn = {
       class="bg-[#19341a] text-white py-4 px-[5%] text-center text-[0.9rem] font-medium flex flex-wrap justify-center items-center gap-x-6 gap-y-2"
     >
       <span class="flex items-center gap-2"
-        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          ><path
+        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
             stroke-linecap="round"
             stroke-linejoin="round"
             stroke-width="2"
             d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          /></svg>
+          />
+        </svg>
         Criptografia em trânsito (HTTPS)</span
       >
       <span class="hidden md:inline text-white/20">·</span>
       <span class="flex items-center gap-2"
-        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          ><path
+        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
             stroke-linecap="round"
             stroke-linejoin="round"
             stroke-width="2"
             d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-          /></svg>
+          />
+        </svg>
         Pensado para atender à LGPD</span
       >
       <span class="hidden md:inline text-white/20">·</span>
       <span class="flex items-center gap-2"
-        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          ><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        ><svg class="w-4 h-4 text-[#ff8a65]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 13l4 4L19 7"
+          ></path>
+        </svg>
         Infraestrutura em nuvem segura</span
       >
     </div>
@@ -377,14 +449,18 @@ const vFadeIn = {
         <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Funcionalidades
         </div>
-        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight">
+        <h2
+          class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight"
+        >
           Tudo que seu escritório precisa.<br />Sem a complexidade que não precisa.
         </h2>
         <p class="text-[1.1rem] text-gray-500 max-w-[600px] mx-auto">
-          Desenvolvido lado a lado com contadores. Cada detalhe pensado para o dia a dia real de um escritório contábil.
+          Desenvolvido lado a lado com contadores. Cada detalhe pensado para o dia a dia real de um
+          escritório contábil.
         </p>
         <p class="text-[0.95rem] text-gray-400 max-w-[600px] mx-auto mt-3">
-          Feito para escritórios contábeis e contadores autônomos que querem organizar tarefas e prazos sem substituir o sistema fiscal atual.
+          Feito para escritórios contábeis e contadores autônomos que querem organizar tarefas e
+          prazos sem substituir o sistema fiscal atual.
         </p>
       </div>
       <div class="grid md:grid-cols-3 gap-8">
@@ -394,7 +470,9 @@ const vFadeIn = {
           v-for="f in features"
           :key="f.title"
         >
-          <div class="w-12 h-12 rounded-xl bg-[#eaf3ea] flex items-center justify-center mb-5 text-2xl">
+          <div
+            class="w-12 h-12 rounded-xl bg-[#eaf3ea] flex items-center justify-center mb-5 text-2xl"
+          >
             {{ f.icon }}
           </div>
           <h3 class="text-[1.15rem] font-bold text-[#19341a] mb-2.5">{{ f.title }}</h3>
@@ -406,21 +484,30 @@ const vFadeIn = {
     <!-- HOW IT WORKS (Dark Section) -->
     <section id="how" class="bg-[#19341a] text-white py-24 px-[5%] relative overflow-hidden">
       <!-- Efeito de luz no fundo -->
-      <div class="absolute top-0 left-1/4 w-96 h-96 bg-[#ff8a65]/10 rounded-full blur-[120px]"></div>
+      <div
+        class="absolute top-0 left-1/4 w-96 h-96 bg-[#ff8a65]/10 rounded-full blur-[120px]"
+      ></div>
 
       <div class="max-w-[1200px] mx-auto relative z-10">
         <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Como funciona
         </div>
-        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-white leading-tight mb-6 tracking-tight">
+        <h2
+          class="text-3xl lg:text-[2.6rem] font-extrabold text-white leading-tight mb-6 tracking-tight"
+        >
           Do cadastro à entrega<br />em três passos.
         </h2>
         <p class="text-[1rem] text-white/70 max-w-[560px] mb-10">
-          Você não precisa trocar seu ERP ou sistema fiscal: o Contably Task organiza tarefas, prazos e documentos em torno do que você já usa.
+          Você não precisa trocar seu ERP ou sistema fiscal: o Contably Task organiza tarefas,
+          prazos e documentos em torno do que você já usa.
         </p>
         <div class="grid md:grid-cols-3 gap-12">
           <div v-fade-in class="fade-in relative" v-for="(s, i) in steps" :key="s.title">
-            <div class="text-6xl font-extrabold text-white/5 leading-none mb-4 absolute -top-8 -left-2">0{{ i + 1 }}</div>
+            <div
+              class="text-6xl font-extrabold text-white/5 leading-none mb-4 absolute -top-8 -left-2"
+            >
+              0{{ i + 1 }}
+            </div>
             <div class="relative z-10">
               <h3 class="text-[1.2rem] font-bold mb-3 text-white">{{ s.title }}</h3>
               <p class="text-[0.95rem] text-white/60 leading-relaxed">{{ s.desc }}</p>
@@ -441,7 +528,9 @@ const vFadeIn = {
         <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
           Depoimentos
         </div>
-        <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight tracking-tight">
+        <h2
+          class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight tracking-tight"
+        >
           Escritórios que transformaram<br />sua rotina conosco.
         </h2>
       </div>
@@ -480,11 +569,13 @@ const vFadeIn = {
           <div class="text-[0.8rem] font-bold tracking-wider uppercase text-[#ff8a65] mb-3">
             Planos
           </div>
-          <h2 class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight">
-            Simples, transparente, sem surpresas.
+          <h2
+            class="text-3xl lg:text-[2.6rem] font-extrabold text-[#19341a] leading-tight mb-4 tracking-tight"
+          >
+            Comece de graça. Evolua quando precisar.
           </h2>
           <p class="text-[1.1rem] text-gray-500 max-w-[500px] mx-auto">
-            Cancele quando quiser. Sem taxas escondidas.
+            Sem cartão de crédito para começar. Cancele quando quiser.
           </p>
         </div>
         <div class="grid md:grid-cols-4 gap-6 items-start">
@@ -493,7 +584,10 @@ const vFadeIn = {
             class="fade-in bg-white border border-gray-100 rounded-2xl p-8 relative transition-all duration-300 hover:shadow-lg"
             v-for="p in plans"
             :key="p.name"
-            :class="{ 'md:scale-110 shadow-[0_20px_50px_rgba(25,52,26,0.1)] border-[#ff8a65] z-10': p.featured }"
+            :class="{
+              'md:scale-110 shadow-[0_20px_50px_rgba(25,52,26,0.1)] border-[#ff8a65] z-10':
+                p.featured,
+            }"
           >
             <div
               v-if="p.featured"
@@ -504,8 +598,9 @@ const vFadeIn = {
             <div class="text-[0.85rem] font-bold uppercase tracking-wider text-gray-400 mb-3">
               {{ p.name }}
             </div>
-            <div class="text-4xl font-extrabold text-[#19341a] leading-none mb-1">
-              R$ {{ p.price }}
+            <div class="flex items-end gap-1 mb-1">
+              <span class="text-2xl font-bold text-gray-400 mb-1">R$</span>
+              <span class="text-4xl font-extrabold text-[#19341a] leading-none">{{ p.price }}</span>
             </div>
             <div class="text-[0.85rem] text-gray-400 font-medium mb-6">/mês</div>
 
@@ -517,8 +612,18 @@ const vFadeIn = {
                 v-for="f in p.features"
                 :key="f"
               >
-                <svg class="w-4 h-4 text-[#ff8a65] mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                <svg
+                  class="w-4 h-4 text-[#ff8a65] mt-0.5 flex-shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="3"
+                    d="M5 13l4 4L19 7"
+                  ></path>
                 </svg>
                 {{ f }}
               </li>
@@ -545,11 +650,13 @@ const vFadeIn = {
         class="absolute inset-0 bg-[linear-gradient(to_right,#80808008_1px,transparent_1px),linear-gradient(to_bottom,#80808008_1px,transparent_1px)] bg-[size:32px_32px] z-[-1]"
       ></div>
       <div v-fade-in class="fade-in max-w-[640px] mx-auto">
-        <h2 class="text-3xl lg:text-[2.8rem] font-extrabold text-[#19341a] leading-tight mb-5 tracking-tight">
+        <h2
+          class="text-3xl lg:text-[2.8rem] font-extrabold text-[#19341a] leading-tight mb-5 tracking-tight"
+        >
           Sua equipe merece uma gestão à altura do seu trabalho.
         </h2>
         <p class="text-gray-500 mb-10 text-[1.1rem]">
-          Crie sua conta em menos de 2 minutos. Nenhum cartão de crédito necessário.
+          Crie sua conta gratuita em menos de 2 minutos. Sem cartão de crédito.
         </p>
         <div class="flex flex-col sm:flex-row gap-3 max-w-[500px] mx-auto">
           <input
@@ -558,22 +665,18 @@ const vFadeIn = {
             placeholder="seu@email.com.br"
             class="flex-1 py-3.5 px-5 border border-gray-200 rounded-xl text-[0.95rem] bg-white text-[#2a2a2a] outline-none focus:border-[#ff8a65] focus:ring-2 focus:ring-[#ff8a65]/20 transition-all"
           />
-          <button
-            @click="handleCTA"
-            class="bg-[#ff8a65] text-white border-none rounded-xl py-3.5 px-7 font-bold text-[0.95rem] cursor-pointer shadow-lg shadow-[#ff8a65]/30 hover:bg-[#f07047] hover:-translate-y-0.5 transition-all whitespace-nowrap"
+          <RouterLink
+            to="/cadastro"
+            class="bg-[#ff8a65] text-white border-none rounded-xl py-3.5 px-7 font-bold text-[0.95rem] cursor-pointer shadow-lg shadow-[#ff8a65]/30 hover:bg-[#f07047] hover:-translate-y-0.5 transition-all whitespace-nowrap inline-flex justify-center items-center"
           >
-            Começar grátis
-          </button>
+            Criar conta grátis
+          </RouterLink>
         </div>
-        <p
-          class="text-[0.85rem] mt-4 font-semibold"
-          v-if="ctaMsg"
-          style="color: #19341a"
-        >
+        <p class="text-[0.85rem] mt-4 font-semibold" v-if="ctaMsg" style="color: #19341a">
           {{ ctaMsg }}
         </p>
         <p class="text-[0.85rem] text-gray-400 mt-4" v-else>
-          7 dias gratuitos · Sem cartão de crédito · Suporte humano em português
+          Plano gratuito para sempre · Sem cartão de crédito · Suporte humano em português
         </p>
       </div>
     </section>
@@ -589,9 +692,15 @@ const vFadeIn = {
         <p class="text-[0.82rem] mt-2">© 2026 Contably Task. Todos os direitos reservados.</p>
       </div>
       <div class="flex gap-8">
-        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Privacidade</a>
-        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Termos</a>
-        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors">Contato</a>
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors"
+          >Privacidade</a
+        >
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors"
+          >Termos</a
+        >
+        <a href="#" class="text-[0.85rem] text-white/50 hover:text-white transition-colors"
+          >Contato</a
+        >
       </div>
     </footer>
   </div>

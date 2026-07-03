@@ -8,10 +8,10 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     UniqueConstraint,
-    Integer
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
@@ -26,6 +26,9 @@ class Tenant(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    asaas_customer_id = Column(String, nullable=True)
+    plano = Column(String, default="free")
+    status_pagamento = Column(String, default="ativo")
 
 
 class Profile(Base):
@@ -37,7 +40,9 @@ class Profile(Base):
     )
     email = Column(String, unique=True, index=True)
     name = Column(String(255), nullable=False)
-    role = Column(Text)
+    role = Column(Text, default="user")
+    is_superadmin = Column(Boolean, default=False, nullable=False)
+
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -60,8 +65,10 @@ class Client(Base):
 
     regime_tributario = Column(String, nullable=False)
     ativo = Column(Boolean, default=True)
-    
-    natureza_operacao = Column(String, default="Serviços") # Comércio, Serviços, Indústria
+
+    natureza_operacao = Column(
+        String, default="Serviços"
+    )  # Comércio, Serviços, Indústria
 
 
 class Task(Base):
@@ -107,7 +114,8 @@ class Document(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    
+
+
 class TaxDeadline(Base):
     __tablename__ = "tax_deadlines"
 

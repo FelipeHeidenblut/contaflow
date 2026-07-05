@@ -79,7 +79,7 @@ const toggleBloqueio = async (tenant: Tenant) => {
   if (!confirm(`Tem certeza que deseja ${acao} o escritório ${tenant.razao_social}?`)) return
 
   try {
-    await api.patch(`/api/v1/admin/tenants/${tenant.id}/status?novo_status=${novo_status}`)
+    await api.patch(`/api/v1/admin/tenants/${tenant.id}/status?novo_status=${novoStatus}`)
     tenant.status_pagamento = novoStatus // Atualiza a tela na hora
     toast.success(`Escritório ${acao} com sucesso.`)
   } catch (error) {

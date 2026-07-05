@@ -1,20 +1,23 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRouter, RouterLink, useRoute } from 'vue-router' // 1. Adicionado o useRoute
 import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { toast } from 'vue3-toastify'
 import VueTurnstile from 'vue-turnstile'
 
 const router = useRouter()
+const route = useRoute() // 2. Inicializa a rota para ler a URL
+
 const isLoading = ref(false)
 const erroMensagem = ref('')
 
 const nomeCompleto = ref('')
-const email = ref('')
+// 3. PEGA O E-MAIL DA URL (se não tiver, começa vazio)
+const email = ref(route.query.email ? String(route.query.email) : '')
 const senha = ref('')
 const nomeEscritorio = ref('')
-const documentoRaw = ref('') // Armazena apenas os números
+const documentoRaw = ref('')
 
 // Termos de uso
 const acceptedTerms = ref(false)

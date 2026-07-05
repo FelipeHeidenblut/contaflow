@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
+const router = useRouter()
 const email = ref('')
 const ctaMsg = ref('')
 
@@ -144,8 +145,8 @@ const handleCTA = () => {
     ctaMsg.value = 'Por favor, insira um e-mail válido.'
     return
   }
-  ctaMsg.value = '✅ Ótimo! Você será o primeiro a saber quando abrirmos o acesso.'
-  email.value = ''
+
+  router.push({ path: '/cadastro', query: { email: email.value } })
 }
 
 // Diretiva customizada para o Fade-in ao rolar
@@ -192,31 +193,34 @@ const vFadeIn = {
           Contably<span class="text-[#ff8a65]"> Task</span>
         </span>
       </div>
-      <div class="hidden md:flex items-center gap-8">
+
+      <!-- NOVA LÓGICA RESPONSIVA AQUI -->
+      <div class="flex items-center gap-2 sm:gap-4">
         <a
           href="#features"
-          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          class="hidden md:block text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
           >Funcionalidades</a
         >
         <a
           href="#how"
-          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          class="hidden md:block text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
           >Como funciona</a
         >
         <a
           href="#pricing"
-          class="text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
+          class="hidden md:block text-[0.92rem] font-medium text-gray-600 hover:text-[#19341a] transition-colors"
           >Planos</a
         >
+
         <RouterLink
           to="/login"
-          class="inline-flex items-center bg-transparent text-[#19341a] border border-gray-200 rounded-lg py-2 px-5 font-semibold text-[0.9rem] cursor-pointer hover:bg-gray-50 transition-all"
+          class="inline-flex items-center bg-transparent text-[#19341a] border border-gray-200 rounded-lg py-1.5 px-3 sm:py-2 sm:px-4 font-semibold text-[0.85rem] sm:text-[0.9rem] cursor-pointer hover:bg-gray-50 transition-all"
         >
           Login
         </RouterLink>
         <RouterLink
           to="/cadastro"
-          class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-2 px-5 font-semibold text-[0.9rem] cursor-pointer hover:bg-[#f07047] hover:shadow-lg hover:shadow-[#ff8a65]/30 transition-all"
+          class="inline-flex items-center bg-[#ff8a65] text-white border-none rounded-lg py-1.5 px-3 sm:py-2 sm:px-5 font-semibold text-[0.85rem] sm:text-[0.9rem] cursor-pointer hover:bg-[#f07047] hover:shadow-lg hover:shadow-[#ff8a65]/30 transition-all whitespace-nowrap"
         >
           Começar grátis
         </RouterLink>
@@ -665,12 +669,12 @@ const vFadeIn = {
             placeholder="seu@email.com.br"
             class="flex-1 py-3.5 px-5 border border-gray-200 rounded-xl text-[0.95rem] bg-white text-[#2a2a2a] outline-none focus:border-[#ff8a65] focus:ring-2 focus:ring-[#ff8a65]/20 transition-all"
           />
-          <RouterLink
-            to="/cadastro"
+          <button
+            @click="handleCTA"
             class="bg-[#ff8a65] text-white border-none rounded-xl py-3.5 px-7 font-bold text-[0.95rem] cursor-pointer shadow-lg shadow-[#ff8a65]/30 hover:bg-[#f07047] hover:-translate-y-0.5 transition-all whitespace-nowrap inline-flex justify-center items-center"
           >
             Criar conta grátis
-          </RouterLink>
+          </button>
         </div>
         <p class="text-[0.85rem] mt-4 font-semibold" v-if="ctaMsg" style="color: #19341a">
           {{ ctaMsg }}

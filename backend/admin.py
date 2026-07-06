@@ -71,8 +71,8 @@ def get_saas_metrics(
 
     valores_planos = {
         "free": 0.00,
-        "basico": 149.00,
-        "profissional": 197.00,
+        "basico": 79.90,
+        "profissional": 149.90,
         "business": 449.00,
     }
 

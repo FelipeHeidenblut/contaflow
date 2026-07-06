@@ -23,7 +23,7 @@ const planos = [
   },
   {
     nome: 'Básico',
-    price: '149',
+    price: '79,90',
     desc: 'Para contadores autônomos.',
     cta: 'Assinar Básico',
     features: [
@@ -36,7 +36,7 @@ const planos = [
   },
   {
     nome: 'Profissional',
-    price: '197',
+    price: '149,90',
     featured: true,
     desc: 'Para escritórios em crescimento.',
     cta: 'Assinar Profissional',

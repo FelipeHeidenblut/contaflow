@@ -1,3 +1,4 @@
+import calendar
 from datetime import date, timedelta
 from typing import List, Optional
 from uuid import UUID
@@ -72,12 +73,14 @@ def criar_obrigacao(
         client_id=tarefa_in.client_id,
         title=tarefa_in.title,
         description=tarefa_in.description,
-        due_date=data_ajustada,  # <--- USA A DATA AJUSTADA AQUI!
+        due_date=data_ajustada,
         status=tarefa_in.status.value
         if isinstance(tarefa_in.status, TaskStatus)
         else tarefa_in.status,
         assigned_to=tarefa_in.assigned_to,
         grau_importancia=tarefa_in.grau_importancia,
+        is_recurring=tarefa_in.is_recurring,  # <--- ADICIONADO
+        recurrence_day=tarefa_in.recurrence_day,  # <--- ADICIONADO
     )
 
     db.add(nova_tarefa)
@@ -104,8 +107,49 @@ def concluir_obrigacao(
     if not tarefa:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
 
-    # Usando o Enum de forma segura
+    # Marca a tarefa atual como concluída
     tarefa.status = TaskStatus.CONCLUIDA.value
+
+    # ==========================================
+    # MOTOR DE RECORRÊNCIA AUTOMÁTICA
+    # ==========================================
+    if tarefa.is_recurring and tarefa.recurrence_day:
+        today = date.today()
+
+        # Calcula o mês e ano do próximo vencimento
+        if today.month == 12:
+            next_month = 1
+            next_year = today.year + 1
+        else:
+            next_month = today.month + 1
+            next_year = today.year
+
+        # Descobre o último dia daquele mês (para não dar erro se o dia for 31 e o mês tiver 30 dias)
+        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
+        day_to_use = min(tarefa.recurrence_day, last_day_of_month)
+
+        # Cria a data do próximo mês
+        next_due_date = date(next_year, next_month, day_to_use)
+
+        # Usa sua função existente para empurrar para o próximo dia útil se cair no fim de semana
+        next_due_date = ajustar_para_dia_util(next_due_date)
+
+        # Cria a nova tarefa do próximo mês
+        nova_tarefa = models.Task(
+            tenant_id=tenant_id,
+            client_id=tarefa.client_id,
+            title=tarefa.title,
+            description=tarefa.description,
+            due_date=next_due_date,
+            status=TaskStatus.PENDENTE.value,
+            assigned_to=tarefa.assigned_to,
+            grau_importancia=tarefa.grau_importancia,
+            is_recurring=True,  # Mantém a recorrência ativa
+            recurrence_day=tarefa.recurrence_day,
+        )
+        db.add(nova_tarefa)
+        # ==========================================
+
     db.commit()
     db.refresh(tarefa)
 
@@ -134,12 +178,13 @@ def excluir_obrigacao(
 
     return None
 
+
 @router.put("/{tarefa_id}", response_model=schemas.TaskResponse)
 def atualizar_obrigacao(
     tarefa_id: UUID,
-    tarefa_update: schemas.TaskCreate, # Reaproveitamos o schema de validação para garantir a consistência
+    tarefa_update: schemas.TaskCreate,  # Reaproveitamos o schema de validação para garantir a consistência
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -162,16 +207,20 @@ def atualizar_obrigacao(
     tarefa.client_id = tarefa_update.client_id
     tarefa.due_date = data_ajustada
     tarefa.grau_importancia = tarefa_update.grau_importancia
-    
+
     # Tratamento seguro para o Enum do Status
     tarefa.status = (
-        tarefa_update.status.value 
-        if hasattr(tarefa_update.status, 'value') 
+        tarefa_update.status.value
+        if hasattr(tarefa_update.status, "value")
         else tarefa_update.status
     )
-    
+
     if tarefa_update.assigned_to:
         tarefa.assigned_to = tarefa_update.assigned_to
+
+    # ADICIONE ESTAS DUAS LINHAS:
+    tarefa.is_recurring = tarefa_update.is_recurring
+    tarefa.recurrence_day = tarefa_update.recurrence_day
 
     # 3. Salva no Supabase
     db.commit()

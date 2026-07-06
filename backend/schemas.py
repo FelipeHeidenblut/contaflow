@@ -62,6 +62,8 @@ class TaskBase(BaseModel):
     client_id: UUID
     assigned_to: Optional[UUID] = None
     grau_importancia: str = "Média"
+    is_recurring: bool = False
+    recurrence_day: Optional[int] = None
 
 
 class TaskCreate(TaskBase):

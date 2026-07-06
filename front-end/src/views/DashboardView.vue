@@ -81,36 +81,42 @@ const tarefasNoPrazo = computed(
 )
 
 // ==========================================
-// 4. DISTRIBUIÇÃO DA EQUIPE
+// 4. CAPACIDADE DA EQUIPE (NOVO FORMATO)
 // ==========================================
 const cargaEquipe = computed(() => {
   const tarefasAtribuidas = officeTasks.value.filter(
     (t) => t.status !== 'concluida' && t.assigned_to,
   )
-  const carga: Record<string, { nome: string; count: number }> = {}
+  const carga: Record<string, { nome: string; count: number; percentual: number }> = {}
+
+  // Limite de tarefas para considerar sobrecarga (ex: 8 tarefas = 100% da capacidade visual)
+  const LIMITE_CAPACIDADE = 8
+
   membros.value.forEach((m) => {
-    carga[String(m.id)] = { nome: m.name, count: 0 }
+    carga[String(m.id)] = { nome: m.name, count: 0, percentual: 0 }
   })
+
   tarefasAtribuidas.forEach((t) => {
     const id = String(t.assigned_to)
     if (carga[id]) carga[id].count++
   })
+
+  // Calcula o percentual da barra de capacidade
+  Object.values(carga).forEach((m) => {
+    m.percentual = Math.min((m.count / LIMITE_CAPACIDADE) * 100, 100)
+  })
+
   return Object.values(carga).sort((a, b) => b.count - a.count)
 })
 
 // ==========================================
-// 5. RELATÓRIO AVANÇADO (NOVO)
+// 5. RELATÓRIO AVANÇADO
 // ==========================================
 const totalTarefasHistoricas = computed(() => officeTasks.value.length)
 
 const taxaConclusao = computed(() => {
   if (totalTarefasHistoricas.value === 0) return 0
   return Math.round((countConcluidas.value / totalTarefasHistoricas.value) * 100)
-})
-
-const taxaAtraso = computed(() => {
-  if (totalTarefasHistoricas.value === 0) return 0
-  return Math.round((dashData.value.tarefas_atrasadas / totalTarefasHistoricas.value) * 100)
 })
 
 const riscoMultas = computed(() => {
@@ -121,7 +127,6 @@ const riscoMultas = computed(() => {
   return { label: 'Conforme', class: 'text-emerald-600', bg: 'bg-emerald-50' }
 })
 
-// Verifica se o usuário tem direito de ver o relatório
 const hasRelatorioPremium = computed(() => {
   return dashData.value.plano === 'profissional' || dashData.value.plano === 'business'
 })
@@ -272,9 +277,9 @@ onMounted(() => fetchData())
 <template>
   <Layout title="Dashboard">
     <!-- Cabeçalho com Selo do Plano -->
-    <div class="mb-8 flex items-center justify-between flex-wrap gap-4">
+    <div class="mb-10 flex items-center justify-between flex-wrap gap-4">
       <div>
-        <h1 class="text-3xl font-extrabold text-[#19341a] flex items-center gap-3">
+        <h1 class="text-3xl font-extrabold text-[#19341a] flex items-center gap-3 tracking-tight">
           Visão Geral
           <span
             class="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider"
@@ -283,7 +288,7 @@ onMounted(() => fetchData())
             {{ planoLabel }}
           </span>
         </h1>
-        <p class="text-[#2a2a2a]/60 text-sm mt-1">
+        <p class="text-[#2a2a2a]/50 text-sm mt-1">
           Acompanhe as métricas e o calendário do seu escritório.
         </p>
       </div>
@@ -291,11 +296,11 @@ onMounted(() => fetchData())
 
     <div v-if="isLoading" class="text-center text-[#2a2a2a]/50 py-10">Carregando métricas...</div>
 
-    <div v-else>
+    <div v-else class="space-y-10">
       <!-- BANNERS DE AÇÃO -->
       <div
         v-if="dashData.plano === 'free' && dashData.status_pagamento === 'ativo'"
-        class="mb-8 p-4 bg-[#eaf3ea] border border-[#19341a]/10 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
+        class="p-5 bg-[#eaf3ea] border border-[#19341a]/10 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
       >
         <div class="flex items-center gap-3">
           <div
@@ -326,7 +331,7 @@ onMounted(() => fetchData())
 
       <div
         v-else-if="dashData.status_pagamento === 'aguardando_pagamento'"
-        class="mb-8 p-4 bg-yellow-50 border border-yellow-100 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
+        class="p-5 bg-yellow-50 border border-yellow-100 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
       >
         <div class="flex items-center gap-3">
           <div
@@ -358,7 +363,7 @@ onMounted(() => fetchData())
 
       <div
         v-else-if="dashData.status_pagamento === 'inadimplente'"
-        class="mb-8 p-4 bg-red-50 border border-red-100 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
+        class="p-5 bg-red-50 border border-red-100 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4"
       >
         <div class="flex items-center gap-3">
           <div
@@ -387,162 +392,161 @@ onMounted(() => fetchData())
         >
       </div>
 
-      <!-- Linha de Cards Clicáveis -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      <!-- Linha de KPIs (Mais limpos e arejados) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div
           @click="goToClients"
-          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
         >
-          <div
-            class="h-14 w-14 rounded-xl bg-[#eaf3ea] flex items-center justify-center flex-shrink-0"
-          >
-            <svg
-              class="w-7 h-7 text-[#19341a]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              ></path>
-            </svg>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-gray-400">Total de Clientes</p>
+            <div class="h-9 w-9 rounded-lg bg-[#eaf3ea] flex items-center justify-center">
+              <svg
+                class="w-5 h-5 text-[#19341a]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                ></path>
+              </svg>
+            </div>
           </div>
-          <div>
-            <p class="text-sm font-medium text-[#2a2a2a]/60">Total de Clientes</p>
-            <p class="text-3xl font-extrabold text-[#19341a]">{{ dashData.total_clientes }}</p>
-          </div>
+          <p class="text-4xl font-extrabold text-[#19341a] tracking-tight">
+            {{ dashData.total_clientes }}
+          </p>
         </div>
 
         <div
           @click="goToTasks"
-          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
         >
-          <div
-            class="h-14 w-14 rounded-xl bg-[#fff3e0] flex items-center justify-center flex-shrink-0"
-          >
-            <svg
-              class="w-7 h-7 text-[#ff8a65]"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-gray-400">Tarefas Abertas</p>
+            <div class="h-9 w-9 rounded-lg bg-[#fff3e0] flex items-center justify-center">
+              <svg
+                class="w-5 h-5 text-[#ff8a65]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+            </div>
           </div>
-          <div>
-            <p class="text-sm font-medium text-[#2a2a2a]/60">Tarefas Abertas</p>
-            <p class="text-3xl font-extrabold text-[#19341a]">{{ dashData.tarefas_abertas }}</p>
-          </div>
+          <p class="text-4xl font-extrabold text-[#19341a] tracking-tight">
+            {{ dashData.tarefas_abertas }}
+          </p>
         </div>
 
         <div
           @click="goToTasks"
-          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
         >
-          <div
-            class="h-14 w-14 rounded-xl bg-yellow-50 flex items-center justify-center flex-shrink-0"
-          >
-            <svg
-              class="w-7 h-7 text-yellow-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              ></path>
-            </svg>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-gray-400">Urgentes</p>
+            <div class="h-9 w-9 rounded-lg bg-yellow-50 flex items-center justify-center">
+              <svg
+                class="w-5 h-5 text-yellow-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                ></path>
+              </svg>
+            </div>
           </div>
-          <div>
-            <p class="text-sm font-medium text-[#2a2a2a]/60">Urgentes</p>
-            <p class="text-3xl font-extrabold text-yellow-600">{{ countUrgentes }}</p>
-          </div>
+          <p class="text-4xl font-extrabold text-yellow-600 tracking-tight">{{ countUrgentes }}</p>
         </div>
 
         <div
           @click="goToTasks"
-          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 flex items-center gap-5 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
+          class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col gap-4 transition-all hover:shadow-md hover:-translate-y-1 cursor-pointer"
         >
-          <div
-            class="h-14 w-14 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0"
-          >
-            <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              ></path>
-            </svg>
+          <div class="flex items-center justify-between">
+            <p class="text-sm font-medium text-gray-400">Atrasadas</p>
+            <div class="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
+              <svg
+                class="w-5 h-5 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+            </div>
           </div>
-          <div>
-            <p class="text-sm font-medium text-[#2a2a2a]/60">Atrasadas</p>
-            <p class="text-3xl font-extrabold text-red-500">{{ dashData.tarefas_atrasadas }}</p>
-          </div>
+          <p class="text-4xl font-extrabold text-red-500 tracking-tight">
+            {{ dashData.tarefas_atrasadas }}
+          </p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="lg:col-span-1 space-y-6">
+      <!-- Grid Principal (Respiro maior) -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-1 space-y-8">
           <!-- Saúde dos Prazos -->
-          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
-            <h3 class="text-lg font-bold text-[#19341a] mb-6">Saúde dos Prazos</h3>
-            <div v-if="totalStatus === 0" class="text-center text-[#2a2a2a]/40 py-8">
+          <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <h3 class="text-lg font-bold text-[#19341a] mb-6 tracking-tight">Saúde dos Prazos</h3>
+            <div v-if="totalStatus === 0" class="text-center text-gray-400 py-8">
               Nenhuma tarefa cadastrada.
             </div>
             <div v-else class="space-y-6">
               <div>
-                <div class="flex justify-between mb-1">
-                  <span class="text-sm font-medium text-[#2a2a2a]/70">Distribuição Global</span>
-                  <span class="text-sm font-medium text-[#2a2a2a]/50">{{ totalStatus }} total</span>
+                <div class="flex justify-between mb-2">
+                  <span class="text-xs font-medium text-gray-500">Distribuição Global</span>
+                  <span class="text-xs font-bold text-gray-700">{{ totalStatus }} total</span>
                 </div>
-                <div class="w-full bg-gray-100 rounded-full h-4 flex overflow-hidden">
+                <div class="w-full bg-gray-100 rounded-full h-3 flex overflow-hidden">
                   <div
                     :style="{ width: percConcluidas + '%' }"
-                    class="bg-[#19341a] h-4 transition-all duration-500"
-                    title="Concluídas"
+                    class="bg-[#19341a] h-3 transition-all duration-500"
                   ></div>
                   <div
                     :style="{ width: percNoPrazo + '%' }"
-                    class="bg-[#8ecba0] h-4 transition-all duration-500"
-                    title="No Prazo"
+                    class="bg-[#8ecba0] h-3 transition-all duration-500"
                   ></div>
                   <div
                     :style="{ width: percAtrasadas + '%' }"
-                    class="bg-red-500 h-4 transition-all duration-500"
-                    title="Atrasadas"
+                    class="bg-red-500 h-3 transition-all duration-500"
                   ></div>
                 </div>
               </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div class="flex flex-col items-center bg-[#eaf3ea] p-2 rounded-lg">
-                  <p class="text-[10px] uppercase font-bold text-[#19341a]/60">Concluídas</p>
-                  <p class="text-lg font-extrabold text-[#19341a]">{{ countConcluidas }}</p>
+              <div class="grid grid-cols-2 gap-3">
+                <div class="flex flex-col items-center bg-[#f9fafb] p-3 rounded-xl">
+                  <p class="text-[10px] uppercase font-bold text-gray-400">Concluídas</p>
+                  <p class="text-xl font-extrabold text-[#19341a]">{{ countConcluidas }}</p>
                 </div>
-                <div class="flex flex-col items-center bg-gray-50 p-2 rounded-lg">
-                  <p class="text-[10px] uppercase font-bold text-gray-500">Pendentes</p>
-                  <p class="text-lg font-extrabold text-gray-700">{{ tarefasNoPrazo }}</p>
+                <div class="flex flex-col items-center bg-[#f9fafb] p-3 rounded-xl">
+                  <p class="text-[10px] uppercase font-bold text-gray-400">Pendentes</p>
+                  <p class="text-xl font-extrabold text-gray-700">{{ tarefasNoPrazo }}</p>
                 </div>
-                <div
-                  class="flex flex-col items-center bg-yellow-50 p-2 rounded-lg border border-yellow-100"
-                >
+                <div class="flex flex-col items-center bg-yellow-50 p-3 rounded-xl">
                   <p class="text-[10px] uppercase font-bold text-yellow-600">Aguard. Cliente</p>
-                  <p class="text-lg font-extrabold text-yellow-700">{{ countAguardandoCliente }}</p>
+                  <p class="text-xl font-extrabold text-yellow-700">{{ countAguardandoCliente }}</p>
                 </div>
-                <div class="flex flex-col items-center bg-red-50 p-2 rounded-lg">
+                <div class="flex flex-col items-center bg-red-50 p-3 rounded-xl">
                   <p class="text-[10px] uppercase font-bold text-red-500">Atrasadas</p>
-                  <p class="text-lg font-extrabold text-red-600">
+                  <p class="text-xl font-extrabold text-red-600">
                     {{ dashData.tarefas_atrasadas }}
                   </p>
                 </div>
@@ -552,73 +556,68 @@ onMounted(() => fetchData())
 
           <!-- Foco do Dia -->
           <div
-            class="bg-gradient-to-br from-[#19341a] to-[#2a4830] p-6 rounded-2xl shadow-sm text-white flex flex-col min-h-[220px]"
+            class="bg-[#19341a] p-6 rounded-2xl shadow-sm text-white flex flex-col min-h-[240px]"
           >
-            <h3 class="text-lg font-bold mb-1">Foco do Dia</h3>
-            <div v-if="focoDoDiaTasks.length > 0" class="flex-1 mt-4 space-y-3">
+            <h3 class="text-lg font-bold mb-4 tracking-tight">Foco do Dia</h3>
+            <div v-if="focoDoDiaTasks.length > 0" class="flex-1 space-y-3">
               <RouterLink
                 to="/obrigacoes"
                 v-for="task in focoDoDiaTasks"
                 :key="task.id"
-                class="block bg-white/10 p-3 rounded-xl border border-white/20 hover:bg-white/20 transition-all group"
+                class="block bg-white/5 p-4 rounded-xl border border-white/10 hover:bg-white/10 transition-all"
               >
                 <div class="flex justify-between items-start mb-1 gap-2">
-                  <span
-                    class="font-bold text-sm leading-tight group-hover:text-[#ff8a65] transition-colors"
-                    >{{ task.title }}</span
-                  >
+                  <span class="font-bold text-sm leading-tight">{{ task.title }}</span>
                   <div class="flex flex-col items-end gap-1">
                     <span
                       v-if="task.status === 'aguardando_cliente'"
-                      class="text-[9px] bg-yellow-500 text-black px-1.5 py-0.5 rounded uppercase font-bold tracking-wider"
+                      class="text-[9px] bg-yellow-500 text-black px-1.5 py-0.5 rounded uppercase font-bold"
                       >Aguardando</span
                     >
                     <span
                       v-else-if="task.grau_importancia === 'Urgente'"
-                      class="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase font-bold tracking-wider"
+                      class="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase font-bold"
                       >Urgente</span
                     >
                     <span
                       v-else-if="task.grau_importancia === 'Alta'"
-                      class="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded uppercase font-bold tracking-wider"
+                      class="text-[9px] bg-orange-500 text-white px-1.5 py-0.5 rounded uppercase font-bold"
                       >Alta</span
                     >
                   </div>
                 </div>
-                <div class="text-white/60 text-xs flex justify-between items-center mt-2">
+                <div class="text-white/50 text-xs flex justify-between items-center mt-2">
                   <span>Prazo: {{ formatDate(task.due_date) }}</span>
-                  <span>Ver Detalhes →</span>
+                  <span>Ver →</span>
                 </div>
               </RouterLink>
             </div>
-            <div v-else class="flex-1 flex flex-col items-center justify-center text-center mt-6">
-              <div class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center mb-3">
+            <div v-else class="flex-1 flex flex-col items-center justify-center text-center">
+              <div class="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3">
                 🎉
               </div>
-              <p class="text-white/80 text-sm">
-                Tudo sob controle! Nenhuma pendência urgente no momento.
-              </p>
+              <p class="text-white/60 text-sm">Tudo sob controle! Nenhuma pendência urgente.</p>
             </div>
           </div>
         </div>
 
         <!-- Próximos 7 Dias -->
-        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80">
+        <div class="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div class="flex items-center justify-between mb-6">
-            <h3 class="text-lg font-bold text-[#19341a]">Próximos 7 Dias</h3>
+            <h3 class="text-lg font-bold text-[#19341a] tracking-tight">Próximos 7 Dias</h3>
             <RouterLink
               to="/calendario"
-              class="text-sm font-bold text-[#ff8a65] hover:text-[#f07047] transition-colors"
-              >Ver Calendário Completo →</RouterLink
+              class="text-xs font-bold text-[#ff8a65] hover:text-[#f07047] transition-colors"
+              >Ver Calendário →</RouterLink
             >
           </div>
-          <div class="space-y-3">
+          <div class="space-y-4">
             <div
               v-for="task in proximosPrazos"
               :key="task.id"
-              class="flex items-center justify-between p-3 rounded-xl hover:bg-gray-50 border border-gray-100 transition-colors"
+              class="flex items-center justify-between p-4 rounded-xl hover:bg-gray-50 border border-gray-100 transition-colors"
             >
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-4">
                 <div
                   class="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   :class="getStatusColor(task.status)"
@@ -631,7 +630,7 @@ onMounted(() => fetchData())
                 </div>
               </div>
               <div class="text-right">
-                <p class="text-sm font-bold text-[#2a2a2a]/80">
+                <p class="text-sm font-bold text-gray-700">
                   {{ formatDate(task.due_date || task.date) }}
                 </p>
                 <p class="text-[10px] uppercase font-bold text-gray-400">
@@ -640,57 +639,61 @@ onMounted(() => fetchData())
               </div>
             </div>
             <div v-if="proximosPrazos.length === 0" class="text-center py-8 text-gray-400 text-sm">
-              Nenhum prazo para os próximos 7 dias. Você está em dia! 🎉
+              Nenhum prazo para os próximos 7 dias. 🎉
             </div>
           </div>
         </div>
       </div>
 
-      <!-- DISTRIBUIÇÃO DA EQUIPE -->
-      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 mb-6">
+      <!-- CAPACIDADE DA EQUIPE (Estilo Karbon) -->
+      <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="text-lg font-bold text-[#19341a]">Distribuição da Equipe</h3>
-          <span class="text-xs text-gray-400 font-medium">Tarefas em aberto por membro</span>
+          <div>
+            <h3 class="text-lg font-bold text-[#19341a] tracking-tight">Capacidade da Equipe</h3>
+            <p class="text-xs text-gray-400 mt-1">Distribuição de tarefas em aberto.</p>
+          </div>
         </div>
         <div v-if="cargaEquipe.length === 0" class="text-center py-8 text-gray-400 text-sm">
           Nenhum membro cadastrado ou sem tarefas atribuídas.
         </div>
-        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div
-            v-for="membro in cargaEquipe"
-            :key="membro.nome"
-            class="border border-gray-100 rounded-xl p-4 flex items-center gap-3 hover:border-[#ff8a65]/40 transition-colors"
-          >
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div v-for="membro in cargaEquipe" :key="membro.nome" class="flex items-center gap-4">
             <div
-              class="w-10 h-10 rounded-full bg-[#19341a]/10 text-[#19341a] flex items-center justify-center font-bold flex-shrink-0"
+              class="w-10 h-10 rounded-full bg-[#eaf3ea] text-[#19341a] flex items-center justify-center font-bold flex-shrink-0"
             >
               {{ getIniciaisMembro(membro.nome) }}
             </div>
-            <div class="min-w-0">
-              <p class="text-sm font-bold text-[#19341a] truncate">{{ membro.nome }}</p>
-              <p
-                class="text-xs font-medium"
-                :class="membro.count > 5 ? 'text-orange-500' : 'text-gray-500'"
-              >
-                {{ membro.count }}
-                {{ membro.count === 1 ? 'tarefa em aberto' : 'tarefas em aberto' }}
-              </p>
+            <div class="flex-1 min-w-0">
+              <div class="flex justify-between items-center mb-1">
+                <p class="text-sm font-bold text-[#19341a] truncate">{{ membro.nome }}</p>
+                <span
+                  class="text-xs font-bold"
+                  :class="membro.count > 5 ? 'text-orange-500' : 'text-gray-400'"
+                >
+                  {{ membro.count }} tarefas
+                </span>
+              </div>
+              <!-- Barra de Capacidade -->
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div
+                  class="h-2 rounded-full transition-all duration-500"
+                  :class="membro.count > 5 ? 'bg-orange-500' : 'bg-[#19341a]'"
+                  :style="{ width: membro.percentual + '%' }"
+                ></div>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ========================================== -->
-      <!-- RELATÓRIO AVANÇADO (PREMIUM)               -->
-      <!-- ========================================== -->
+      <!-- RELATÓRIO AVANÇADO (PREMIUM) -->
       <div
-        class="relative bg-white p-6 rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden"
+        class="relative bg-white p-6 rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
       >
-        <!-- Conteúdo do Relatório (Fica embaçado se for Free/Básico) -->
         <div :class="{ 'blur-sm pointer-events-none select-none': !hasRelatorioPremium }">
           <div class="flex items-center justify-between mb-6">
             <div>
-              <h3 class="text-lg font-bold text-[#19341a] flex items-center gap-2">
+              <h3 class="text-lg font-bold text-[#19341a] flex items-center gap-2 tracking-tight">
                 Relatório de Produtividade
                 <span
                   class="text-[9px] font-bold bg-[#19341a] text-white px-1.5 py-0.5 rounded uppercase"
@@ -704,8 +707,7 @@ onMounted(() => fetchData())
           </div>
 
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Card 1: Taxa de Conclusão -->
-            <div class="bg-[#f8f8f8] p-5 rounded-xl border border-gray-100">
+            <div class="bg-[#f9fafb] p-5 rounded-xl border border-gray-100">
               <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Taxa de Conclusão
               </p>
@@ -714,17 +716,13 @@ onMounted(() => fetchData())
               </div>
               <div class="w-full bg-gray-200 rounded-full h-2.5">
                 <div
-                  class="bg-[#19341a] h-2.5 rounded-full transition-all duration-500"
+                  class="bg-[#19341a] h-2.5 rounded-full"
                   :style="{ width: taxaConclusao + '%' }"
                 ></div>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">
-                {{ countConcluidas }} de {{ totalTarefasHistoricas }} tarefas concluídas
-              </p>
             </div>
 
-            <!-- Card 2: Risco de Multas -->
-            <div class="bg-[#f8f8f8] p-5 rounded-xl border border-gray-100">
+            <div class="bg-[#f9fafb] p-5 rounded-xl border border-gray-100">
               <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Risco de Multas
               </p>
@@ -735,17 +733,13 @@ onMounted(() => fetchData())
               </div>
               <div class="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
                 <div
-                  class="bg-red-500 h-2.5 transition-all duration-500"
+                  class="bg-red-500 h-2.5"
                   :style="{ width: (dashData.tarefas_atrasadas > 0 ? '100' : '0') + '%' }"
                 ></div>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">
-                {{ dashData.tarefas_atrasadas }} tarefas atrasadas historicamente
-              </p>
             </div>
 
-            <!-- Card 3: Volume de Entregas -->
-            <div class="bg-[#f8f8f8] p-5 rounded-xl border border-gray-100">
+            <div class="bg-[#f9fafb] p-5 rounded-xl border border-gray-100">
               <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
                 Volume de Entregas
               </p>
@@ -754,18 +748,15 @@ onMounted(() => fetchData())
                 <span class="text-sm text-gray-400 mb-1">tarefas</span>
               </div>
               <div class="flex gap-1 h-2.5">
-                <!-- Simulação de gráfico de barras simples -->
                 <div class="flex-1 bg-[#ff8a65]/30 rounded-sm h-full"></div>
                 <div class="flex-1 bg-[#ff8a65]/50 rounded-sm h-full"></div>
                 <div class="flex-1 bg-[#ff8a65]/70 rounded-sm h-full"></div>
                 <div class="flex-1 bg-[#ff8a65] rounded-sm h-full"></div>
               </div>
-              <p class="text-[11px] text-gray-400 mt-2">Total entregue no ciclo atual</p>
             </div>
           </div>
         </div>
 
-        <!-- Overlay de Bloqueio (Aparece apenas para Free/Básico) -->
         <div
           v-if="!hasRelatorioPremium"
           class="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[2px] z-10"

@@ -92,6 +92,9 @@ class Task(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    is_recurring = Column(Boolean, default=False)
+
+    recurrence_day = Column(Integer, nullable=True)
     # Dentro da classe Tarefa
     grau_importancia = Column(String, default="Média")
 

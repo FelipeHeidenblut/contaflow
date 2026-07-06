@@ -89,8 +89,8 @@ def criar_assinatura(
 
     # 2. Definições do Plano (Removido o Starter, pois agora é Free)
     valores = {
-        "basico": 149.00,
-        "profissional": 197.00,
+        "basico": 79.90,
+        "profissional": 149.90,
         "business": 449.00,
     }
 
@@ -104,7 +104,7 @@ def criar_assinatura(
         "billingType": "UNDEFINED",
         "value": valores[plano],
         "cycle": "MONTHLY",
-        "description": f"Plano {plano.capitalize()} - ContaFlow",
+        "description": f"Plano {plano.capitalize()} - ContablyTask",
         "nextDueDate": vencimento_amanha,
     }
 

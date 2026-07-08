@@ -1,0 +1,17 @@
+name: Keep Render Awake
+
+on:
+  schedule:
+    # Roda a cada 10 minutos (Sintaxe Cron)
+    - cron: "*/10 * * * *"
+  # Permite rodar manualmente se você quiser testar
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cutucar o servidor do Render
+        run: |
+          # Tenta bater na rota /db-check. Se der erro, ele ignora e tenta daqui a 10 min denovo
+          curl -sSf --max-time 60 ${{ secrets.RENDER_API_URL }}/db-check > /dev/null || true

@@ -33,7 +33,12 @@ frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],  # <-- ALTERAÇÃO AQUI: Dinâmico!
+    allow_origins=[
+        "https://www.contablytask.com.br",
+        "https://contablytask.com.br",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

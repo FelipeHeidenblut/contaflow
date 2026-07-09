@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase' // Ajuste o caminho se necessár
 
 // Cria a instância base do Axios apontando para o FastAPI
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://contablytaskapi-back-end.otkayl.easypanel.host',
+  baseURL: import.meta.env.VITE_API_URL || 'https://api.contablytask.com.br',
   timeout: 10000,
 })
 

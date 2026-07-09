@@ -176,14 +176,14 @@ const fetchData = async () => {
   try {
     const [dashRes, tasksRes] = await Promise.all([
       api.get('/api/v1/dashboard/'),
-      api.get('/api/v1/obrigacoes/'),
+      api.get('/api/v1/obrigacoes'),
     ])
 
     dashData.value = dashRes.data
     const apiTasks: TaskData[] = tasksRes.data.map((t: any) => ({ ...t, type: 'task' }))
 
     try {
-      const membrosRes = await api.get('/api/v1/membros/')
+      const membrosRes = await api.get('/api/v1/membros')
       membros.value = membrosRes.data
     } catch (error) {
       membros.value = []
@@ -191,7 +191,7 @@ const fetchData = async () => {
 
     let federalTasks: TaskData[] = []
     try {
-      const fiscalRes = await api.get('/api/v1/fiscal-deadlines/')
+      const fiscalRes = await api.get('/api/v1/fiscal-deadlines')
       federalTasks = fiscalRes.data.map((f: any) => ({
         ...f,
         date: f.deadline_date,

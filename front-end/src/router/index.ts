@@ -1,16 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth' // Importação da sua Store de Autenticação
-
-// ==========================================
-// IMPORTAÇÕES ESTÁTICAS (Apenas rotas públicas para Fast Load)
-// ==========================================
-import LandingView from '../views/LandingView.vue'
-import LoginView from '../views/LoginView.vue'
-import CadastroView from '../views/CadastroView.vue'
-import ForgotPasswordView from '../views/ForgotPasswordView.vue'
-import ResetPasswordView from '../views/ResetPasswordView.vue'
-import PrivacidadeView from '../views/PrivacidadeView.vue'
-import TermosView from '../views/TermosView.vue'
+import { useAuthStore } from '../stores/auth'
 
 // As rotas privadas serão carregadas via Lazy Loading abaixo para otimizar performance.
 
@@ -18,20 +7,20 @@ const routes = [
   // ==========================================
   // ROTAS PÚBLICAS
   // ==========================================
-  { path: '/', component: LandingView },
-  { path: '/login', component: LoginView, meta: { guestOnly: true } },
-  { path: '/cadastro', component: CadastroView, meta: { guestOnly: true } },
-  { path: '/esqueceu-senha', component: ForgotPasswordView, meta: { guestOnly: true } },
-  { path: '/redefinir-senha', component: ResetPasswordView, meta: { guestOnly: true } },
-  { path: '/privacidade', component: PrivacidadeView },
-  { path: '/termos', component: TermosView },
+  { path: '/', component: () => import('@/views/LandingView.vue') },
+  { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { guestOnly: true } },
+  { path: '/cadastro', component: () => import('@/views/CadastroView.vue'), meta: { guestOnly: true } },
+  { path: '/esqueceu-senha', component: () => import('@/views/ForgotPasswordView.vue'), meta: { guestOnly: true } },
+  { path: '/redefinir-senha', component: () => import('@/views/ResetPasswordView.vue'), meta: { guestOnly: true } },
+  { path: '/privacidade', component: () => import('@/views/PrivacidadeView.vue') },
+  { path: '/termos', component: () => import('@/views/TermosView.vue') },
 
   // ==========================================
   // ROTAS PRIVADAS (Painel do Cliente SaaS)
   // ==========================================
   {
     path: '/dashboard',
-    component: () => import('../views/DashboardView.vue'),
+    component: () => import('@/views/DashboardView.vue'),
     meta: { requiresAuth: true },
   },
   {

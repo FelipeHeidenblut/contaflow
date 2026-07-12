@@ -37,7 +37,41 @@ const selectedDayTasks = ref<TaskData[]>([])
 const selectedDayTitle = ref('')
 
 // ==========================================
-// 3. LÓGICA DO CALENDÁRIO
+// 3. SINCRONIZAÇÃO ICS (.ics)
+// ==========================================
+// Pega a URL base do backend do arquivo .env (ou usa localhost se não tiver)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://api.contablytask.com.br'
+
+const icsUrl = ref('')
+const copied = ref(false)
+
+const carregarIcsUrl = async () => {
+  try {
+    // Busca o tenant_id do usuário logado no backend
+    const res = await api.get('/api/v1/auth/me')
+    if (res.data.tenant_id) {
+      icsUrl.value = `${API_BASE_URL}/api/v1/calendario/feed/${res.data.tenant_id}.ics`
+    } else {
+      console.warn("Backend não retornou tenant_id na rota /me")
+    }
+  } catch (error) {
+    console.error("Erro ao buscar tenant_id para o link ICS:", error)
+  }
+}
+
+const copyLink = async () => {
+  try {
+    await navigator.clipboard.writeText(icsUrl.value)
+    copied.value = true
+    toast.success('Link copiado! Cole no Google Agenda ou Outlook.')
+    setTimeout(() => copied.value = false, 3000)
+  } catch (error) {
+    toast.error('Não foi possível copiar o link.')
+  }
+}
+
+// ==========================================
+// 4. LÓGICA DO CALENDÁRIO
 // ==========================================
 const currentMonth = computed(() => currentDate.value.toLocaleDateString('pt-BR', { month: 'long' }))
 const currentYear = computed(() => currentDate.value.getFullYear())
@@ -69,7 +103,7 @@ const nextMonth = () => {
 }
 
 // ==========================================
-// 4. MODAL DO DIA (NOVO)
+// 5. MODAL DO DIA (NOVO)
 // ==========================================
 const openDayModal = (day: CalendarDay) => {
   // Só abre se o dia tiver tarefas
@@ -82,7 +116,7 @@ const openDayModal = (day: CalendarDay) => {
 }
 
 // ==========================================
-// 5. CHAMADAS À API
+// 6. CHAMADAS À API
 // ==========================================
 const fetchData = async () => {
   isLoading.value = true
@@ -111,11 +145,11 @@ const fetchData = async () => {
 }
 
 // ==========================================
-// 6. HELPERS VISUAIS
+// 7. HELPERS VISUAIS
 // ==========================================
 const getStatusColor = (status: string) => {
-  if (status === 'concluida') return 'bg-[#19341a]' 
-  if (status === 'em_andamento') return 'bg-[#ff8a65]' 
+  if (status === 'concluida') return 'bg-[#19341a]'
+  if (status === 'em_andamento') return 'bg-[#ff8a65]'
   if (status === 'aguardando_cliente') return 'bg-yellow-400'
   return 'bg-gray-400'
 }
@@ -139,13 +173,16 @@ const isToday = (day: number) => {
   )
 }
 
-onMounted(() => fetchData())
+onMounted(() => {
+  fetchData()
+  carregarIcsUrl()
+})
 </script>
 
 <template>
   <Layout title="Calendário de Prazos">
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-6 md:p-8">
-      
+
       <!-- Cabeçalho do Calendário -->
       <div class="flex items-center justify-between mb-8">
         <h2 class="text-2xl font-extrabold text-[#19341a] capitalize tracking-tight">
@@ -157,6 +194,25 @@ onMounted(() => fetchData())
           </button>
           <button @click="nextMonth" class="p-2.5 rounded-lg hover:bg-[#eaf3ea] transition-colors text-[#2a2a2a]/60 hover:text-[#19341a] border border-gray-100">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- CARTÃO DE SINCRONIZAÇÃO (.ICS) -->
+      <div v-if="icsUrl" class="mb-8 p-5 bg-[#eaf3ea] border border-[#19341a]/10 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3 text-center md:text-left">
+          <div class="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-[#19341a] flex-shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          </div>
+          <div>
+            <p class="font-bold text-[#19341a]">Sincronizar com minha agenda</p>
+            <p class="text-sm text-gray-500">Adicione este link no Google Agenda ou Outlook para ver seus prazos no celular.</p>
+          </div>
+        </div>
+        <div class="flex gap-2 items-center w-full md:w-auto">
+          <input type="text" readonly :value="icsUrl" class="flex-1 md:w-64 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white text-gray-500 outline-none" />
+          <button @click="copyLink" class="bg-[#19341a] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#0f2010] transition-colors whitespace-nowrap">
+            {{ copied ? 'Copiado!' : 'Copiar Link' }}
           </button>
         </div>
       </div>
@@ -212,7 +268,7 @@ onMounted(() => fetchData())
                     </template>
                   </div>
                 </template>
-                
+
                 <div v-if="day.tasks.length > 3" class="mt-1 text-[10px] font-bold text-center text-[#ff8a65] bg-[#fff3e0] rounded-md py-0.5 border border-[#ffe0b2]">
                   + {{ day.tasks.length - 3 }} tarefas (Clique para ver)
                 </div>
@@ -236,7 +292,7 @@ onMounted(() => fetchData())
     <!-- ========================================== -->
     <div v-if="isDayModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" @click="isDayModalOpen = false">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" @click.stop>
-        
+
         <!-- Cabeçalho do Modal -->
         <div class="bg-[#19341a] px-6 py-5 flex justify-between items-center">
           <div>
@@ -248,10 +304,10 @@ onMounted(() => fetchData())
 
         <!-- Lista de Tarefas do Dia -->
         <div class="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
-          <div v-for="task in selectedDayTasks" :key="task.id" 
+          <div v-for="task in selectedDayTasks" :key="task.id"
                class="flex items-start gap-3 p-4 rounded-xl border transition-colors"
                :class="task.type === 'receita_federal' ? 'bg-[#fff3e0] border-[#ffe0b2]' : 'bg-[#f8f8f8] border-gray-100'">
-            
+
             <div class="flex-shrink-0 mt-1">
               <span v-if="task.type === 'receita_federal'" class="text-xl">🏛️</span>
               <div v-else class="w-3 h-3 rounded-full" :class="getStatusColor(task.status)"></div>
@@ -260,10 +316,10 @@ onMounted(() => fetchData())
             <div class="flex-1 min-w-0">
               <p class="text-sm font-bold text-[#19341a]">{{ task.title }}</p>
               <p v-if="task.description" class="text-xs text-gray-500 mt-1 truncate">{{ task.description }}</p>
-              
+
               <div class="flex items-center gap-3 mt-2">
-                <span v-if="task.type !== 'receita_federal'" 
-                      class="text-[10px] font-bold px-2 py-0.5 rounded-md" 
+                <span v-if="task.type !== 'receita_federal'"
+                      class="text-[10px] font-bold px-2 py-0.5 rounded-md"
                       :class="getStatusColor(task.status) + ' text-white'">
                   {{ getStatusLabel(task.status) }}
                 </span>

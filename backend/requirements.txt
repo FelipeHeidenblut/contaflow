@@ -11,3 +11,4 @@ supabase
 alembic==1.18.4
 email-validator==2.3.0
 gunicorn
+icalendar

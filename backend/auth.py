@@ -113,4 +113,5 @@ def get_me(current_user: dict = Depends(get_current_user)):
     return {
         "role": current_user.get("role"),
         "is_superadmin": current_user.get("is_superadmin"),
+        "tenant_id": current_user.get("tenant_id"),
     }

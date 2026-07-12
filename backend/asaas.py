@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
-logger = logging.getLogger("ContaFlow.Asaas")
+logger = logging.getLogger("ContablyTask.Asaas")
 
 load_dotenv()
 
@@ -130,7 +130,7 @@ def criar_assinatura(
         tenant.plano = plano
         tenant.status_pagamento = "aguardando_pagamento"
         db.commit()
-        logger.info(f"Assinatura gerada para o tenant {tenant_id}. Plano: {plano}")
+        logger.info(f"Assinatura gerada para o tenant {tenant_id}. Aguardando pagamento.")
 
         return {
             "invoice_url": invoice_url,
@@ -172,27 +172,35 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
             payment_data = payload.get("payment", payload)
             customer_id = payment_data.get("customer") or payload.get("customer")
 
+            # Pega o valor que o cliente pagou
+            payment_value = payment_data.get("value")
+
             if customer_id:
-                tenant = (
-                    db.query(models.Tenant)
-                    .filter(models.Tenant.asaas_customer_id == customer_id)
-                    .first()
-                )
+                tenant = db.query(models.Tenant).filter(models.Tenant.asaas_customer_id == customer_id).first()
 
                 if tenant:
-                    db.execute(
-                        update(models.Tenant)
-                        .where(models.Tenant.id == tenant.id)
-                        .values(status_pagamento="ativo")
-                    )
-                    db.commit()
-                    logger.info(
-                        f"[WEBHOOK SUCESSO] Pagamento confirmado! Escritório {tenant.razao_social} liberado."
-                    )
+                    # Descobre qual plano ele pagou baseado no valor
+                    plano_ativado = None
+                    if payment_value == 79.90:
+                        plano_ativado = "basico"
+                    elif payment_value == 149.90:
+                        plano_ativado = "profissional"
+                    elif payment_value == 449.00:
+                        plano_ativado = "business"
+
+                    if plano_ativado:
+                        # SÓ AQUI O PLANO É ALTERADO NO BANCO DE DADOS!
+                        db.execute(
+                            update(models.Tenant)
+                            .where(models.Tenant.id == tenant.id)
+                            .values(status_pagamento="ativo", plano=plano_ativado)
+                        )
+                        db.commit()
+                        logger.info(f"[WEBHOOK SUCESSO] Pagamento de R${payment_value} confirmado! Plano {plano_ativado} liberado para {tenant.razao_social}.")
+                    else:
+                        logger.warning(f"[WEBHOOK AVISO] Pagamento recebido de R${payment_value}, mas não bate com nenhum plano.")
                 else:
-                    logger.warning(
-                        f"[WEBHOOK AVISO] Cliente do Asaas {customer_id} não encontrado no banco."
-                    )
+                    logger.warning(f"[WEBHOOK AVISO] Cliente do Asaas {customer_id} não encontrado no banco.")
 
         # 3. Bloqueio Automático (Inadimplência, Estorno ou Cancelamento)
         elif event in [

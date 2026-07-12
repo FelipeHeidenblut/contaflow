@@ -15,4 +15,20 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Separa o Supabase em um arquivo próprio
+            if (id.includes('@supabase')) return 'supabase'
+            // Separa o Vue/Pinia em outro
+            if (id.includes('vue') || id.includes('pinia')) return 'vue-core'
+            // O resto das bibliotecas
+            return 'vendor'
+          }
+        }
+      }
+    }
+  }
 })

@@ -260,7 +260,7 @@ const vFadeIn = {
           <div v-fade-in class="mb-12 max-w-[760px]">
             <span class="font-mono text-xs uppercase tracking-[0.12em] text-[#ff8a65]">Como funciona</span>
             <h2 class="text-[clamp(28px,3vw,40px)] font-bold tracking-[-0.03em] mt-3.5">Quatro passos para o controle total</h2>
-            <p class="mt-4 text-gray-500 text-lg">Do cadastro do cliente à entrega da obrigação, sem caos e sem perder prazos.</p>
+            <p class="mt-4 text-gray-500 text-lg">Do cadastro do cliente à entrega da obrigação, sem correria e sem perder prazos.</p>
           </div>
 
           <!-- Cards dos passos (Grid 2x2) -->

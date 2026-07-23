@@ -295,10 +295,10 @@ const vFadeIn = {
                 </div>
                 <div class="flex flex-wrap items-end justify-between gap-6">
                   <div class="flex items-center gap-3.5">
-                    <div class="flex size-11 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">FH</div>
+                    <div class="flex size-11 items-center justify-center rounded-full bg-white/10 text-sm font-semibold text-white">EC</div>
                     <div>
                       <div class="text-sm font-semibold text-white">Contabilidade</div>
-                      <div class="text-xs text-white/60">escritório contábil · SC</div>
+                      <div class="text-xs text-white/60">escritório contábil</div>
                     </div>
                   </div>
                   <div class="rounded-xl border border-white/12 bg-white/5 px-4 py-2.5">

@@ -57,7 +57,7 @@ def criar_assinatura(
 
         # Em produção, o Asaas exige o CNPJ/CPF. No sandbox, ignoramos para não dar erro de dígito inválido.
         if os.getenv("ASAAS_ENV") == "production" and tenant.cnpj:
-            cnpj_limpo = re.sub(r"\D", "", tenant.cnpj)
+            cnpj_limpo = re.sub(r"\D", "", tenant.cnpj or "")
             if len(cnpj_limpo) == 14:
                 cliente_payload["cpfCnpj"] = cnpj_limpo
             else:

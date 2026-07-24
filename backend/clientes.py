@@ -6,6 +6,7 @@ from uuid import UUID
 
 import models
 import schemas
+import re
 from database import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from security import get_current_user
@@ -147,10 +148,24 @@ def desativar_cliente(
 async def importar_clientes_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    # current_user = Depends(get_current_user) # Descomente se já tiver o sistema de login
+    current_user: dict = Depends(get_current_user) # Autenticação reativada!
 ):
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="O arquivo deve ser .csv")
+
+    # Pega o tenant_id do usuário logado e busca o plano dele
+    tenant_id = current_user.get("tenant_id")
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Escritório não encontrado.")
+
+    # Checa o limite do plano antes de começar a importação
+    limite = LIMITES_CLIENTES.get(tenant.plano, 5)
+    total_clientes_atuais = db.query(models.Client).filter(
+        models.Client.tenant_id == tenant_id, 
+        models.Client.ativo == True
+    ).count()
 
     try:
         contents = await file.read()
@@ -167,14 +182,17 @@ async def importar_clientes_csv(
         clientes_importados = 0
         linhas_com_erro = 0
 
-        primeiro_tenant = db.query(
-            models.Tenant
-        ).first()  # Ajuste se a sua tabela de tenant tiver outro nome
-        tenant_ativo = primeiro_tenant.id if primeiro_tenant else uuid.uuid4()
-
         for row in csv_reader:
             if not any(row.values()):
                 continue
+
+            # BLOQUEIO: Se atingiu o limite, salva os que já passaram e avisa o usuário
+            if total_clientes_atuais >= limite:
+                db.commit() # Salva os clientes que já foram adicionados antes do limite
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"A importação foi interrompida. Você atingiu o limite de {limite} clientes do plano {tenant.plano.capitalize()}. Foram importados {clientes_importados} clientes antes do bloqueio."
+                )
 
             tipo_pessoa = str(row.get("TIPO (PF/PJ)", "")).strip().upper()
             nome_razao = str(row.get("NOME_OU_RAZAO", "")).strip()
@@ -185,9 +203,12 @@ async def importar_clientes_csv(
                 linhas_com_erro += 1
                 continue
 
-            # Usando models.Client e injetando o tenant_id!
+            # Limpa a pontuação, mas MANTÉM letras e números (para o novo CNPJ alfanumérico)
+            documento_limpo = re.sub(r'[^a-zA-Z0-9]', '', documento)
+
+            # Usa o tenant_id do usuário logado!
             novo_cliente = models.Client(
-                tenant_id=tenant_ativo,  # O banco de dados agora vai aceitar!
+                tenant_id=tenant_id, 
                 tipo_pessoa=tipo_pessoa if tipo_pessoa in ["PF", "PJ"] else "PJ",
                 regime_tributario=regime,
                 natureza_operacao=str(row.get("NATUREZA_OPERACAO", "Serviços")).strip(),
@@ -195,13 +216,14 @@ async def importar_clientes_csv(
 
             if novo_cliente.tipo_pessoa == "PF":
                 novo_cliente.nome = nome_razao
-                novo_cliente.cpf = documento
+                novo_cliente.cpf = documento_limpo
             else:
                 novo_cliente.razao_social = nome_razao
-                novo_cliente.cnpj = documento
+                novo_cliente.cnpj = documento_limpo
 
             db.add(novo_cliente)
             clientes_importados += 1
+            total_clientes_atuais += 1 # Atualiza o contador para a checagem do limite
 
         db.commit()
         return {
@@ -210,11 +232,13 @@ async def importar_clientes_csv(
             "erros": linhas_com_erro,
         }
 
+    except HTTPException:
+        # Já fizemos o commit dos válidos acima antes de levantar o erro.
+        # Apenas repassamos a exceção para o frontend.
+        raise
     except Exception as e:
         db.rollback()
-        print(
-            f"[ERRO CSV] {str(e)}"
-        )  # Vai printar o erro exato no terminal se falhar de novo
+        print(f"[ERRO CSV] {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Erro ao processar arquivo: {str(e)}"
         )

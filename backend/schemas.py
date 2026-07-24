@@ -24,12 +24,12 @@ class ClientCreate(ClientBase):
         if self.tipo_pessoa == "PJ":
             if not self.razao_social:
                 raise ValueError("Razão Social é obrigatória para Pessoa Jurídica")
-            # Validação de formato de CNPJ
+            # Validação de formato de CNPJ (Agora aceita Alfanuméricos - Letras e Números)
             if not self.cnpj or not re.match(
-                r"^\d{2}\.\d{3}\.\d{3}\/\d{4}\-\d{2}$", self.cnpj
+                r"^[A-Za-z0-9]{2}\.[A-Za-z0-9]{3}\.[A-Za-z0-9]{3}\/[A-Za-z0-9]{4}\-[A-Za-z0-9]{2}$", self.cnpj
             ):
                 raise ValueError(
-                    "CNPJ inválido para Pessoa Jurídica (Formato: XX.XXX.XXX/0001-XX)"
+                    "CNPJ inválido para Pessoa Jurídica (Formato: XX.XXX.XXXX/XXXX-XX)"
                 )
         elif self.tipo_pessoa == "PF":
             if not self.nome:

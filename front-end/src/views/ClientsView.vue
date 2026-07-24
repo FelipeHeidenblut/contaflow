@@ -172,7 +172,7 @@ const validateForm = () => {
       formErrors.value.razao_social = 'A razão social é obrigatória.'
       isValid = false
     }
-    const cnpjClean = newClient.value.cnpj.replace(/\D/g, '')
+    const cnpjClean = newClient.value.cnpj.replace(/[^a-zA-Z0-9]/g, '')
     if (cnpjClean.length < 14) {
       formErrors.value.cnpj = 'CNPJ inválido.'
       isValid = false
@@ -693,7 +693,7 @@ onMounted(() => {
               <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">CNPJ</label>
               <input
                 v-model="newClient.cnpj"
-                v-maska="'##.###.###/####-##'"
+                v-maska="{ mask: 'XX.XXX.XXX/XXXX-XX', tokens: { 'X': { pattern: /[a-zA-Z0-9]/ } } }"
                 type="text"
                 required
                 placeholder="00.000.000/0000-00"

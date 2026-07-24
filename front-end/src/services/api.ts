@@ -30,7 +30,7 @@ api.interceptors.request.use(
   },
 )
 
-// 🚨 2. INTERCEPTOR DE RESPOSTA (NOVO!)
+// 🚨 2. INTERCEPTOR DE RESPOSTA (CORRIGIDO)
 // Fica de olho nas respostas do Backend
 api.interceptors.response.use(
   (response) => {
@@ -38,22 +38,22 @@ api.interceptors.response.use(
     return response
   },
   async (error) => {
-    // Se der erro, entramos aqui
-    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      console.warn('Sessão expirada ou acesso negado. Deslogando...')
+    // Só desloga se for 401 (Token expirado/inválido)
+    if (error.response && error.response.status === 401) {
+      console.warn('Sessão expirada. Deslogando...')
 
-      // 1. Desloga o usuário do Supabase localmente (limpa o cookie/localStorage)
+      // 1. Desloga o usuário do Supabase localmente
       await supabase.auth.signOut()
 
       // 2. Redireciona para a tela de Login
-      // Usamos window.location.href em vez do router.push para forçar um "hard reload",
-      // limpando qualquer estado bugado do Pinia/Vue na memória.
       if (window.location.pathname !== '/login') {
         window.location.href = '/login'
       }
     }
-
-    // Repassa o erro para o bloco catch da função que fez a chamada original
+    
+    // Se for 403 (Acesso negado / Limite de plano), NÃO desloga!
+    // Apenas repassa o erro para o bloco 'catch' da função original,
+    // para que o Toast vermelho apareça na tela com a mensagem do backend.
     return Promise.reject(error)
   },
 )

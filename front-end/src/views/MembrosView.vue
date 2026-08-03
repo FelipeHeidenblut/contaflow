@@ -98,10 +98,25 @@ const formatRole = (role: string) => {
   return role
 }
 
-const getInitials = (name: string) => {
-  const parts = name.trim().split(' ')
-  if (parts.length === 1) return parts[0].charAt(0)
-  return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`
+const getIniciaisMembro = (nome: string) => {
+  if (!nome) return '?'
+  
+  // Renomeie de 'parts' para 'partes' para manter o padrão, ou mantenha 'parts' se preferir
+  const partes = nome
+    .trim()
+    .split(' ')
+    .filter((p) => p)
+
+  if (partes.length === 0) return '?'
+  
+  // Usando ?. e || para evitar o erro de 'Object is possibly undefined'
+  if (partes.length === 1) return (partes[0]?.charAt(0) || '?').toUpperCase()
+
+  const primeiraLetra = partes[0]?.charAt(0) || ''
+  const ultimaLetra = partes[partes.length - 1]?.charAt(0) || ''
+  
+  // Adicionei a crave de fechamento ` no final que estava faltando
+  return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
 }
 
 onMounted(() => fetchData())
@@ -207,7 +222,7 @@ onMounted(() => fetchData())
                     <div
                       class="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-sm font-bold uppercase text-[var(--ct-primary)]"
                     >
-                      {{ getInitials(membro.name) }}
+                      {{ getIniciaisMembro(membro.name) }}
                     </div>
 
                     <div class="min-w-0">

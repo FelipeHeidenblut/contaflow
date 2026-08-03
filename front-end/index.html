@@ -3,77 +3,88 @@
   <head>
     <meta charset="UTF-8" />
 
-    <!-- Preconnect & DNS Prefetch (Otimização de rede) -->
-    <link rel="preconnect" href="https://api.contablytask.com.br" />
-    <link rel="dns-prefetch" href="https://api.contablytask.com.br" />
-    <!-- Substitua 'SEU_PROJETO' pelo ID real do seu projeto no Supabase -->
-    <link rel="preconnect" href="https://mtseqhmojdcyfdgdhlvd.supabase.co" />
-    <link rel="dns-prefetch" href="https://mtseqhmojdcyfdgdhlvd.supabase.co" />
-
-    <!-- Favicon (MIME Type corrigido) -->
-    <link rel="icon" type="image/png" href="/favicon.png" />
-
+    <!-- Viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Tag Canonical (Crucial para SEO) -->
+    <!-- Identidade / Navegador -->
+    <meta name="theme-color" content="#172554" />
+    <meta name="color-scheme" content="light" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Preconnect & DNS Prefetch -->
+    <link rel="preconnect" href="https://api.contablytask.com.br" />
+    <link rel="dns-prefetch" href="https://api.contablytask.com.br" />
+
+    <link rel="preconnect" href="https://mtseqhmojdcyfdgdhlvd.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://mtseqhmojdcyfdgdhlvd.supabase.co" />
+
+    <!-- Canonical global da home -->
     <link rel="canonical" href="https://www.contablytask.com.br/" />
 
-    <!-- SEO Principal -->
+    <!-- SEO global -->
     <title>ContablyTask | Software de Gestão para Escritórios Contábeis</title>
-    <meta name="description" content="O ContablyTask é um software de gestão de tarefas e prazos feito para escritórios contábeis. Centralize clientes, obrigações fiscais e documentos. Acabe com o caos das planilhas." />
-    <meta name="keywords" content="software para contadores, gestão de tarefas contábeis, controle de prazos contabilidade, ERP contábil, obrigações fiscais, ContablyTask" />
+    <meta
+      name="description"
+      content="O ContablyTask é um software de gestão para escritórios contábeis. Organize tarefas, clientes, obrigações fiscais e documentos em um só lugar."
+    />
     <meta name="author" content="ContablyTask" />
     <meta name="robots" content="index, follow" />
 
-    <!-- Open Graph (WhatsApp, Facebook, LinkedIn) -->
+    <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.contablytask.com.br/" />
-    <meta property="og:title" content="ContablyTask | Gestão Inteligente para Contabilidade" />
-    <meta property="og:description" content="Organize seu escritório contábil. Centralize clientes, obrigações fiscais e documentos em um só lugar." />
-    <meta property="og:image" content="https://www.contablytask.com.br/banner.png" />
-    <!-- Open Graph Complementar -->
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="ContablyTask" />
+    <meta property="og:url" content="https://www.contablytask.com.br/" />
+    <meta property="og:title" content="ContablyTask | Software de Gestão para Escritórios Contábeis" />
+    <meta
+      property="og:description"
+      content="Organize tarefas, clientes, obrigações fiscais e documentos do seu escritório contábil com mais clareza e controle."
+    />
+    <meta property="og:image" content="https://www.contablytask.com.br/banner.png" />
 
-    <!-- Twitter Cards (Compartilhamento no X/Discord/Slack) -->
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="https://www.contablytask.com.br/" />
-    <meta name="twitter:title" content="ContablyTask | Gestão Inteligente para Contabilidade" />
-    <meta name="twitter:description" content="Organize seu escritório contábil. Centralize clientes, obrigações fiscais e documentos em um só lugar." />
+    <meta name="twitter:title" content="ContablyTask | Software de Gestão para Escritórios Contábeis" />
+    <meta
+      name="twitter:description"
+      content="Organize tarefas, clientes, obrigações fiscais e documentos do seu escritório contábil com mais clareza e controle."
+    />
     <meta name="twitter:image" content="https://www.contablytask.com.br/banner.png" />
+    <meta name="twitter:url" content="https://www.contablytask.com.br/" />
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-HK0N1KGHBC"></script>
     <script>
-      window.dataLayer = window.dataLayer || []
+      window.dataLayer = window.dataLayer || [];
       function gtag() {
-        dataLayer.push(arguments)
+        dataLayer.push(arguments);
       }
-      gtag('js', new Date())
-
-      gtag('config', 'G-HK0N1KGHBC')
+      gtag('js', new Date());
+      gtag('config', 'G-HK0N1KGHBC');
     </script>
 
-    <!-- Dados Estruturados (SEO Avançado) -->
+    <!-- Dados estruturados -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "SoftwareApplication",
-      "name": "ContablyTask",
-      "operatingSystem": "Web",
-      "applicationCategory": "BusinessApplication",
-      "description": "Software de gestão de tarefas e prazos para escritórios de contabilidade.",
-      "offers": {
-        "@type": "Offer",
-        "price": "79.90",
-        "priceCurrency": "BRL"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "5",
-        "ratingCount": "1"
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "ContablyTask",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "url": "https://www.contablytask.com.br/",
+        "description": "Software de gestão para escritórios contábeis, com organização de tarefas, clientes, documentos e obrigações.",
+        "offers": {
+          "@type": "Offer",
+          "price": "79.90",
+          "priceCurrency": "BRL"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "ContablyTask",
+          "url": "https://www.contablytask.com.br/"
+        }
       }
-    }
     </script>
   </head>
 

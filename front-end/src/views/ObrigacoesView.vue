@@ -4,7 +4,6 @@ import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 
-// 1. Tipagem
 interface Cliente {
   id: string | number
   razao_social?: string
@@ -26,28 +25,32 @@ interface Obrigacao {
   assigned_to?: string | number | null
   type?: 'custom' | 'receita_federal'
   grau_importancia?: string
-  is_recurring?: boolean // NOVO
-  recurrence_day?: number | null // NOVO
+  is_recurring?: boolean
+  recurrence_day?: number | null
 }
 
-// Estados
+interface TemplateContabil {
+  nome: string
+  title: string
+  description: string
+  grau_importancia: string
+  status?: string
+}
+
 const obrigacoes = ref<Obrigacao[]>([])
 const clientes = ref<Cliente[]>([])
 const membros = ref<Membro[]>([])
 const isLoading = ref(true)
 
-// Filtros Reativos
 const filtroClienteId = ref('')
 const filtroStatus = ref('')
 const filtroResponsavel = ref('')
 const searchQuery = ref('')
 
-// Estados dos Modais
 const isDetalhesModalOpen = ref(false)
 const obrigacaoSelecionada = ref<Obrigacao | null>(null)
 const isCadastroModalOpen = ref(false)
 
-// Estado do Formulário (Adicionado recorrência)
 const isEditando = ref(false)
 const idSendoEditado = ref<string | number | null>(null)
 const formularioObrigacao = ref({
@@ -58,20 +61,9 @@ const formularioObrigacao = ref({
   due_date: '',
   status: 'pendente',
   grau_importancia: 'Média',
-  is_recurring: false, // NOVO CAMPO
-  recurrence_day: null as number | null, // NOVO CAMPO
+  is_recurring: false,
+  recurrence_day: null as number | null,
 })
-
-// ==========================================
-// TEMPLATES CONTÁBEIS
-// ==========================================
-interface TemplateContabil {
-  nome: string
-  title: string
-  description: string
-  grau_importancia: string
-  status?: string
-}
 
 const templatesContabeis: TemplateContabil[] = [
   {
@@ -97,7 +89,7 @@ const templatesContabeis: TemplateContabil[] = [
   {
     nome: '🏛️ DCTFWeb',
     title: 'DCTFWeb',
-    description: 'Gerar e transmitat a DCTFWeb com as apurações do eSocial e EFD-Contribuições.',
+    description: 'Gerar e transmitir a DCTFWeb com as apurações do eSocial e EFD-Contribuições.',
     grau_importancia: 'Alta',
   },
   {
@@ -130,17 +122,20 @@ const aplicarTemplate = (event: Event) => {
   }
 }
 
-// ==========================================
-// COMPUTED E FILTROS
-// ==========================================
 const obrigacoesFiltradas = computed(() => {
   let resultado = obrigacoes.value
 
-  if (filtroClienteId.value)
-    resultado = resultado.filter((o) => o.client_id === filtroClienteId.value)
-  if (filtroStatus.value) resultado = resultado.filter((o) => o.status === filtroStatus.value)
-  if (filtroResponsavel.value)
-    resultado = resultado.filter((o) => o.assigned_to === filtroResponsavel.value)
+  if (filtroClienteId.value) {
+    resultado = resultado.filter((o) => String(o.client_id) === String(filtroClienteId.value))
+  }
+
+  if (filtroStatus.value) {
+    resultado = resultado.filter((o) => o.status === filtroStatus.value)
+  }
+
+  if (filtroResponsavel.value) {
+    resultado = resultado.filter((o) => String(o.assigned_to) === String(filtroResponsavel.value))
+  }
 
   if (searchQuery.value) {
     const termoBusca = searchQuery.value.toLowerCase()
@@ -152,20 +147,35 @@ const obrigacoesFiltradas = computed(() => {
   }
 
   const prioridadePeso: Record<string, number> = { Urgente: 4, Alta: 3, Média: 2, Baixa: 1 }
+
   return [...resultado].sort((a, b) => {
     const pesoA = prioridadePeso[a.grau_importancia || 'Média'] || 0
     const pesoB = prioridadePeso[b.grau_importancia || 'Média'] || 0
-    return pesoB - pesoA
+
+    if (pesoB !== pesoA) return pesoB - pesoA
+    return a.due_date.localeCompare(b.due_date)
   })
 })
 
-// ==========================================
-// FUNÇÕES DO MODAL
-// ==========================================
+const totalConcluidas = computed(
+  () => obrigacoes.value.filter((o) => o.status === 'concluida').length,
+)
+const totalPendentes = computed(
+  () => obrigacoes.value.filter((o) => o.status === 'pendente').length,
+)
+const totalAguardando = computed(
+  () => obrigacoes.value.filter((o) => o.status === 'aguardando_cliente').length,
+)
+const totalAtrasadas = computed(
+  () =>
+    obrigacoes.value.filter((o) => isAtrasada(o.due_date, o.status)).length,
+)
+
 const abrirDetalhes = (obrigacao: Obrigacao) => {
   obrigacaoSelecionada.value = obrigacao
   isDetalhesModalOpen.value = true
 }
+
 const fecharDetalhes = () => {
   isDetalhesModalOpen.value = false
   obrigacaoSelecionada.value = null
@@ -182,8 +192,8 @@ const abrirCadastro = () => {
     due_date: '',
     status: 'pendente',
     grau_importancia: 'Média',
-    is_recurring: false, // LIMPA O CAMPO
-    recurrence_day: null, // LIMPA O CAMPO
+    is_recurring: false,
+    recurrence_day: null,
   }
   isCadastroModalOpen.value = true
 }
@@ -193,6 +203,7 @@ const abrirEdicao = (obrigacao: Obrigacao) => {
     toast.info('Não é possível editar prazos federais fixos.')
     return
   }
+
   isEditando.value = true
   idSendoEditado.value = obrigacao.id
   formularioObrigacao.value = {
@@ -203,8 +214,8 @@ const abrirEdicao = (obrigacao: Obrigacao) => {
     due_date: obrigacao.due_date,
     status: obrigacao.status,
     grau_importancia: obrigacao.grau_importancia || 'Média',
-    is_recurring: obrigacao.is_recurring || false, // CARREGA O CAMPO
-    recurrence_day: obrigacao.recurrence_day || null, // CARREGA O CAMPO
+    is_recurring: obrigacao.is_recurring || false,
+    recurrence_day: obrigacao.recurrence_day || null,
   }
   fecharDetalhes()
   isCadastroModalOpen.value = true
@@ -224,9 +235,8 @@ const salvarObrigacao = async () => {
     return
   }
 
-  // Validação extra: Se marcou recorrência, precisa escolher o dia
   if (formularioObrigacao.value.is_recurring && !formularioObrigacao.value.recurrence_day) {
-    toast.warn('Você marcou como tarefa recorrente. Por favor, escolha o dia do vencimento mensal.')
+    toast.warn('Você marcou como tarefa recorrente. Escolha o dia do vencimento mensal.')
     return
   }
 
@@ -244,6 +254,7 @@ const salvarObrigacao = async () => {
       obrigacoes.value.push(response.data)
       toast.success('Nova obrigação criada com sucesso!')
     }
+
     fecharCadastro()
   } catch (error) {
     toast.error('Erro ao salvar a obrigação.')
@@ -255,17 +266,15 @@ const concluirTarefa = async (obrigacao: Obrigacao) => {
   try {
     const response = await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/concluir`)
     const index = obrigacoes.value.findIndex((o) => o.id === obrigacao.id)
+
     if (index !== -1) obrigacoes.value[index] = response.data
     if (obrigacaoSelecionada.value?.id === obrigacao.id) obrigacaoSelecionada.value = response.data
 
-    // Se a tarefa era recorrente, o backend já criou a próxima. Avisamos o usuário!
     if (obrigacao.is_recurring) {
-      toast.success(
-        '🎉 Obrigação concluída! A tarefa do próximo mês já foi criada automaticamente.',
-      )
-      fetchData() // Atualiza a lista para mostrar a nova tarefa que o backend gerou
+      toast.success('Obrigação concluída! A tarefa do próximo mês já foi criada automaticamente.')
+      fetchData()
     } else {
-      toast.success('🎉 Obrigação concluída!')
+      toast.success('Obrigação concluída!')
     }
   } catch (error) {
     toast.error('Erro ao concluir tarefa.')
@@ -274,6 +283,7 @@ const concluirTarefa = async (obrigacao: Obrigacao) => {
 
 const excluirTarefa = async (id: string | number) => {
   if (!confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) return
+
   try {
     await api.delete(`/api/v1/obrigacoes/${id}`)
     obrigacoes.value = obrigacoes.value.filter((o) => o.id !== id)
@@ -284,9 +294,6 @@ const excluirTarefa = async (id: string | number) => {
   }
 }
 
-// ==========================================
-// FETCH DE DADOS
-// ==========================================
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -295,6 +302,7 @@ const fetchData = async () => {
       api.get('/api/v1/clientes'),
       api.get('/api/v1/membros'),
     ])
+
     obrigacoes.value = obrigacoesRes.data
     clientes.value = clientesRes.data
     membros.value = membrosRes.data
@@ -306,28 +314,28 @@ const fetchData = async () => {
   }
 }
 
-// ==========================================
-// HELPERS VISUAIS
-// ==========================================
 const getNomeCliente = (clientId: string | number) => {
-  const cliente = clientes.value.find((c) => c.id === clientId)
-  return cliente ? cliente.nome || cliente.razao_social || 'Nome Indisponível' : 'Não vinculado'
+  const cliente = clientes.value.find((c) => String(c.id) === String(clientId))
+  return cliente ? cliente.nome || cliente.razao_social || 'Nome indisponível' : 'Não vinculado'
 }
 
 const getNomeMembro = (membroId?: string | number | null) => {
   if (!membroId) return 'Não atribuído'
-  const membro = membros.value.find((m) => m.id === membroId)
+  const membro = membros.value.find((m) => String(m.id) === String(membroId))
   return membro ? membro.name : 'Desconhecido'
 }
 
 const getIniciaisMembro = (nome: string) => {
   if (!nome || nome === 'Não atribuído') return '?'
+
   const partes = nome
     .trim()
     .split(' ')
     .filter((p) => p)
+
   if (partes.length === 0) return '?'
   if (partes.length === 1) return (partes[0]?.charAt(0) || '?').toUpperCase()
+
   const primeiraLetra = partes[0]?.charAt(0) || ''
   const ultimaLetra = partes[partes.length - 1]?.charAt(0) || ''
   return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
@@ -348,19 +356,21 @@ const isAtrasada = (dateString: string, status: string) => {
 
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
-    concluida: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    em_andamento: 'bg-blue-100 text-blue-800 border-blue-200',
-    aguardando_cliente: 'bg-orange-100 text-orange-800 border-orange-200',
-    pendente: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+    concluida: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    em_andamento: 'bg-blue-100 text-blue-700 border-blue-200',
+    aguardando_cliente: 'bg-amber-100 text-amber-700 border-amber-200',
+    pendente: 'bg-slate-100 text-slate-700 border-slate-200',
   }
+
   const labels: Record<string, string> = {
     concluida: 'Concluída',
-    em_andamento: 'Em Andamento',
-    aguardando_cliente: 'Aguard. Cliente',
+    em_andamento: 'Em andamento',
+    aguardando_cliente: 'Aguard. cliente',
     pendente: 'Pendente',
   }
+
   return {
-    class: `px-2.5 py-0.5 rounded-full text-xs font-semibold border ${styles[status] || styles['pendente']}`,
+    class: `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status] || styles['pendente']}`,
     label: labels[status] || 'Pendente',
   }
 }
@@ -371,10 +381,11 @@ const getImportanciaBadge = (grau?: string) => {
     Urgente: 'bg-red-50 text-red-700 border-red-200',
     Alta: 'bg-orange-50 text-orange-700 border-orange-200',
     Média: 'bg-blue-50 text-blue-700 border-blue-200',
-    Baixa: 'bg-gray-50 text-gray-700 border-gray-200',
+    Baixa: 'bg-slate-50 text-slate-700 border-slate-200',
   }
+
   return {
-    class: `px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${styles[nivel] || styles['Média']}`,
+    class: `inline-flex items-center rounded-md border px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${styles[nivel] || styles['Média']}`,
     label: nivel,
   }
 }
@@ -384,397 +395,584 @@ onMounted(() => fetchData())
 
 <template>
   <Layout title="Controle de Obrigações">
-    <header class="mb-6">
-      <h1 class="text-2xl font-bold text-[#19341a]">Obrigações e Tarefas</h1>
-      <p class="text-gray-500 text-sm mt-1">
-        Gerencie prazos, delegue responsabilidades e acompanhe pendências.
-      </p>
-    </header>
-
-    <!-- FILTROS -->
-    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-      <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto sm:max-w-2xl">
-        <div class="relative w-full sm:w-48">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Buscar tarefa..."
-            class="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] text-sm shadow-sm"
-          />
+    <div class="space-y-6">
+      <!-- topo -->
+      <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+            Obrigações e tarefas
+          </h1>
+          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+            Gerencie prazos, responsáveis e pendências operacionais do escritório.
+          </p>
         </div>
 
-        <select
-          v-model="filtroClienteId"
-          class="w-full sm:w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 text-sm shadow-sm"
+        <button
+          @click="abrirCadastro"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
-          <option value="">🏢 Todos Clientes</option>
-          <option v-for="c in clientes" :key="c.id" :value="c.id">
-            {{ c.nome || c.razao_social }}
-          </option>
-        </select>
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          <span>Nova obrigação</span>
+        </button>
+      </header>
 
-        <select
-          v-model="filtroResponsavel"
-          class="w-full sm:w-44 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 text-sm shadow-sm"
-        >
-          <option value="">👥 Todos Responsáveis</option>
-          <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
-        </select>
+      <!-- kpis -->
+      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalPendentes }}
+          </p>
+        </div>
 
-        <select
-          v-model="filtroStatus"
-          class="w-full sm:w-40 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#ff8a65] bg-white text-gray-700 text-sm shadow-sm"
-        >
-          <option value="">Todos Status</option>
-          <option value="pendente">Pendentes</option>
-          <option value="em_andamento">Em Andamento</option>
-          <option value="aguardando_cliente">Aguard. Cliente</option>
-          <option value="concluida">Concluídas</option>
-        </select>
-      </div>
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Em espera do cliente</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalAguardando }}
+          </p>
+        </div>
 
-      <button
-        @click="abrirCadastro"
-        class="w-full sm:w-auto bg-[#ff8a65] hover:bg-[#f07047] text-white font-semibold py-2.5 px-5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 4v16m8-8H4"
-          ></path>
-        </svg>
-        <span>Nova Obrigação</span>
-      </button>
-    </div>
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Concluídas</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalConcluidas }}
+          </p>
+        </div>
 
-    <!-- TABELA -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div v-if="isLoading" class="p-10 text-center text-gray-500">Sincronizando obrigações...</div>
-      <div v-else-if="obrigacoesFiltradas.length === 0" class="p-16 text-center text-gray-500">
-        Nenhuma obrigação encontrada.
-      </div>
-      <div v-else class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead class="bg-gray-50">
-            <tr>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Tarefa
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Cliente
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Responsável
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Prazo
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Prioridade
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Status
-              </th>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">
-                Ações
-              </th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <tr
-              v-for="obrigacao in obrigacoesFiltradas"
-              :key="obrigacao.id"
-              class="hover:bg-gray-50"
-            >
-              <td class="px-6 py-4">
-                <div class="flex items-center gap-2">
-                  <!-- BADGE DE RECORRÊNCIA NA TABELA -->
-                  <span
-                    v-if="obrigacao.is_recurring"
-                    title="Tarefa Recorrente"
-                    class="text-blue-500"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                      ></path>
-                    </svg>
-                  </span>
-                  <div>
-                    <div class="text-sm font-bold text-[#19341a]">{{ obrigacao.title }}</div>
-                    <div class="text-xs text-gray-400 truncate max-w-xs">
-                      {{ obrigacao.description }}
-                    </div>
-                  </div>
-                </div>
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-700 font-medium">
-                {{ getNomeCliente(obrigacao.client_id) }}
-              </td>
-              <td class="px-6 py-4">
-                <div class="flex items-center gap-2" :title="getNomeMembro(obrigacao.assigned_to)">
-                  <div
-                    class="w-7 h-7 rounded-full bg-[#19341a]/10 text-[#19341a] flex items-center justify-center text-[10px] font-bold"
-                  >
-                    {{ getIniciaisMembro(getNomeMembro(obrigacao.assigned_to)) }}
-                  </div>
-                  <span class="text-xs text-gray-500 hidden md:block">{{
-                    getNomeMembro(obrigacao.assigned_to)
-                  }}</span>
-                </div>
-              </td>
-              <td
-                class="px-6 py-4 text-sm"
-                :class="
-                  isAtrasada(obrigacao.due_date, obrigacao.status)
-                    ? 'text-red-600 font-bold'
-                    : 'text-gray-500'
-                "
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Atrasadas</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-red-600 [font-variant-numeric:tabular-nums]">
+            {{ totalAtrasadas }}
+          </p>
+        </div>
+      </section>
+
+      <!-- filtros -->
+      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div class="relative">
+              <svg
+                class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                {{ formatDate(obrigacao.due_date) }}
-              </td>
-              <td class="px-6 py-4">
-                <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">{{
-                  getImportanciaBadge(obrigacao.grau_importancia).label
-                }}</span>
-              </td>
-              <td class="px-6 py-4">
-                <span :class="getStatusBadge(obrigacao.status).class">{{
-                  getStatusBadge(obrigacao.status).label
-                }}</span>
-              </td>
-              <td class="px-6 py-4">
-                <div class="flex gap-2">
-                  <button
-                    v-if="obrigacao.status !== 'concluida'"
-                    @click="concluirTarefa(obrigacao)"
-                    class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-xs font-bold"
-                  >
-                    Concluir
-                  </button>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"/>
+              </svg>
+              <input
+                v-model="searchQuery"
+                type="text"
+                placeholder="Buscar tarefa..."
+                class="w-full rounded-xl border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              />
+            </div>
+
+            <select
+              v-model="filtroClienteId"
+              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+            >
+              <option value="">Todos os clientes</option>
+              <option v-for="c in clientes" :key="c.id" :value="c.id">
+                {{ c.nome || c.razao_social }}
+              </option>
+            </select>
+
+            <select
+              v-model="filtroResponsavel"
+              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+            >
+              <option value="">Todos os responsáveis</option>
+              <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
+            </select>
+
+            <select
+              v-model="filtroStatus"
+              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+            >
+              <option value="">Todos os status</option>
+              <option value="pendente">Pendentes</option>
+              <option value="em_andamento">Em andamento</option>
+              <option value="aguardando_cliente">Aguard. cliente</option>
+              <option value="concluida">Concluídas</option>
+            </select>
+          </div>
+
+          <div class="text-xs text-[var(--ct-text-muted)]">
+            {{ obrigacoesFiltradas.length }} resultado(s)
+          </div>
+        </div>
+      </section>
+
+      <!-- tabela -->
+      <section class="overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-sm">
+        <div v-if="isLoading" class="space-y-3 p-6">
+          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+        </div>
+
+        <div v-else-if="obrigacoesFiltradas.length === 0" class="p-16 text-center">
+          <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhuma obrigação encontrada.</p>
+          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+            Ajuste os filtros ou crie uma nova obrigação para começar.
+          </p>
+        </div>
+
+        <div v-else class="overflow-x-auto">
+          <table class="min-w-full">
+            <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
+              <tr>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Tarefa
+                </th>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Cliente
+                </th>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Responsável
+                </th>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Prazo
+                </th>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Prioridade
+                </th>
+                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Status
+                </th>
+                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Ações
+                </th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-[var(--ct-border)] bg-white">
+              <tr
+                v-for="obrigacao in obrigacoesFiltradas"
+                :key="obrigacao.id"
+                class="transition-colors hover:bg-slate-50/70"
+              >
+                <td class="px-6 py-4">
                   <button
                     @click="abrirDetalhes(obrigacao)"
-                    class="px-3 py-1 bg-white text-gray-700 border border-gray-200 rounded-md text-xs font-bold"
+                    class="flex max-w-sm items-start gap-3 text-left transition-colors hover:text-[var(--ct-primary)]"
                   >
-                    Detalhes
+                    <div
+                      class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl"
+                      :class="obrigacao.is_recurring ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'"
+                    >
+                      <svg
+                        v-if="obrigacao.is_recurring"
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                      </svg>
+                      <svg
+                        v-else
+                        class="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-7-4h6m0 0v6m0-6L10 14"/>
+                      </svg>
+                    </div>
+
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2">
+                        <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
+                          {{ obrigacao.title }}
+                        </p>
+                        <span
+                          v-if="obrigacao.is_recurring"
+                          class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700"
+                        >
+                          Recorrente
+                        </span>
+                      </div>
+
+                      <p class="mt-1 truncate text-xs text-[var(--ct-text-muted)]">
+                        {{ obrigacao.description || 'Sem descrição adicional.' }}
+                      </p>
+                    </div>
                   </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+                </td>
 
-    <!-- MODAL CADASTRO/EDIÇÃO -->
-    <div
-      v-if="isCadastroModalOpen"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-    >
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-        <div class="px-6 py-5 border-b flex justify-between items-center bg-[#f8f8f8]">
-          <h3 class="text-xl font-bold text-[#19341a]">
-            {{ isEditando ? '✏️ Editar' : '✨ Nova Obrigação' }}
-          </h3>
-          <button @click="fecharCadastro" class="text-gray-400 text-2xl">&times;</button>
+                <td class="px-6 py-4 text-sm text-[var(--ct-ink)]">
+                  {{ getNomeCliente(obrigacao.client_id) }}
+                </td>
+
+                <td class="px-6 py-4">
+                  <div class="flex items-center gap-2" :title="getNomeMembro(obrigacao.assigned_to)">
+                    <div
+                      class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-[10px] font-semibold text-[var(--ct-primary)]"
+                    >
+                      {{ getIniciaisMembro(getNomeMembro(obrigacao.assigned_to)) }}
+                    </div>
+                    <span class="hidden text-xs text-[var(--ct-text-muted)] lg:block">
+                      {{ getNomeMembro(obrigacao.assigned_to) }}
+                    </span>
+                  </div>
+                </td>
+
+                <td
+                  class="px-6 py-4 text-sm"
+                  :class="isAtrasada(obrigacao.due_date, obrigacao.status) ? 'font-semibold text-red-600' : 'text-[var(--ct-ink)]'"
+                >
+                  {{ formatDate(obrigacao.due_date) }}
+                </td>
+
+                <td class="px-6 py-4">
+                  <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">
+                    {{ getImportanciaBadge(obrigacao.grau_importancia).label }}
+                  </span>
+                </td>
+
+                <td class="px-6 py-4">
+                  <span :class="getStatusBadge(obrigacao.status).class">
+                    {{ getStatusBadge(obrigacao.status).label }}
+                  </span>
+                </td>
+
+                <td class="px-6 py-4">
+                  <div class="flex justify-end gap-2">
+                    <button
+                      v-if="obrigacao.status !== 'concluida'"
+                      @click="concluirTarefa(obrigacao)"
+                      class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      Concluir
+                    </button>
+
+                    <button
+                      @click="abrirDetalhes(obrigacao)"
+                      class="rounded-lg border border-[var(--ct-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Detalhes
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      </section>
 
-        <div class="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-          <div v-if="!isEditando">
-            <label class="text-xs font-bold text-gray-500 uppercase mb-1 block"
-              >Modelo Rápido</label
+      <!-- modal cadastro/edição -->
+      <div
+        v-if="isCadastroModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+      >
+        <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
+          <div class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5">
+            <h3 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              {{ isEditando ? 'Editar obrigação' : 'Nova obrigação' }}
+            </h3>
+            <button
+              @click="fecharCadastro"
+              class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
-            <select
-              @change="aplicarTemplate($event)"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-            >
-              <option value="">Escolher modelo...</option>
-              <option v-for="(t, i) in templatesContabeis" :key="i" :value="i">{{ t.nome }}</option>
-            </select>
-            <hr class="my-3 border-gray-100" />
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
           </div>
 
-          <div>
-            <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Título *</label>
-            <input
-              v-model="formularioObrigacao.title"
-              type="text"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            />
-          </div>
-          <div>
-            <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Descrição</label>
-            <textarea
-              v-model="formularioObrigacao.description"
-              rows="2"
-              class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            ></textarea>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Cliente *</label>
+          <div class="max-h-[80vh] space-y-5 overflow-y-auto p-6">
+            <div v-if="!isEditando">
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Modelo rápido
+              </label>
               <select
-                v-model="formularioObrigacao.client_id"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                @change="aplicarTemplate($event)"
+                class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               >
-                <option value="">Selecione...</option>
-                <option v-for="c in clientes" :key="c.id" :value="c.id">
-                  {{ c.nome || c.razao_social }}
+                <option value="">Escolha um modelo...</option>
+                <option v-for="(t, i) in templatesContabeis" :key="i" :value="i">
+                  {{ t.nome }}
                 </option>
               </select>
             </div>
-            <div>
-              <label class="text-xs font-bold text-gray-500 uppercase mb-1 block"
-                >Atribuir para</label
-              >
-              <select
-                v-model="formularioObrigacao.assigned_to"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-              >
-                <option value="">Não atribuído</option>
-                <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
-              </select>
-            </div>
-          </div>
 
-          <div class="grid grid-cols-2 gap-4">
             <div>
-              <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Prazo *</label>
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Título *
+              </label>
               <input
-                v-model="formularioObrigacao.due_date"
-                type="date"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                v-model="formularioObrigacao.title"
+                type="text"
+                class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
+
             <div>
-              <label class="text-xs font-bold text-gray-500 uppercase mb-1 block">Prioridade</label>
-              <select
-                v-model="formularioObrigacao.grau_importancia"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-              >
-                <option value="Urgente">🚨 Urgente</option>
-                <option value="Alta">🟠 Alta</option>
-                <option value="Média">🔵 Média</option>
-                <option value="Baixa">🟢 Baixa</option>
-              </select>
+              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                Descrição
+              </label>
+              <textarea
+                v-model="formularioObrigacao.description"
+                rows="3"
+                class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              ></textarea>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Cliente *
+                </label>
+                <select
+                  v-model="formularioObrigacao.client_id"
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                >
+                  <option value="">Selecione...</option>
+                  <option v-for="c in clientes" :key="c.id" :value="c.id">
+                    {{ c.nome || c.razao_social }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Atribuir para
+                </label>
+                <select
+                  v-model="formularioObrigacao.assigned_to"
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                >
+                  <option value="">Não atribuído</option>
+                  <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Prazo *
+                </label>
+                <input
+                  v-model="formularioObrigacao.due_date"
+                  type="date"
+                  class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                />
+              </div>
+
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Prioridade
+                </label>
+                <select
+                  v-model="formularioObrigacao.grau_importancia"
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                >
+                  <option value="Urgente">Urgente</option>
+                  <option value="Alta">Alta</option>
+                  <option value="Média">Média</option>
+                  <option value="Baixa">Baixa</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Status
+                </label>
+                <select
+                  v-model="formularioObrigacao.status"
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                >
+                  <option value="pendente">Pendente</option>
+                  <option value="em_andamento">Em andamento</option>
+                  <option value="aguardando_cliente">Aguardando cliente</option>
+                  <option value="concluida">Concluída</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
+              <label class="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  v-model="formularioObrigacao.is_recurring"
+                  class="h-4 w-4 rounded border-gray-300 text-[var(--ct-primary)] focus:ring-[var(--ct-primary)]"
+                />
+                <div>
+                  <span class="block text-sm font-semibold text-[var(--ct-ink)]">
+                    Tarefa recorrente mensal
+                  </span>
+                  <span class="block text-xs text-[var(--ct-text-muted)]">
+                    Ao concluir, o sistema poderá gerar automaticamente a próxima competência.
+                  </span>
+                </div>
+              </label>
+
+              <div v-if="formularioObrigacao.is_recurring" class="mt-4">
+                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  Vence todo dia
+                </label>
+                <select
+                  v-model="formularioObrigacao.recurrence_day"
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                >
+                  <option :value="null" disabled>Selecione o dia</option>
+                  <option v-for="n in 31" :key="n" :value="n">Dia {{ n }}</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <!-- ========================================== -->
-          <!-- OPÇÃO DE TAREFA RECORRENTE (NOVO)         -->
-          <!-- ========================================== -->
-          <div class="p-4 bg-[#f8f8f8] rounded-xl border border-gray-100">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                v-model="formularioObrigacao.is_recurring"
-                class="w-4 h-4 text-[#ff8a65] border-gray-300 rounded focus:ring-[#ff8a65]"
-              />
-              <span class="text-sm font-bold text-[#19341a]">Tarefa Recorrente (Mensal)</span>
-            </label>
-
-            <div v-if="formularioObrigacao.is_recurring" class="mt-4">
-              <label class="block text-xs font-bold text-gray-500 uppercase mb-1"
-                >Vence todo dia</label
-              >
-              <select
-                v-model="formularioObrigacao.recurrence_day"
-                class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#ff8a65]"
-              >
-                <option :value="null" disabled>Selecione o dia</option>
-                <option v-for="n in 31" :key="n" :value="n">Dia {{ n }}</option>
-              </select>
-              <p class="text-[11px] text-gray-400 mt-1">
-                ⚡ Ao concluir esta tarefa, o sistema criará automaticamente a do próximo mês com
-                este mesmo vencimento (ajustado para o próximo dia útil se cair no fim de semana).
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div class="px-6 py-4 border-t bg-gray-50 flex justify-between">
-          <button
-            v-if="isEditando"
-            @click="excluirTarefa(idSendoEditado!)"
-            class="text-red-600 text-sm font-bold"
-          >
-            🗑️ Excluir
-          </button>
-          <div class="flex gap-2 ml-auto">
-            <button @click="fecharCadastro" class="px-4 py-2 text-gray-600 text-sm">
-              Cancelar
-            </button>
+          <div class="flex items-center justify-between border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4">
             <button
-              @click="salvarObrigacao"
-              class="px-5 py-2 bg-[#ff8a65] text-white text-sm font-semibold rounded-xl"
+              v-if="isEditando"
+              @click="excluirTarefa(idSendoEditado!)"
+              class="text-sm font-semibold text-red-600 transition-colors hover:text-red-700"
             >
-              {{ isEditando ? 'Salvar' : 'Criar' }}
+              Excluir
             </button>
+
+            <div class="ml-auto flex gap-3">
+              <button
+                @click="fecharCadastro"
+                class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-white"
+              >
+                Cancelar
+              </button>
+
+              <button
+                @click="salvarObrigacao"
+                class="rounded-xl bg-[var(--ct-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
+              >
+                {{ isEditando ? 'Salvar alterações' : 'Criar obrigação' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- MODAL DETALHES -->
-    <div
-      v-if="isDetalhesModalOpen && obrigacaoSelecionada"
-      class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-    >
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div class="px-6 py-5 border-b flex justify-between bg-[#f8f8f8]">
-          <h3 class="text-xl font-bold text-[#19341a]">Detalhes</h3>
-          <button @click="fecharDetalhes" class="text-gray-400 text-2xl">&times;</button>
-        </div>
-        <div class="p-6 space-y-4">
-          <p class="text-lg font-bold text-[#19341a]">{{ obrigacaoSelecionada.title }}</p>
-          <p class="text-sm text-gray-600">{{ obrigacaoSelecionada.description }}</p>
-          <div class="grid grid-cols-2 gap-4 pt-4 border-t">
-            <div>
-              <span class="text-xs text-gray-400 block">Cliente</span
-              ><span class="text-sm font-semibold">{{
-                getNomeCliente(obrigacaoSelecionada.client_id)
-              }}</span>
-            </div>
-            <div>
-              <span class="text-xs text-gray-400 block">Responsável</span
-              ><span class="text-sm font-semibold">{{
-                getNomeMembro(obrigacaoSelecionada.assigned_to)
-              }}</span>
-            </div>
-            <div>
-              <span class="text-xs text-gray-400 block">Prazo</span
-              ><span class="text-sm font-semibold">{{
-                formatDate(obrigacaoSelecionada.due_date)
-              }}</span>
-            </div>
-            <div>
-              <span class="text-xs text-gray-400 block">Status</span
-              ><span :class="getStatusBadge(obrigacaoSelecionada.status).class">{{
-                getStatusBadge(obrigacaoSelecionada.status).label
-              }}</span>
+      <!-- drawer detalhes -->
+      <div
+        v-if="isDetalhesModalOpen && obrigacaoSelecionada"
+        class="fixed inset-0 z-50 overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="absolute inset-0 bg-slate-950/50" @click="fecharDetalhes"></div>
+
+        <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
+          <div class="pointer-events-auto w-screen max-w-xl">
+            <div class="flex h-full flex-col overflow-y-auto bg-white shadow-2xl">
+              <div class="border-b border-[var(--ct-border)] bg-[var(--ct-navy)] px-6 py-5">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                      <span :class="getStatusBadge(obrigacaoSelecionada.status).class">
+                        {{ getStatusBadge(obrigacaoSelecionada.status).label }}
+                      </span>
+
+                      <span :class="getImportanciaBadge(obrigacaoSelecionada.grau_importancia).class">
+                        {{ getImportanciaBadge(obrigacaoSelecionada.grau_importancia).label }}
+                      </span>
+
+                      <span
+                        v-if="obrigacaoSelecionada.is_recurring"
+                        class="inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white"
+                      >
+                        Recorrente
+                      </span>
+                    </div>
+
+                    <h3 class="text-xl font-semibold tracking-tight text-white">
+                      {{ obrigacaoSelecionada.title }}
+                    </h3>
+
+                    <p class="mt-1 text-sm text-white/70">
+                      {{ obrigacaoSelecionada.description || 'Sem descrição adicional.' }}
+                    </p>
+                  </div>
+
+                  <button
+                    @click="fecharDetalhes"
+                    class="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex-1 space-y-6 p-6">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
+                    <span class="block text-xs text-[var(--ct-text-muted)]">Cliente</span>
+                    <span class="mt-1 block text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ getNomeCliente(obrigacaoSelecionada.client_id) }}
+                    </span>
+                  </div>
+
+                  <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
+                    <span class="block text-xs text-[var(--ct-text-muted)]">Responsável</span>
+                    <span class="mt-1 block text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ getNomeMembro(obrigacaoSelecionada.assigned_to) }}
+                    </span>
+                  </div>
+
+                  <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
+                    <span class="block text-xs text-[var(--ct-text-muted)]">Prazo</span>
+                    <span
+                      class="mt-1 block text-sm font-semibold"
+                      :class="isAtrasada(obrigacaoSelecionada.due_date, obrigacaoSelecionada.status) ? 'text-red-600' : 'text-[var(--ct-ink)]'"
+                    >
+                      {{ formatDate(obrigacaoSelecionada.due_date) }}
+                    </span>
+                  </div>
+
+                  <div
+                    v-if="obrigacaoSelecionada.is_recurring"
+                    class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4"
+                  >
+                    <span class="block text-xs text-[var(--ct-text-muted)]">Recorrência</span>
+                    <span class="mt-1 block text-sm font-semibold text-[var(--ct-ink)]">
+                      Todo dia {{ obrigacaoSelecionada.recurrence_day || '-' }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4">
+                  <h4 class="text-sm font-semibold text-[var(--ct-ink)]">Resumo</h4>
+                  <p class="mt-2 text-sm leading-6 text-[var(--ct-text-muted)]">
+                    {{ obrigacaoSelecionada.description || 'Esta obrigação não possui descrição cadastrada.' }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4">
+                <div class="flex flex-wrap justify-end gap-3">
+                  <button
+                    v-if="obrigacaoSelecionada.status !== 'concluida'"
+                    @click="concluirTarefa(obrigacaoSelecionada)"
+                    class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                  >
+                    Concluir
+                  </button>
+
+                  <button
+                    @click="abrirEdicao(obrigacaoSelecionada)"
+                    class="rounded-xl bg-[var(--ct-navy)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F1B46]"
+                  >
+                    Editar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-        <div class="px-6 py-4 border-t bg-gray-50 flex justify-end gap-2">
-          <button
-            v-if="obrigacaoSelecionada.status !== 'concluida'"
-            @click="concluirTarefa(obrigacaoSelecionada)"
-            class="px-4 py-2 bg-emerald-500 text-white text-sm font-semibold rounded-xl"
-          >
-            Concluir ✓
-          </button>
-          <button
-            @click="abrirEdicao(obrigacaoSelecionada)"
-            class="px-4 py-2 bg-[#19341a] text-white text-sm font-semibold rounded-xl"
-          >
-            Editar
-          </button>
         </div>
       </div>
     </div>

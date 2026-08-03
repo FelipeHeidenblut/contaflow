@@ -14,22 +14,21 @@ const handleUpdatePassword = async () => {
     toast.error('A senha deve ter no mínimo 6 caracteres.')
     return
   }
+
   if (novaSenha.value !== confirmarSenha.value) {
     toast.error('As senhas não coincidem.')
     return
   }
 
   isLoading.value = true
+
   try {
-    // 1. Atualiza a senha
     const { error } = await supabase.auth.updateUser({ password: novaSenha.value })
 
     if (error) throw error
 
-    // 2. FORÇA O LOGOUT: Destrói a sessão temporária do link de recuperação
     await supabase.auth.signOut()
 
-    // 3. Avisa e manda para o login
     toast.success('Senha atualizada com sucesso! Faça o login com a nova senha.')
     router.push('/login')
   } catch (error: any) {
@@ -41,73 +40,141 @@ const handleUpdatePassword = async () => {
 </script>
 
 <template>
-  <div class="min-h-screen flex">
-    <!-- Lado Esquerdo (Escuro) -->
+  <div class="min-h-screen flex bg-[var(--ct-bg)] text-[var(--ct-ink)]">
+    <!-- Lado Esquerdo -->
     <div
-      class="hidden md:flex md:w-1/2 bg-[#19341a] text-white flex-col justify-center items-center p-12 relative overflow-hidden"
+      class="relative hidden overflow-hidden md:flex md:w-1/2 flex-col justify-center items-center p-12 text-white bg-[var(--ct-navy)]"
     >
-      <!-- Efeito de luz moderna -->
-      <div class="absolute top-1/4 left-1/4 w-96 h-96 bg-[#ff8a65]/20 rounded-full filter blur-[120px]"></div>
+      <div
+        class="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px] opacity-30"
+      ></div>
+
+      <div
+        class="absolute top-1/4 left-1/4 h-72 w-72 rounded-full bg-[var(--ct-primary)]/20 blur-[120px]"
+      ></div>
+
+      <div
+        class="absolute bottom-1/4 right-1/4 h-72 w-72 rounded-full bg-[#1E3A8A]/20 blur-[120px]"
+      ></div>
+
+      <div
+        class="absolute inset-0"
+        style="background: radial-gradient(120% 90% at 50% 30%, transparent 35%, rgba(15, 23, 42, .72) 100%)"
+      ></div>
 
       <div class="relative z-10 text-center">
-        <h1 class="text-5xl font-extrabold tracking-tight mb-4">
-          Contably<span class="text-[#ff8a65]">Task</span>.
-        </h1>
-        <p class="text-white/60 text-lg max-w-md mx-auto leading-relaxed">
-          Crie uma nova senha segura para sua conta e proteja os dados dos seus clientes.
+        <div class="mb-6 flex items-center justify-center gap-3">
+          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#93C5FD"
+              stroke-width="2.4"
+              class="h-6 w-6"
+            >
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+          </div>
+
+          <h1 class="text-5xl font-extrabold tracking-tight">
+            Contably<span class="text-[#93C5FD]">Task</span>
+          </h1>
+        </div>
+
+        <p class="mx-auto max-w-md text-lg leading-relaxed text-white/70">
+          Crie uma nova senha segura para proteger o acesso à sua conta e aos dados do seu escritório.
         </p>
       </div>
     </div>
 
-    <!-- Lado Direito (Formulário) -->
-    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[#f8f8f8]">
+    <!-- Lado Direito -->
+    <div class="w-full md:w-1/2 flex flex-col justify-center items-center p-8 bg-[var(--ct-bg)]">
       <div class="w-full max-w-md">
-        <!-- Logo para Mobile -->
+        <!-- Logo Mobile -->
         <div class="md:hidden text-center mb-8">
-          <h1 class="text-4xl font-extrabold tracking-tight text-[#19341a]">
-            Contably<span class="text-[#ff8a65]">Task</span>.
+          <div class="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--ct-primary-soft)]">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--ct-primary)"
+              stroke-width="2.4"
+              class="h-6 w-6"
+            >
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+            </svg>
+          </div>
+
+          <h1 class="text-4xl font-extrabold tracking-tight text-[var(--ct-ink)]">
+            Contably<span class="text-[var(--ct-primary)]">Task</span>
           </h1>
         </div>
 
-        <h2 class="text-2xl font-extrabold text-[#19341a] mb-2 tracking-tight">Redefinir Senha</h2>
-        <p class="text-gray-500 mb-8 text-[0.95rem]">
-          Escolha uma nova senha para acessar o sistema.
-        </p>
+        <div class="rounded-3xl border border-[var(--ct-border)] bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <h2 class="mb-2 text-2xl font-extrabold tracking-tight text-[var(--ct-ink)]">
+            Redefinir senha
+          </h2>
+          <p class="mb-8 text-[0.95rem] text-[var(--ct-text-muted)]">
+            Escolha uma nova senha para acessar o sistema com segurança.
+          </p>
 
-        <form @submit.prevent="handleUpdatePassword" class="space-y-6">
-          <div>
-            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Nova Senha</label>
-            <input
-              v-model="novaSenha"
-              type="password"
-              required
-              placeholder="Mínimo 6 caracteres"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-all"
-            />
-          </div>
+          <form @submit.prevent="handleUpdatePassword" class="space-y-6">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">
+                Nova senha
+              </label>
+              <input
+                v-model="novaSenha"
+                type="password"
+                required
+                placeholder="Mínimo 6 caracteres"
+                class="w-full rounded-2xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm text-[var(--ct-ink)] shadow-sm transition-all placeholder:text-slate-400 focus:border-[var(--ct-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              />
+            </div>
 
-          <div>
-            <label class="block text-sm font-medium text-[#2a2a2a]/70 mb-1.5">Confirmar Nova Senha</label>
-            <input
-              v-model="confirmarSenha"
-              type="password"
-              required
-              placeholder="Repita a senha"
-              class="w-full px-4 py-3 border border-gray-200 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-[#ff8a65] focus:border-transparent text-sm transition-all"
-            />
-          </div>
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">
+                Confirmar nova senha
+              </label>
+              <input
+                v-model="confirmarSenha"
+                type="password"
+                required
+                placeholder="Repita a senha"
+                class="w-full rounded-2xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm text-[var(--ct-ink)] shadow-sm transition-all placeholder:text-slate-400 focus:border-[var(--ct-primary)] focus:outline-none focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              />
+            </div>
 
-          <div>
-            <button
-              type="submit"
-              :disabled="isLoading"
-              class="w-full flex justify-center py-3 px-4 border border-transparent rounded-xl shadow-md shadow-[#ff8a65]/30 text-sm font-semibold text-white bg-[#ff8a65] hover:bg-[#f07047] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#ff8a65] disabled:opacity-50 transition-all"
-            >
-              {{ isLoading ? 'Salvando...' : 'Salvar Nova Senha' }}
-            </button>
-          </div>
-        </form>
+            <div>
+              <button
+                type="submit"
+                :disabled="isLoading"
+                class="flex w-full justify-center rounded-2xl border border-transparent bg-[var(--ct-primary)] px-4 py-3 text-sm font-semibold text-white shadow-md shadow-[rgba(37,99,235,0.22)] transition-all hover:bg-[var(--ct-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ct-primary)] focus:ring-offset-2 disabled:opacity-50"
+              >
+                {{ isLoading ? 'Salvando...' : 'Salvar nova senha' }}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+:global(:root) {
+  --ct-bg: #F8FAFC;
+  --ct-surface: #FFFFFF;
+  --ct-muted: #F1F5F9;
+  --ct-border: #E2E8F0;
+
+  --ct-ink: #0F172A;
+  --ct-text-muted: #64748B;
+
+  --ct-primary: #2563EB;
+  --ct-primary-hover: #1D4ED8;
+  --ct-primary-soft: #DBEAFE;
+  --ct-navy: #172554;
+}
+</style>

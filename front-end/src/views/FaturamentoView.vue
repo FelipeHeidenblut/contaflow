@@ -11,8 +11,8 @@ const planos = [
     nome: 'Free',
     price: '0',
     desc: 'Para testar a plataforma.',
-    cta: 'Plano Atual',
-    isFree: true, // Flag para não chamar o Asaas
+    cta: 'Plano atual',
+    isFree: true,
     features: [
       'Até 5 clientes',
       '1 usuário (Admin)',
@@ -66,28 +66,23 @@ const planos = [
 ]
 
 const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
-  // Se o usuário tentar "assinar" o plano free, apenas avisa
   if (isFree) {
-    toast.info('Você já pode utilizar os recursos do plano Free. Faça upgrade para liberar mais!')
+    toast.info('Você já pode utilizar os recursos do plano Free. Faça upgrade para liberar mais.')
     return
   }
 
   isLoadingPlano.value = nomePlano
+
   try {
-    // NORMALIZAÇÃO: Remove acentos e passa para minúsculo (Ex: "Básico" -> "basico")
     const planoFormatado = nomePlano
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
 
-    // Chama o backend com o nome formatado
     const response = await api.post(`/api/v1/asaas/criar-assinatura/${planoFormatado}`)
 
-    // Validação estrita para evitar falhas silenciosas
     if (response.data.invoice_url) {
       toast.success('Estamos te redirecionando para o pagamento seguro...')
-
-      // Utiliza location.href para evitar bloqueadores de pop-up no navegador do cliente
       window.location.href = response.data.invoice_url
     } else {
       toast.error('Assinatura criada, mas o link de pagamento ainda está sendo gerado.')
@@ -103,81 +98,133 @@ const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
 
 <template>
   <Layout title="Planos e Faturamento">
-    <header class="mb-8 text-center">
-      <h1 class="text-3xl font-extrabold text-[#19341a] tracking-tight">
-        Escolha o plano ideal para o seu escritório
-      </h1>
-      <p class="text-gray-500 mt-2">
-        Cancele quando quiser. Sem fidelidade. Pague com PIX, Boleto ou Cartão.
-      </p>
-    </header>
+    <div class="space-y-8">
+      <!-- hero -->
+      <header class="mx-auto max-w-3xl text-center">
+        <h1 class="text-3xl font-semibold tracking-tight text-[var(--ct-ink)] md:text-4xl">
+          Escolha o plano ideal para o seu escritório
+        </h1>
+        <p class="mt-3 text-sm leading-relaxed text-[var(--ct-text-muted)] md:text-base">
+          Cancele quando quiser. Sem fidelidade. Pague com PIX, boleto ou cartão.
+        </p>
+      </header>
 
-    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
-      <div
-        v-for="plano in planos"
-        :key="plano.nome"
-        class="bg-white border rounded-2xl p-8 relative transition-all duration-300 hover:shadow-lg"
-        :class="
-          plano.featured
-            ? 'border-[#ff8a65] shadow-[0_20px_50px_rgba(25,52,26,0.1)] md:scale-105 z-10'
-            : 'border-gray-100'
-        "
-      >
-        <div
-          v-if="plano.featured"
-          class="absolute top-[-14px] left-1/2 -translate-x-1/2 bg-[#ff8a65] text-white rounded-full py-1.5 px-5 text-[0.75rem] font-bold whitespace-nowrap shadow-md"
-        >
-          Mais popular
+      <!-- trust strip -->
+      <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Sem fidelidade</p>
+          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cancele quando quiser</p>
         </div>
 
-        <div class="text-sm font-bold uppercase tracking-wider text-gray-400 mb-3">
-          {{ plano.nome }}
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pagamento seguro</p>
+          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Checkout protegido</p>
         </div>
 
-        <div class="flex items-end gap-1 mb-1">
-          <span class="text-2xl font-bold text-gray-400 mb-1">R$</span>
-          <span class="text-4xl font-extrabold text-[#19341a] leading-none">{{ plano.price }}</span>
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Escalável</p>
+          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cresça no seu ritmo</p>
         </div>
-        <div class="text-sm text-gray-400 font-medium mb-6">/mês</div>
+      </section>
 
-        <div class="text-sm text-gray-500 mt-2 mb-6 min-h-[40px]">{{ plano.desc }}</div>
-
-        <ul class="mb-8 space-y-3 border-t border-gray-100 pt-6">
-          <li
-            v-for="f in plano.features"
-            :key="f"
-            class="text-sm text-[#2a2a2a] flex items-start gap-2.5"
-          >
-            <svg
-              class="w-4 h-4 text-[#ff8a65] mt-0.5 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="3"
-                d="M5 13l4 4L19 7"
-              ></path>
-            </svg>
-            {{ f }}
-          </li>
-        </ul>
-
-        <button
-          @click="assinarPlano(plano.nome, plano.isFree)"
-          :disabled="isLoadingPlano === plano.nome || plano.isFree"
-          class="w-full rounded-xl py-3 font-bold text-sm cursor-pointer transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      <!-- cards -->
+      <section class="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <article
+          v-for="plano in planos"
+          :key="plano.nome"
+          class="relative flex h-full flex-col rounded-2xl border bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
           :class="
             plano.featured
-              ? 'bg-[#ff8a65] text-white hover:bg-[#f07047] shadow-lg shadow-[#ff8a65]/30'
-              : 'bg-transparent text-[#19341a] border-2 border-gray-200 hover:border-[#19341a] hover:bg-white'
+              ? 'border-[var(--ct-primary)] shadow-[0_20px_60px_rgba(37,99,235,0.14)]'
+              : 'border-[var(--ct-border)]'
           "
         >
-          {{ isLoadingPlano === plano.nome ? 'Gerando cobrança...' : plano.cta }}
-        </button>
-      </div>
+          <div
+            v-if="plano.featured"
+            class="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ct-primary)] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white shadow-md"
+          >
+            Mais popular
+          </div>
+
+          <div class="mb-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+              {{ plano.nome }}
+            </p>
+
+            <div class="mt-4 flex items-end gap-1">
+              <span class="mb-1 text-lg font-semibold text-slate-400">R$</span>
+              <span class="text-4xl font-semibold tracking-tight text-[var(--ct-ink)]">
+                {{ plano.price }}
+              </span>
+            </div>
+
+            <p class="mt-1 text-sm font-medium text-slate-400">/mês</p>
+            <p class="mt-4 min-h-[42px] text-sm leading-relaxed text-[var(--ct-text-muted)]">
+              {{ plano.desc }}
+            </p>
+          </div>
+
+          <ul class="mb-6 space-y-3 border-t border-[var(--ct-border)] pt-6">
+            <li
+              v-for="f in plano.features"
+              :key="f"
+              class="flex items-start gap-3 text-sm text-[var(--ct-ink)]"
+            >
+              <span
+                class="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]"
+              >
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                </svg>
+              </span>
+              <span>{{ f }}</span>
+            </li>
+          </ul>
+
+          <div class="mt-auto">
+            <button
+              @click="assinarPlano(plano.nome, plano.isFree)"
+              :disabled="isLoadingPlano === plano.nome || plano.isFree"
+              class="w-full rounded-xl py-3 text-sm font-semibold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50"
+              :class="
+                plano.featured
+                  ? 'bg-[var(--ct-primary)] text-white hover:bg-[var(--ct-primary-hover)] shadow-sm'
+                  : plano.isFree
+                    ? 'border border-[var(--ct-border)] bg-slate-50 text-slate-400'
+                    : 'border border-[var(--ct-border)] bg-white text-[var(--ct-ink)] hover:border-[var(--ct-primary)] hover:text-[var(--ct-primary)]'
+              "
+            >
+              {{ isLoadingPlano === plano.nome ? 'Gerando cobrança...' : plano.cta }}
+            </button>
+          </div>
+        </article>
+      </section>
+
+      <!-- info box -->
+      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-5 shadow-sm">
+        <div class="grid gap-4 md:grid-cols-3">
+          <div>
+            <p class="text-sm font-semibold text-[var(--ct-ink)]">Upgrade simples</p>
+            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+              Escolha o plano e siga para o pagamento com redirecionamento seguro.
+            </p>
+          </div>
+
+          <div>
+            <p class="text-sm font-semibold text-[var(--ct-ink)]">Sem travas desnecessárias</p>
+            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+              Comece no Free e evolua conforme o volume de clientes e equipe crescer.
+            </p>
+          </div>
+
+          <div>
+            <p class="text-sm font-semibold text-[var(--ct-ink)]">Para cada fase do escritório</p>
+            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+              Dos contadores autônomos até operações maiores com necessidade de escala.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   </Layout>
 </template>

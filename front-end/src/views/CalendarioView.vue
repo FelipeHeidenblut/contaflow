@@ -5,9 +5,6 @@ import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 
-// ==========================================
-// 1. TIPAGENS
-// ==========================================
 interface TaskData {
   id: string | number
   title: string
@@ -24,38 +21,28 @@ interface CalendarDay {
   tasks: TaskData[]
 }
 
-// ==========================================
-// 2. ESTADOS
-// ==========================================
 const isLoading = ref(true)
 const tasks = ref<TaskData[]>([])
 const currentDate = ref(new Date())
 
-// Controle do Modal do Dia
 const isDayModalOpen = ref(false)
 const selectedDayTasks = ref<TaskData[]>([])
 const selectedDayTitle = ref('')
 
-// ==========================================
-// 3. SINCRONIZAÇÃO ICS (.ics)
-// ==========================================
-// Pega a URL base do backend do arquivo .env (ou usa localhost se não tiver)
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://api.contablytask.com.br'
-
 const icsUrl = ref('')
 const copied = ref(false)
 
 const carregarIcsUrl = async () => {
   try {
-    // Busca o tenant_id do usuário logado no backend
     const res = await api.get('/api/v1/auth/me')
     if (res.data.tenant_id) {
       icsUrl.value = `${API_BASE_URL}/api/v1/calendario/feed/${res.data.tenant_id}.ics`
     } else {
-      console.warn("Backend não retornou tenant_id na rota /me")
+      console.warn('Backend não retornou tenant_id na rota /me')
     }
   } catch (error) {
-    console.error("Erro ao buscar tenant_id para o link ICS:", error)
+    console.error('Erro ao buscar tenant_id para o link ICS:', error)
   }
 }
 
@@ -64,16 +51,15 @@ const copyLink = async () => {
     await navigator.clipboard.writeText(icsUrl.value)
     copied.value = true
     toast.success('Link copiado! Cole no Google Agenda ou Outlook.')
-    setTimeout(() => copied.value = false, 3000)
+    setTimeout(() => (copied.value = false), 3000)
   } catch (error) {
     toast.error('Não foi possível copiar o link.')
   }
 }
 
-// ==========================================
-// 4. LÓGICA DO CALENDÁRIO
-// ==========================================
-const currentMonth = computed(() => currentDate.value.toLocaleDateString('pt-BR', { month: 'long' }))
+const currentMonth = computed(() =>
+  currentDate.value.toLocaleDateString('pt-BR', { month: 'long' }),
+)
 const currentYear = computed(() => currentDate.value.getFullYear())
 
 const calendarDays = computed<CalendarDay[]>(() => {
@@ -81,7 +67,8 @@ const calendarDays = computed<CalendarDay[]>(() => {
   const month = currentDate.value.getMonth()
   const firstDayOfMonth = new Date(year, month, 1).getDay()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
-  let days: CalendarDay[] = []
+
+  const days: CalendarDay[] = []
 
   for (let i = 0; i < firstDayOfMonth; i++) {
     days.push({ date: null, tasks: [] })
@@ -92,32 +79,56 @@ const calendarDays = computed<CalendarDay[]>(() => {
     const dayTasks = tasks.value.filter((t) => (t.due_date || t.date) === dateStr)
     days.push({ date: day, tasks: dayTasks })
   }
+
   return days
 })
 
+const totalPrazos = computed(() => tasks.value.length)
+const totalFederais = computed(
+  () => tasks.value.filter((task) => task.type === 'receita_federal').length,
+)
+const totalPendentes = computed(
+  () => tasks.value.filter((task) => task.status === 'pendente').length,
+)
+const totalEmAndamento = computed(
+  () => tasks.value.filter((task) => task.status === 'em_andamento').length,
+)
+
 const prevMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
-}
-const nextMonth = () => {
-  currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() + 1, 1)
+  currentDate.value = new Date(
+    currentDate.value.getFullYear(),
+    currentDate.value.getMonth() - 1,
+    1,
+  )
 }
 
-// ==========================================
-// 5. MODAL DO DIA (NOVO)
-// ==========================================
+const nextMonth = () => {
+  currentDate.value = new Date(
+    currentDate.value.getFullYear(),
+    currentDate.value.getMonth() + 1,
+    1,
+  )
+}
+
 const openDayModal = (day: CalendarDay) => {
-  // Só abre se o dia tiver tarefas
   if (day.date && day.tasks.length > 0) {
-    const dateObj = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth(), day.date)
-    selectedDayTitle.value = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+    const dateObj = new Date(
+      currentDate.value.getFullYear(),
+      currentDate.value.getMonth(),
+      day.date,
+    )
+
+    selectedDayTitle.value = dateObj.toLocaleDateString('pt-BR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    })
+
     selectedDayTasks.value = day.tasks
     isDayModalOpen.value = true
   }
 }
 
-// ==========================================
-// 6. CHAMADAS À API
-// ==========================================
 const fetchData = async () => {
   isLoading.value = true
   try {
@@ -144,22 +155,30 @@ const fetchData = async () => {
   }
 }
 
-// ==========================================
-// 7. HELPERS VISUAIS
-// ==========================================
 const getStatusColor = (status: string) => {
-  if (status === 'concluida') return 'bg-[#19341a]'
-  if (status === 'em_andamento') return 'bg-[#ff8a65]'
-  if (status === 'aguardando_cliente') return 'bg-yellow-400'
-  return 'bg-gray-400'
+  if (status === 'concluida') return 'bg-emerald-500'
+  if (status === 'em_andamento') return 'bg-[var(--ct-primary)]'
+  if (status === 'aguardando_cliente') return 'bg-amber-400'
+  return 'bg-slate-400'
+}
+
+const getStatusBadge = (status: string) => {
+  const styles: Record<string, string> = {
+    concluida: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    em_andamento: 'bg-blue-100 text-blue-700 border-blue-200',
+    aguardando_cliente: 'bg-amber-100 text-amber-700 border-amber-200',
+    pendente: 'bg-slate-100 text-slate-600 border-slate-200',
+  }
+
+  return `inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold ${styles[status] || styles.pendente}`
 }
 
 const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
-    'concluida': 'Concluída',
-    'em_andamento': 'Em Andamento',
-    'aguardando_cliente': 'Aguardando Cliente',
-    'pendente': 'Pendente'
+    concluida: 'Concluída',
+    em_andamento: 'Em andamento',
+    aguardando_cliente: 'Aguardando cliente',
+    pendente: 'Pendente',
   }
   return labels[status] || 'Pendente'
 }
@@ -181,164 +200,345 @@ onMounted(() => {
 
 <template>
   <Layout title="Calendário de Prazos">
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-6 md:p-8">
-
-      <!-- Cabeçalho do Calendário -->
-      <div class="flex items-center justify-between mb-8">
-        <h2 class="text-2xl font-extrabold text-[#19341a] capitalize tracking-tight">
-          {{ currentMonth }} <span class="text-gray-300 font-light">{{ currentYear }}</span>
-        </h2>
-        <div class="flex items-center gap-2">
-          <button @click="prevMonth" class="p-2.5 rounded-lg hover:bg-[#eaf3ea] transition-colors text-[#2a2a2a]/60 hover:text-[#19341a] border border-gray-100">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
-          </button>
-          <button @click="nextMonth" class="p-2.5 rounded-lg hover:bg-[#eaf3ea] transition-colors text-[#2a2a2a]/60 hover:text-[#19341a] border border-gray-100">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-          </button>
+    <div class="space-y-6">
+      <!-- topo -->
+      <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+            Calendário de prazos
+          </h1>
+          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+            Acompanhe vencimentos, obrigações internas e prazos fiscais em um só lugar.
+          </p>
         </div>
-      </div>
+      </header>
 
-      <!-- CARTÃO DE SINCRONIZAÇÃO (.ICS) -->
-      <div v-if="icsUrl" class="mb-8 p-5 bg-[#eaf3ea] border border-[#19341a]/10 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-        <div class="flex items-center gap-3 text-center md:text-left">
-          <div class="h-10 w-10 rounded-xl bg-white flex items-center justify-center text-[#19341a] flex-shrink-0">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+      <!-- indicadores -->
+      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de prazos</p>
+          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalPrazos }}
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Prazos federais</p>
+          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalFederais }}
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
+          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalPendentes }}
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Em andamento</p>
+          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalEmAndamento }}
+          </p>
+        </div>
+      </section>
+
+      <!-- card ics -->
+      <section
+        v-if="icsUrl"
+        class="flex flex-col gap-4 rounded-2xl border border-[var(--ct-border)] bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between"
+      >
+        <div class="flex items-start gap-4">
+          <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
           </div>
+
           <div>
-            <p class="font-bold text-[#19341a]">Sincronizar com minha agenda</p>
-            <p class="text-sm text-gray-500">Adicione este link no Google Agenda ou Outlook para ver seus prazos no celular.</p>
+            <p class="text-sm font-semibold text-[var(--ct-ink)]">
+              Sincronizar com minha agenda
+            </p>
+            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+              Use este link no Google Agenda ou Outlook para acompanhar seus prazos fora da plataforma.
+            </p>
           </div>
         </div>
-        <div class="flex gap-2 items-center w-full md:w-auto">
-          <input type="text" readonly :value="icsUrl" class="flex-1 md:w-64 px-3 py-2 border border-gray-200 rounded-lg text-xs bg-white text-gray-500 outline-none" />
-          <button @click="copyLink" class="bg-[#19341a] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-[#0f2010] transition-colors whitespace-nowrap">
-            {{ copied ? 'Copiado!' : 'Copiar Link' }}
+
+        <div class="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+          <input
+            type="text"
+            readonly
+            :value="icsUrl"
+            class="w-full rounded-xl border border-[var(--ct-border)] bg-slate-50 px-3 py-2.5 text-xs text-slate-500 outline-none"
+          />
+          <button
+            @click="copyLink"
+            class="inline-flex items-center justify-center rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] whitespace-nowrap"
+          >
+            {{ copied ? 'Copiado!' : 'Copiar link' }}
           </button>
         </div>
-      </div>
+      </section>
 
-      <div v-if="isLoading" class="text-center text-gray-400 py-20">Carregando calendário...</div>
+      <!-- calendario -->
+      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-4 shadow-sm md:p-6">
+        <div class="mb-8 flex items-center justify-between">
+          <div>
+            <h2 class="text-2xl font-semibold capitalize tracking-tight text-[var(--ct-ink)]">
+              {{ currentMonth }}
+              <span class="font-medium text-slate-300">{{ currentYear }}</span>
+            </h2>
+            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+              Visualize seus prazos por dia e clique para ver os detalhes.
+            </p>
+          </div>
 
-      <div v-else>
-        <!-- Dias da Semana -->
-        <div class="grid grid-cols-7 gap-2 mb-2">
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Dom</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Seg</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Ter</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Qua</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Qui</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Sex</div>
-          <div class="text-center text-xs font-bold text-gray-400 uppercase py-2">Sáb</div>
+          <div class="flex items-center gap-2">
+            <button
+              @click="prevMonth"
+              class="rounded-xl border border-[var(--ct-border)] bg-white p-2.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-[var(--ct-ink)]"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+              </svg>
+            </button>
+
+            <button
+              @click="nextMonth"
+              class="rounded-xl border border-[var(--ct-border)] bg-white p-2.5 text-slate-500 transition-colors hover:bg-slate-50 hover:text-[var(--ct-ink)]"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <!-- Grid do Calendário -->
-        <div class="grid grid-cols-7 gap-2">
+        <div v-if="isLoading" class="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
           <div
-            v-for="(day, index) in calendarDays"
-            :key="index"
-            @click="openDayModal(day)"
-            class="min-h-[110px] border rounded-xl p-2 transition-all flex flex-col"
-            :class="[
-              day.date ? 'bg-white border-gray-100 hover:border-[#ff8a65]/40 hover:shadow-sm' : 'bg-gray-50/30 border-transparent',
-              day.tasks.length > 0 ? 'cursor-pointer hover:bg-[#f8f8f8]' : ''
-            ]"
-          >
-            <template v-if="day.date">
-              <div class="text-right mb-1">
-                <span
-                  class="text-xs font-bold inline-flex items-center justify-center"
-                  :class="isToday(day.date) ? 'bg-[#ff8a65] text-white w-6 h-6 rounded-full shadow-sm' : 'text-gray-400'"
-                >{{ day.date }}</span>
+            v-for="n in 14"
+            :key="n"
+            class="h-28 animate-pulse rounded-xl border border-slate-100 bg-slate-50"
+          ></div>
+        </div>
+
+        <div v-else class="space-y-4">
+          <!-- semana -->
+          <div class="grid grid-cols-7 gap-2">
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Dom
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Seg
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Ter
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Qua
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Qui
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Sex
+            </div>
+            <div class="py-2 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Sáb
+            </div>
+          </div>
+
+          <!-- grid -->
+          <div class="grid grid-cols-7 gap-2">
+            <div
+              v-for="(day, index) in calendarDays"
+              :key="index"
+              @click="openDayModal(day)"
+              class="flex min-h-[118px] flex-col rounded-2xl border p-2.5 transition-all"
+              :class="[
+                day.date
+                  ? 'border-[var(--ct-border)] bg-white'
+                  : 'border-transparent bg-slate-50/40',
+                day.tasks.length > 0
+                  ? 'cursor-pointer hover:border-[var(--ct-primary)]/25 hover:bg-slate-50'
+                  : '',
+              ]"
+            >
+              <template v-if="day.date">
+                <div class="mb-2 flex justify-end">
+                  <span
+                    class="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
+                    :class="
+                      isToday(day.date)
+                        ? 'bg-[var(--ct-primary)] text-white shadow-sm'
+                        : 'text-slate-400'
+                    "
+                  >
+                    {{ day.date }}
+                  </span>
+                </div>
+
+                <div class="flex-1 space-y-1 overflow-hidden">
+                  <template v-for="(task, tIndex) in day.tasks" :key="task.id">
+                    <div
+                      v-if="tIndex < 3"
+                      class="group flex items-center gap-1.5 rounded-lg px-1.5 py-1"
+                      :class="
+                        task.type === 'receita_federal'
+                          ? 'bg-amber-50'
+                          : 'bg-slate-50'
+                      "
+                      :title="task.description || task.title"
+                    >
+                      <template v-if="task.type === 'receita_federal'">
+                        <span class="text-[10px]">🏛️</span>
+                        <span class="truncate text-[11px] font-semibold text-amber-700">
+                          {{ task.title }}
+                        </span>
+                      </template>
+
+                      <template v-else>
+                        <div
+                          class="h-2 w-2 flex-shrink-0 rounded-full"
+                          :class="getStatusColor(task.status)"
+                        ></div>
+                        <span class="truncate text-[11px] font-medium text-slate-600">
+                          {{ task.title }}
+                        </span>
+                      </template>
+                    </div>
+                  </template>
+
+                  <div
+                    v-if="day.tasks.length > 3"
+                    class="rounded-md border border-blue-100 bg-blue-50 py-1 text-center text-[10px] font-bold text-blue-700"
+                  >
+                    + {{ day.tasks.length - 3 }} item(ns)
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- legenda -->
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-[var(--ct-border)] pt-5">
+            <div class="flex items-center gap-2">
+              <span class="text-sm">🏛️</span>
+              <span class="text-xs font-medium text-[var(--ct-text-muted)]">Prazo federal</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <div class="h-2.5 w-2.5 rounded-full bg-emerald-500"></div>
+              <span class="text-xs font-medium text-[var(--ct-text-muted)]">Concluída</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <div class="h-2.5 w-2.5 rounded-full bg-[var(--ct-primary)]"></div>
+              <span class="text-xs font-medium text-[var(--ct-text-muted)]">Em andamento</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <div class="h-2.5 w-2.5 rounded-full bg-amber-400"></div>
+              <span class="text-xs font-medium text-[var(--ct-text-muted)]">Aguardando cliente</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- modal dia -->
+      <div
+        v-if="isDayModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+        @click="isDayModalOpen = false"
+      >
+        <div
+          class="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          @click.stop
+        >
+          <div class="bg-[var(--ct-navy)] px-6 py-5">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
+                  Prazos do dia
+                </p>
+                <h3 class="mt-1 text-xl font-semibold capitalize tracking-tight text-white">
+                  {{ selectedDayTitle }}
+                </h3>
               </div>
 
-              <div class="space-y-1 mt-1 flex-1 overflow-hidden">
-                <template v-for="(task, tIndex) in day.tasks" :key="task.id">
-                  <div v-if="tIndex < 3"
-                    class="flex items-center gap-1.5 group cursor-pointer rounded-md px-1.5 py-1 transition-colors"
-                    :class="task.type === 'receita_federal' ? 'bg-[#fff3e0]' : 'bg-gray-50'"
-                    :title="task.description || task.title"
-                  >
-                    <template v-if="task.type === 'receita_federal'">
-                      <span class="text-[10px]">🏛️</span>
-                      <span class="text-[11px] text-[#e65100] truncate font-bold">{{ task.title }}</span>
-                    </template>
-                    <template v-else>
-                      <div class="w-2 h-2 rounded-full flex-shrink-0" :class="getStatusColor(task.status)"></div>
-                      <span class="text-[11px] text-[#2a2a2a]/70 truncate font-medium">{{ task.title }}</span>
-                    </template>
-                  </div>
-                </template>
+              <button
+                @click="isDayModalOpen = false"
+                class="rounded-lg p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
 
-                <div v-if="day.tasks.length > 3" class="mt-1 text-[10px] font-bold text-center text-[#ff8a65] bg-[#fff3e0] rounded-md py-0.5 border border-[#ffe0b2]">
-                  + {{ day.tasks.length - 3 }} tarefas (Clique para ver)
+          <div class="max-h-[60vh] space-y-3 overflow-y-auto p-6">
+            <div
+              v-for="task in selectedDayTasks"
+              :key="task.id"
+              class="rounded-xl border p-4"
+              :class="
+                task.type === 'receita_federal'
+                  ? 'border-amber-200 bg-amber-50'
+                  : 'border-[var(--ct-border)] bg-slate-50/70'
+              "
+            >
+              <div class="flex items-start gap-3">
+                <div class="mt-0.5 flex-shrink-0">
+                  <span v-if="task.type === 'receita_federal'" class="text-xl">🏛️</span>
+                  <div
+                    v-else
+                    class="h-3 w-3 rounded-full"
+                    :class="getStatusColor(task.status)"
+                  ></div>
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-semibold text-[var(--ct-ink)]">
+                    {{ task.title }}
+                  </p>
+
+                  <p
+                    v-if="task.description"
+                    class="mt-1 text-xs leading-relaxed text-[var(--ct-text-muted)]"
+                  >
+                    {{ task.description }}
+                  </p>
+
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <span v-if="task.type !== 'receita_federal'" :class="getStatusBadge(task.status)">
+                      {{ getStatusLabel(task.status) }}
+                    </span>
+
+                    <span
+                      v-if="task.grau_importancia"
+                      class="inline-flex rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase text-slate-500"
+                    >
+                      ⚡ {{ task.grau_importancia }}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </template>
+            </div>
           </div>
-        </div>
 
-        <!-- Legenda -->
-        <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-gray-100 pt-6">
-          <div class="flex items-center gap-2"><span class="text-sm">🏛️</span><span class="text-xs text-gray-500 font-medium">Prazo Federal</span></div>
-          <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-[#19341a]"></div><span class="text-xs text-gray-500 font-medium">Concluída</span></div>
-          <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-[#ff8a65]"></div><span class="text-xs text-gray-500 font-medium">Em Andamento</span></div>
-          <div class="flex items-center gap-2"><div class="w-2.5 h-2.5 rounded-full bg-yellow-400"></div><span class="text-xs text-gray-500 font-medium">Aguardando Cliente</span></div>
+          <div class="flex justify-end border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4">
+            <RouterLink
+              to="/obrigacoes"
+              class="inline-flex items-center rounded-xl bg-[var(--ct-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
+            >
+              Gerenciar tarefas
+            </RouterLink>
+          </div>
         </div>
       </div>
     </div>
-
-    <!-- ========================================== -->
-    <!-- MODAL DE DETALHES DO DIA (NOVO)            -->
-    <!-- ========================================== -->
-    <div v-if="isDayModalOpen" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" @click="isDayModalOpen = false">
-      <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden" @click.stop>
-
-        <!-- Cabeçalho do Modal -->
-        <div class="bg-[#19341a] px-6 py-5 flex justify-between items-center">
-          <div>
-            <p class="text-white/50 text-xs font-bold uppercase tracking-wider">Prazos do Dia</p>
-            <h3 class="text-xl font-bold text-white capitalize tracking-tight">{{ selectedDayTitle }}</h3>
-          </div>
-          <button @click="isDayModalOpen = false" class="text-white/50 hover:text-white text-2xl font-bold">&times;</button>
-        </div>
-
-        <!-- Lista de Tarefas do Dia -->
-        <div class="p-6 space-y-3 max-h-[60vh] overflow-y-auto">
-          <div v-for="task in selectedDayTasks" :key="task.id"
-               class="flex items-start gap-3 p-4 rounded-xl border transition-colors"
-               :class="task.type === 'receita_federal' ? 'bg-[#fff3e0] border-[#ffe0b2]' : 'bg-[#f8f8f8] border-gray-100'">
-
-            <div class="flex-shrink-0 mt-1">
-              <span v-if="task.type === 'receita_federal'" class="text-xl">🏛️</span>
-              <div v-else class="w-3 h-3 rounded-full" :class="getStatusColor(task.status)"></div>
-            </div>
-
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-bold text-[#19341a]">{{ task.title }}</p>
-              <p v-if="task.description" class="text-xs text-gray-500 mt-1 truncate">{{ task.description }}</p>
-
-              <div class="flex items-center gap-3 mt-2">
-                <span v-if="task.type !== 'receita_federal'"
-                      class="text-[10px] font-bold px-2 py-0.5 rounded-md"
-                      :class="getStatusColor(task.status) + ' text-white'">
-                  {{ getStatusLabel(task.status) }}
-                </span>
-                <span v-if="task.grau_importancia" class="text-[10px] font-bold text-gray-400 uppercase">
-                  ⚡ {{ task.grau_importancia }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Rodapé do Modal -->
-        <div class="px-6 py-4 bg-[#f8f8f8] border-t border-gray-100 flex justify-end">
-          <RouterLink to="/obrigacoes" class="px-5 py-2.5 bg-[#ff8a65] text-white text-sm font-bold rounded-xl hover:bg-[#f07047] transition-colors">
-            Gerenciar Tarefas →
-          </RouterLink>
-        </div>
-      </div>
-    </div>
-
   </Layout>
 </template>

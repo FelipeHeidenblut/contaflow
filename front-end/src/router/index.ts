@@ -14,6 +14,10 @@ const routes = [
   { path: '/redefinir-senha', component: () => import('@/views/ResetPasswordView.vue'), meta: { guestOnly: true } },
   { path: '/privacidade', component: () => import('@/views/PrivacidadeView.vue') },
   { path: '/termos', component: () => import('@/views/TermosView.vue') },
+  {path: '/sobre', component: () => import('@/views/SobreNosView.vue')},
+  {path: '/contato', component: () => import('@/views/ContatoView.vue')},
+  {path: '/planos', component: () => import('@/views/PlanosView.vue')},
+  {path: '/como-funciona', component: () => import('@/views/ComoFuncionaView.vue')},
 
   // ==========================================
   // ROTAS PRIVADAS (Painel do Cliente SaaS)

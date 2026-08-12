@@ -405,23 +405,23 @@ onMounted(async () => {
 
 <template>
   <Layout title="Controle de Obrigações">
-    <div class="space-y-6">
+    <div class="ct-workspace space-y-4">
       <!-- topo -->
       <header
-        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+        class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
       >
         <div>
-          <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+          <h1 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Obrigações e tarefas
           </h1>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+          <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
             Gerencie prazos, responsáveis e pendências operacionais do escritório.
           </p>
         </div>
 
         <button
           @click="abrirCadastro"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+          class="ct-primary-action inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -437,7 +437,7 @@ onMounted(async () => {
 
       <!-- kpis -->
       <section
-        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
       >
         <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
@@ -477,7 +477,7 @@ onMounted(async () => {
       </section>
 
       <!-- filtros -->
-      <section class="border-b border-[var(--ct-border)] pb-5">
+      <section class="ct-filter-panel border-b border-[var(--ct-border)] pb-5">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div class="relative">
@@ -543,7 +543,9 @@ onMounted(async () => {
       </section>
 
       <!-- tabela -->
-      <section class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
+      <section
+        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+      >
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -791,7 +793,7 @@ onMounted(async () => {
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
         <div
-          class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="w-full max-w-2xl overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
         >
           <div
             class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
@@ -1022,7 +1024,7 @@ onMounted(async () => {
         <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
           <div class="pointer-events-auto w-screen max-w-xl">
             <div class="flex h-full flex-col overflow-y-auto bg-white shadow-2xl">
-              <div class="border-b border-[var(--ct-border)] bg-[var(--ct-navy)] px-6 py-5">
+              <div class="border-b border-[var(--ct-border)] bg-white px-6 py-5">
                 <div class="flex items-start justify-between gap-4">
                   <div>
                     <div class="mb-2 flex flex-wrap items-center gap-2">
@@ -1038,17 +1040,17 @@ onMounted(async () => {
 
                       <span
                         v-if="obrigacaoSelecionada.is_recurring"
-                        class="inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white"
+                        class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700"
                       >
                         Recorrente
                       </span>
                     </div>
 
-                    <h3 class="text-xl font-semibold tracking-tight text-white">
+                    <h3 class="text-xl font-semibold tracking-tight text-[#101a38]">
                       {{ obrigacaoSelecionada.title }}
                     </h3>
 
-                    <p class="mt-1 text-sm text-white/70">
+                    <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
                       {{ obrigacaoSelecionada.description || 'Sem descrição adicional.' }}
                     </p>
                   </div>
@@ -1056,7 +1058,7 @@ onMounted(async () => {
                   <button
                     @click="fecharDetalhes"
                     aria-label="Fechar detalhes da obrigação"
-                    class="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                    class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   >
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path

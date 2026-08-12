@@ -225,16 +225,16 @@ onMounted(() => {
 
 <template>
   <Layout title="Calendário de Prazos">
-    <div class="space-y-6">
+    <div class="ct-workspace space-y-4">
       <!-- topo -->
       <header
-        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-start xl:justify-between"
+        class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-start xl:justify-between"
       >
         <div>
-          <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+          <h1 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Calendário de prazos
           </h1>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+          <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
             Acompanhe vencimentos, obrigações internas e prazos fiscais em um só lugar.
           </p>
         </div>
@@ -242,7 +242,7 @@ onMounted(() => {
 
       <!-- indicadores -->
       <section
-        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
       >
         <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de prazos</p>
@@ -276,7 +276,7 @@ onMounted(() => {
       <!-- card ics -->
       <section
         v-if="icsUrl"
-        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 lg:flex-row lg:items-center lg:justify-between"
+        class="ct-information-panel flex flex-col gap-4 border-b border-[var(--ct-border)] bg-white pb-5 lg:flex-row lg:items-center lg:justify-between"
       >
         <div class="flex items-start gap-4">
           <div
@@ -326,7 +326,9 @@ onMounted(() => {
       </section>
 
       <!-- calendario -->
-      <section class="rounded-xl border border-[var(--ct-border)] bg-white p-4 md:p-6">
+      <section
+        class="ct-data-panel rounded-xl border border-[var(--ct-border)] bg-white p-4 md:p-6"
+      >
         <div class="mb-8 flex items-center justify-between">
           <div>
             <h2 class="text-2xl font-semibold capitalize tracking-tight text-[var(--ct-ink)]">
@@ -568,18 +570,20 @@ onMounted(() => {
         @click="isDayModalOpen = false"
       >
         <div
-          class="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="w-full max-w-xl overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
           @click.stop
         >
-          <div class="bg-[var(--ct-navy)] px-6 py-5">
+          <div class="border-b border-[var(--ct-border)] bg-white px-6 py-5">
             <div class="flex items-start justify-between gap-4">
               <div>
-                <p class="text-[11px] font-bold uppercase tracking-[0.14em] text-white/50">
+                <p
+                  class="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ct-primary)]"
+                >
                   Prazos do dia
                 </p>
                 <h3
                   id="day-modal-title"
-                  class="mt-1 text-xl font-semibold capitalize tracking-tight text-white"
+                  class="mt-1 text-xl font-semibold capitalize tracking-tight text-[#101a38]"
                 >
                   {{ selectedDayTitle }}
                 </h3>
@@ -588,7 +592,7 @@ onMounted(() => {
               <button
                 @click="isDayModalOpen = false"
                 aria-label="Fechar detalhes do dia"
-                class="rounded-lg p-1 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
               >
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

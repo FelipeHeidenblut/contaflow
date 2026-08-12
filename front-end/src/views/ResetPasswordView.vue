@@ -9,8 +9,8 @@ const novaSenha = ref('')
 const confirmarSenha = ref('')
 const isLoading = ref(false)
 const handleUpdatePassword = async () => {
-  if (novaSenha.value.length < 6) {
-    toast.error('A senha deve ter no mínimo 6 caracteres.')
+  if (novaSenha.value.length < 8) {
+    toast.error('A senha deve ter no mínimo 8 caracteres.')
     return
   }
   if (novaSenha.value !== confirmarSenha.value) {
@@ -39,7 +39,7 @@ const handleUpdatePassword = async () => {
 <template>
   <AuthShell
     title="Defina uma nova senha"
-    description="Escolha uma senha exclusiva com pelo menos seis caracteres."
+    description="Escolha uma senha exclusiva com pelo menos oito caracteres."
     ><form class="space-y-5" @submit.prevent="handleUpdatePassword">
       <div>
         <label for="new-password" class="ct-label">Nova senha</label
@@ -49,7 +49,8 @@ const handleUpdatePassword = async () => {
           class="ct-field"
           type="password"
           required
-          minlength="6"
+          minlength="8"
+          maxlength="72"
           autocomplete="new-password"
         />
       </div>
@@ -61,6 +62,8 @@ const handleUpdatePassword = async () => {
           class="ct-field"
           type="password"
           required
+          minlength="8"
+          maxlength="72"
           autocomplete="new-password"
         />
       </div>

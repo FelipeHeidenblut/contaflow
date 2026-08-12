@@ -9,6 +9,8 @@ export const useAuthStore = defineStore('auth', () => {
     tenant_id?: string
     role?: string
     is_superadmin?: boolean
+    plan?: string
+    payment_status?: string
   }
   // Estados
   const isSuperAdmin = ref(false)
@@ -17,6 +19,8 @@ export const useAuthStore = defineStore('auth', () => {
   const tenantId = ref('')
   const userName = ref('')
   const userEmail = ref('')
+  const plan = ref('free')
+  const paymentStatus = ref('ativo')
   const isInitialized = ref(false)
   const hasValidProfile = ref(false)
   let initializationPromise: Promise<boolean> | null = null
@@ -35,6 +39,8 @@ export const useAuthStore = defineStore('auth', () => {
     setRole(profile?.role || 'colaborador')
     userId.value = profile?.user_id || ''
     tenantId.value = profile?.tenant_id || ''
+    plan.value = profile?.plan || 'free'
+    paymentStatus.value = profile?.payment_status || 'ativo'
     hasValidProfile.value = true
   }
 
@@ -56,6 +62,8 @@ export const useAuthStore = defineStore('auth', () => {
     tenantId.value = ''
     userName.value = ''
     userEmail.value = ''
+    plan.value = 'free'
+    paymentStatus.value = 'ativo'
     hasValidProfile.value = false
   }
 
@@ -120,6 +128,8 @@ export const useAuthStore = defineStore('auth', () => {
     tenantId,
     userName,
     userEmail,
+    plan,
+    paymentStatus,
     isInitialized,
     setSuperAdmin,
     setRole,

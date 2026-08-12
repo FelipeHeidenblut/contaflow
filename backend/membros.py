@@ -25,6 +25,12 @@ router = APIRouter(prefix="/api/v1/membros", tags=["Equipe e Membros"])
 
 # Limites de membros por plano
 LIMITES_MEMBROS = {"free": 1, "basico": 5, "profissional": 10, "business": float("inf")}
+NOMES_PLANOS = {
+    "free": "Gratuito",
+    "basico": "Essencial",
+    "profissional": "Profissional",
+    "business": "Empresarial",
+}
 
 
 # ==========================================
@@ -34,7 +40,7 @@ class ProfileCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=150)
     email: EmailStr
     role: Literal["admin", "colaborador"]
-    password: str = Field(..., min_length=6, max_length=72)
+    password: str = Field(..., min_length=8, max_length=72)
 
 
 class ProfileResponse(BaseModel):
@@ -93,7 +99,7 @@ def adicionar_membro(
     if total_membros >= limite:
         raise HTTPException(
             status_code=403, 
-            detail=f"Seu plano {tenant.plano.capitalize()} permite apenas {limite} usuário(s). Faça upgrade para adicionar mais membros!"
+            detail=f"Seu plano {NOMES_PLANOS.get(tenant.plano, tenant.plano)} permite apenas {limite} usuário(s). Faça upgrade para adicionar mais membros!"
         )
 
     # 1. Verifica no banco se o e-mail já existe

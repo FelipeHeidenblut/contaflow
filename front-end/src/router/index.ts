@@ -92,6 +92,11 @@ const routes = [
     meta: { requiresAuth: true, title: 'Calendário' },
   },
   {
+    path: '/relatorios',
+    component: () => import('@/views/RelatoriosView.vue'),
+    meta: { requiresAuth: true, title: 'Relatórios' },
+  },
+  {
     path: '/faturamento',
     component: () => import('@/views/FaturamentoView.vue'),
     meta: { requiresAuth: true, title: 'Planos e faturamento' },
@@ -154,6 +159,12 @@ router.beforeEach(async (to) => {
     if (to.meta.authenticatedRedirect === '/admin') {
       return authStore.isSuperAdmin ? '/admin' : '/dashboard'
     }
+    const requestedPlan =
+      typeof to.query.plano === 'string' &&
+      ['basico', 'profissional', 'business'].includes(to.query.plano)
+        ? to.query.plano
+        : null
+    if (requestedPlan) return { path: '/faturamento', query: { plano: requestedPlan } }
     return '/dashboard'
   }
 

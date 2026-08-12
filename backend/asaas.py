@@ -99,6 +99,11 @@ def criar_assinatura(
         "profissional": 149.90,
         "business": 449.00,
     }
+    nomes_planos = {
+        "basico": "Essencial",
+        "profissional": "Profissional",
+        "business": "Empresarial",
+    }
 
     if plano not in valores:
         raise HTTPException(status_code=400, detail="Plano inválido ou gratuito.")
@@ -110,7 +115,7 @@ def criar_assinatura(
         "billingType": "UNDEFINED",
         "value": valores[plano],
         "cycle": "MONTHLY",
-        "description": f"Plano {plano.capitalize()} - ContablyTask",
+        "description": f"Plano {nomes_planos[plano]} - ContablyTask",
         "nextDueDate": vencimento_amanha,
     }
 

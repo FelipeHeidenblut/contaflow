@@ -335,16 +335,16 @@ onMounted(() => {
 
 <template>
   <Layout title="Gerenciar Clientes">
-    <div class="relative space-y-6">
+    <div class="ct-workspace relative space-y-4">
       <!-- topo -->
       <div
-        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+        class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
       >
         <div>
-          <h2 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+          <h2 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Carteira de clientes
           </h2>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+          <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
             Consulte a carteira e acesse rapidamente o histórico de cada cliente.
           </p>
         </div>
@@ -352,7 +352,7 @@ onMounted(() => {
         <div class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
           <button
             @click="isImportModalOpen = true"
-            class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ct-border)] bg-white px-3.5 py-2 text-sm font-medium text-[var(--ct-ink)] transition-colors hover:bg-slate-50 sm:w-auto"
+            class="ct-secondary-action inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ct-border)] bg-white px-3.5 py-2 text-sm font-medium text-[var(--ct-ink)] transition-colors hover:bg-slate-50 sm:w-auto"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -367,7 +367,7 @@ onMounted(() => {
 
           <button
             @click="isModalOpen = true"
-            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+            class="ct-primary-action inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -384,7 +384,7 @@ onMounted(() => {
 
       <!-- resumo compacto -->
       <div
-        class="flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-[var(--ct-border)] pb-4"
+        class="ct-summary-grid flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-[var(--ct-border)] pb-4"
       >
         <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Clientes ativos</p>
@@ -417,7 +417,7 @@ onMounted(() => {
       </div>
 
       <!-- filtros -->
-      <div>
+      <div class="ct-filter-panel">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
             <div class="relative w-full sm:flex-1">
@@ -463,7 +463,9 @@ onMounted(() => {
       </div>
 
       <!-- tabela -->
-      <div class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
+      <div
+        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+      >
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -651,13 +653,16 @@ onMounted(() => {
           >
             <div class="flex h-full flex-col overflow-y-auto bg-white shadow-2xl">
               <!-- cabeçalho -->
-              <div class="border-b border-[var(--ct-border)] bg-[var(--ct-navy)] px-6 py-5">
+              <div class="border-b border-[var(--ct-border)] bg-white px-6 py-5">
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <h3 id="dossier-title" class="text-xl font-semibold tracking-tight text-white">
+                    <h3
+                      id="dossier-title"
+                      class="text-xl font-semibold tracking-tight text-[#101a38]"
+                    >
                       {{ selectedClient?.razao_social || selectedClient?.nome }}
                     </h3>
-                    <p class="mt-1 text-sm text-white/65">
+                    <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
                       {{ selectedClient ? formatDocumento(selectedClient) : '' }}
                     </p>
                   </div>
@@ -665,7 +670,7 @@ onMounted(() => {
                   <button
                     @click="isDossierOpen = false"
                     aria-label="Fechar dossiê"
-                    class="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                    class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
                   >
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path
@@ -849,7 +854,7 @@ onMounted(() => {
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
         <div
-          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="w-full max-w-md overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
         >
           <div
             class="flex items-center justify-between border-b border-[var(--ct-border)] px-6 py-5"
@@ -1082,7 +1087,7 @@ onMounted(() => {
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
         <div
-          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="w-full max-w-md overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
         >
           <div
             class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"

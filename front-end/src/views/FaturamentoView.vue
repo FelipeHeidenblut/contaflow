@@ -1,90 +1,27 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { getApiErrorMessage } from '../utils/apiError'
+import { getPlan, plans, type PlanOption } from '../constants/plans'
 
 const isLoadingPlano = ref<string | null>(null)
 const isLoadingCurrent = ref(true)
 const planoAtual = ref('free')
 const statusPagamento = ref('ativo')
 const router = useRouter()
+const route = useRoute()
+const selectedPlan = computed(() => getPlan(route.query.plano))
+const currentPlan = computed(() => getPlan(planoAtual.value))
+const isCurrentPlan = (plan: PlanOption) => plan.id === planoAtual.value
 
-const planos = [
-  {
-    nome: 'Free',
-    price: '0',
-    desc: 'Para testar a plataforma.',
-    isFree: true,
-    features: [
-      'Até 5 clientes',
-      '1 usuário (Admin)',
-      'Calendário de obrigações',
-      'Gestão de documentos',
-      'Suporte por e-mail',
-    ],
-  },
-  {
-    nome: 'Básico',
-    price: '79,90',
-    desc: 'Para contadores autônomos.',
-    features: [
-      'Até 40 clientes',
-      'Até 5 usuários',
-      'Tudo do Free',
-      'Alertas por e-mail',
-      'Suporte por chat',
-    ],
-  },
-  {
-    nome: 'Profissional',
-    price: '149,90',
-    featured: true,
-    desc: 'Para escritórios em crescimento.',
-    features: [
-      'Até 100 clientes',
-      'Até 10 usuários',
-      'Tudo do Básico',
-      'Distribuição de equipe',
-      'Relatórios avançados',
-      'Suporte prioritário',
-    ],
-  },
-  {
-    nome: 'Business',
-    price: '449',
-    desc: 'Para grandes operações.',
-    sales: true,
-    features: [
-      'Clientes ilimitados',
-      'Usuários ilimitados',
-      'Tudo do Profissional',
-      'API e integrações',
-      'Gerente de conta dedicado',
-      'Onboarding assistido',
-    ],
-  },
-]
-
-const normalizePlan = (name: string) =>
-  name
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-const isCurrentPlan = (name: string) => normalizePlan(name) === planoAtual.value
-const currentPlanLabel = computed(
-  () => planoAtual.value.charAt(0).toUpperCase() + planoAtual.value.slice(1),
-)
-
-type Plan = (typeof planos)[number]
-
-const getCta = (plan: Plan) => {
-  if (isCurrentPlan(plan.nome)) return 'Plano atual'
+const getCta = (plan: PlanOption) => {
+  if (isCurrentPlan(plan)) return 'Plano atual'
   if (plan.sales) return 'Falar com vendas'
-  if (plan.isFree) return 'Plano gratuito'
-  return `Assinar ${plan.nome}`
+  if (plan.id === 'free') return 'Plano gratuito'
+  return `Assinar ${plan.name}`
 }
 
 const loadCurrentPlan = async () => {
@@ -99,30 +36,24 @@ const loadCurrentPlan = async () => {
   }
 }
 
-const assinarPlano = async (plano: Plan) => {
-  const nomePlano = plano.nome
-  if (isCurrentPlan(nomePlano) || plano.isFree) {
+const assinarPlano = async (plano: PlanOption) => {
+  if (isCurrentPlan(plano) || plano.id === 'free') {
     toast.info(
-      isCurrentPlan(nomePlano)
+      isCurrentPlan(plano)
         ? 'Este já é o seu plano atual.'
         : 'Entre em contato com o suporte para fazer downgrade.',
     )
     return
   }
   if (plano.sales) {
-    router.push({ path: '/contato', query: { assunto: 'Plano Business' } })
+    router.push({ path: '/contato', query: { assunto: 'Plano Empresarial' } })
     return
   }
 
-  isLoadingPlano.value = nomePlano
+  isLoadingPlano.value = plano.id
 
   try {
-    const planoFormatado = nomePlano
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-
-    const response = await api.post(`/api/v1/asaas/criar-assinatura/${planoFormatado}`)
+    const response = await api.post(`/api/v1/asaas/criar-assinatura/${plano.id}`)
 
     if (response.data.invoice_url) {
       toast.success('Estamos te redirecionando para o pagamento seguro...')
@@ -142,25 +73,29 @@ onMounted(loadCurrentPlan)
 
 <template>
   <Layout title="Planos e Faturamento">
-    <div class="space-y-7">
+    <div class="ct-workspace space-y-4">
       <!-- hero -->
-      <header class="border-b border-[var(--ct-border)] pb-6 text-left">
-        <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)] md:text-3xl">
+      <header class="ct-page-header border-b border-[var(--ct-border)] pb-6 text-left">
+        <h1
+          class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)] md:text-3xl"
+        >
           Escolha o plano ideal para o seu escritório
         </h1>
-        <p class="mt-3 text-sm leading-relaxed text-[var(--ct-text-muted)] md:text-base">
+        <p
+          class="ct-page-description mt-2 text-sm leading-relaxed text-[var(--ct-text-muted)] md:text-base"
+        >
           Sem fidelidade. Pague com PIX, boleto ou cartão e solicite alterações pelo suporte.
         </p>
       </header>
 
       <section
         v-if="!isLoadingCurrent"
-        class="flex flex-col items-center justify-between gap-3 rounded-xl border border-[var(--ct-border)] bg-[var(--ct-primary-soft)] px-5 py-4 text-center sm:flex-row sm:text-left"
+        class="ct-information-panel flex flex-col items-center justify-between gap-3 rounded-xl border border-[var(--ct-border)] bg-[var(--ct-primary-soft)] px-5 py-4 text-center sm:flex-row sm:text-left"
         role="status"
       >
         <div>
           <p class="text-sm font-semibold text-[var(--ct-primary)]">
-            Seu plano: {{ currentPlanLabel }}
+            Seu plano: {{ currentPlan?.name || planoAtual }}
           </p>
           <p class="mt-0.5 text-xs text-[var(--ct-text-muted)]">
             Status:
@@ -178,9 +113,31 @@ onMounted(loadCurrentPlan)
         >
       </section>
 
+      <section
+        v-if="selectedPlan && selectedPlan.id !== planoAtual"
+        class="ct-information-panel flex flex-col justify-between gap-4 rounded-xl border border-[var(--ct-primary)] bg-[var(--ct-primary-soft)] px-5 py-4 sm:flex-row sm:items-center"
+        aria-live="polite"
+      >
+        <div>
+          <p class="text-sm font-semibold text-[var(--ct-primary)]">
+            Você escolheu o plano {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês.
+          </p>
+          <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+            Confira os limites abaixo e prossiga quando estiver pronto.
+          </p>
+        </div>
+        <button
+          class="ct-button-primary shrink-0"
+          type="button"
+          @click="assinarPlano(selectedPlan)"
+        >
+          Continuar para pagamento
+        </button>
+      </section>
+
       <!-- trust strip -->
       <section
-        class="grid border-y border-[var(--ct-border)] sm:grid-cols-3 sm:divide-x sm:divide-[var(--ct-border)]"
+        class="ct-information-panel grid border-y border-[var(--ct-border)] bg-white sm:grid-cols-3 sm:divide-x sm:divide-[var(--ct-border)]"
       >
         <div class="px-4 py-3 text-center">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Sem fidelidade</p>
@@ -199,17 +156,19 @@ onMounted(loadCurrentPlan)
       </section>
 
       <!-- cards -->
-      <section class="grid items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
+      <section class="ct-plan-grid grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
         <article
-          v-for="plano in planos"
-          :key="plano.nome"
+          v-for="plano in plans"
+          :key="plano.id"
           class="relative flex h-full flex-col rounded-xl border bg-white p-6 transition-colors duration-200"
           :class="
-            isCurrentPlan(plano.nome)
+            isCurrentPlan(plano)
               ? 'border-emerald-400 ring-2 ring-emerald-100'
-              : plano.featured
-                ? 'border-[var(--ct-primary)] ring-1 ring-[var(--ct-primary)]/20'
-                : 'border-[var(--ct-border)]'
+              : selectedPlan?.id === plano.id
+                ? 'border-[var(--ct-primary)] ring-2 ring-[var(--ct-primary-soft)]'
+                : plano.featured
+                  ? 'border-[var(--ct-primary)] ring-1 ring-[var(--ct-primary)]/20'
+                  : 'border-[var(--ct-border)]'
           "
         >
           <div
@@ -221,7 +180,7 @@ onMounted(loadCurrentPlan)
 
           <div class="mb-5">
             <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
-              {{ plano.nome }}
+              {{ plano.name }}
             </p>
 
             <div class="mt-4 flex items-end gap-1">
@@ -233,13 +192,19 @@ onMounted(loadCurrentPlan)
 
             <p class="mt-1 text-sm font-medium text-slate-400">/mês</p>
             <p class="mt-4 min-h-[42px] text-sm leading-relaxed text-[var(--ct-text-muted)]">
-              {{ plano.desc }}
+              {{ plano.description }}
             </p>
           </div>
 
           <ul class="mb-6 space-y-3 border-t border-[var(--ct-border)] pt-6">
             <li
-              v-for="f in plano.features"
+              v-if="plano.id === 'profissional'"
+              class="rounded-lg bg-[var(--ct-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--ct-primary)]"
+            >
+              25% menor custo por cliente que o Essencial
+            </li>
+            <li
+              v-for="f in [`${plano.clients} clientes`, plano.users, ...plano.features]"
               :key="f"
               class="flex items-start gap-3 text-sm text-[var(--ct-ink)]"
             >
@@ -262,26 +227,24 @@ onMounted(loadCurrentPlan)
           <div class="mt-auto">
             <button
               @click="assinarPlano(plano)"
-              :disabled="
-                isLoadingPlano === plano.nome || isCurrentPlan(plano.nome) || isLoadingCurrent
-              "
+              :disabled="isLoadingPlano === plano.id || isCurrentPlan(plano) || isLoadingCurrent"
               class="w-full rounded-xl py-3 text-sm font-semibold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50"
               :class="
                 plano.featured
                   ? 'bg-[var(--ct-primary)] text-white hover:bg-[var(--ct-primary-hover)]'
-                  : isCurrentPlan(plano.nome) || plano.isFree
+                  : isCurrentPlan(plano) || plano.id === 'free'
                     ? 'border border-[var(--ct-border)] bg-slate-50 text-slate-400'
                     : 'border border-[var(--ct-border)] bg-white text-[var(--ct-ink)] hover:border-[var(--ct-primary)] hover:text-[var(--ct-primary)]'
               "
             >
-              {{ isLoadingPlano === plano.nome ? 'Gerando cobrança...' : getCta(plano) }}
+              {{ isLoadingPlano === plano.id ? 'Gerando cobrança...' : getCta(plano) }}
             </button>
           </div>
         </article>
       </section>
 
       <!-- info box -->
-      <section class="border-t border-[var(--ct-border)] pt-6">
+      <section class="ct-information-panel border-t border-[var(--ct-border)] bg-white pt-6">
         <div class="grid gap-4 md:grid-cols-3">
           <div>
             <p class="text-sm font-semibold text-[var(--ct-ink)]">Upgrade simples</p>
@@ -293,7 +256,7 @@ onMounted(loadCurrentPlan)
           <div>
             <p class="text-sm font-semibold text-[var(--ct-ink)]">Sem travas desnecessárias</p>
             <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-              Comece no Free e evolua conforme o volume de clientes e equipe crescer.
+              Comece no Gratuito e evolua conforme o volume de clientes e equipe crescer.
             </p>
           </div>
 

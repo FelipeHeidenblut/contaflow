@@ -64,8 +64,8 @@ const salvarMembro = async () => {
     return
   }
 
-  if (novoMembro.value.password.length < 6) {
-    toast.warn('A senha deve ter no mínimo 6 caracteres.')
+  if (novoMembro.value.password.length < 8) {
+    toast.warn('A senha deve ter no mínimo 8 caracteres.')
     return
   }
 
@@ -134,16 +134,16 @@ onMounted(() => fetchData())
 
 <template>
   <Layout title="Membros e Acessos">
-    <div class="space-y-6">
+    <div class="ct-workspace space-y-4">
       <!-- cabeçalho -->
       <header
-        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+        class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
       >
         <div>
-          <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+          <h1 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Membros da equipe
           </h1>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
+          <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
             Gerencie usuários, níveis de acesso e permissões internas do escritório.
           </p>
         </div>
@@ -151,7 +151,7 @@ onMounted(() => fetchData())
         <button
           v-if="loggedUserRole === 'admin'"
           @click="isModalOpen = true"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+          class="ct-primary-action inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -167,7 +167,7 @@ onMounted(() => fetchData())
 
       <!-- indicadores -->
       <section
-        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
       >
         <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de membros</p>
@@ -192,7 +192,9 @@ onMounted(() => fetchData())
       </section>
 
       <!-- tabela -->
-      <section class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
+      <section
+        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+      >
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
@@ -326,7 +328,7 @@ onMounted(() => fetchData())
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
         <div
-          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="w-full max-w-md overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
         >
           <div
             class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
@@ -423,9 +425,10 @@ onMounted(() => fetchData())
                   id="member-password"
                   autocomplete="new-password"
                   required
-                  minlength="6"
+                  minlength="8"
+                  maxlength="72"
                   type="text"
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   class="flex-1 rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                 />
 

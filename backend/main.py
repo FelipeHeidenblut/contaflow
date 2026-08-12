@@ -14,8 +14,10 @@ import fiscal_deadlines
 import membros
 import models
 import obrigacoes
+import relatorios
 import schemas
 import calendario
+import contact
 from database import get_db
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -60,6 +62,8 @@ app.include_router(membros.router)
 app.include_router(asaas.router)
 app.include_router(admin.router)
 app.include_router(calendario.router)
+app.include_router(contact.router)
+app.include_router(relatorios.router)
 
 
 @app.get("/")

@@ -108,11 +108,20 @@ def sincronizar_cadastro(
 
 
 @router.get("/me", tags=["Autenticação e Sincronização"])
-def get_me(current_user: dict = Depends(get_current_user)):
+def get_me(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
     """Retorna os dados de permissão do usuário logado."""
+    tenant = (
+        db.query(models.Tenant)
+        .filter(models.Tenant.id == current_user.get("tenant_id"))
+        .first()
+    )
     return {
         "user_id": current_user.get("user_id"),
         "role": current_user.get("role"),
         "is_superadmin": current_user.get("is_superadmin"),
         "tenant_id": current_user.get("tenant_id"),
+        "plan": tenant.plano if tenant else "free",
+        "payment_status": tenant.status_pagamento if tenant else "ativo",
     }

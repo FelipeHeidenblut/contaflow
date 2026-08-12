@@ -24,6 +24,12 @@ LIMITES_CLIENTES = {
     "profissional": 100,
     "business": float("inf"),  # Infinito
 }
+NOMES_PLANOS = {
+    "free": "Gratuito",
+    "basico": "Essencial",
+    "profissional": "Profissional",
+    "business": "Empresarial",
+}
 
 
 @router.post(
@@ -49,7 +55,7 @@ def criar_cliente(
     if total_clientes >= limite:
         raise HTTPException(
             status_code=403,
-            detail=f"Você atingiu o limite de {limite} clientes do plano {tenant.plano.capitalize()}. Faça upgrade para adicionar mais!",
+            detail=f"Você atingiu o limite de {limite} clientes do plano {NOMES_PLANOS.get(tenant.plano, tenant.plano)}. Faça upgrade para adicionar mais!",
         )
 
     # LÓGICA DE DUPLICIDADE INTELIGENTE
@@ -205,7 +211,7 @@ async def importar_clientes_csv(
                 db.commit() # Salva os clientes que já foram adicionados antes do limite
                 raise HTTPException(
                     status_code=403,
-                    detail=f"A importação foi interrompida. Você atingiu o limite de {limite} clientes do plano {tenant.plano.capitalize()}. Foram importados {clientes_importados} clientes antes do bloqueio."
+                    detail=f"A importação foi interrompida. Você atingiu o limite de {limite} clientes do plano {NOMES_PLANOS.get(tenant.plano, tenant.plano)}. Foram importados {clientes_importados} clientes antes do bloqueio."
                 )
 
             tipo_pessoa = str(row.get("TIPO (PF/PJ)", "")).strip().upper()

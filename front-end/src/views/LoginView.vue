@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
 import VueTurnstile from 'vue-turnstile'
 import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
+import { getPlan } from '@/constants/plans'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
+const selectedPlan = getPlan(route.query.plano)
 const isLoading = ref(false)
 const erroMensagem = ref('')
 const email = ref('')
@@ -80,7 +83,11 @@ const handleLogin = async () => {
         }
       }
       authStore.initializeAuthenticatedSession(profile, data.user)
-      router.push('/dashboard')
+      router.push(
+        selectedPlan && selectedPlan.id !== 'free'
+          ? { path: '/faturamento', query: { plano: selectedPlan.id } }
+          : '/dashboard',
+      )
     }
   } catch (error: unknown) {
     const message = getErrorMessage(error)
@@ -101,10 +108,23 @@ const handleLogin = async () => {
     description="Entre para acompanhar clientes, obrigações e documentos."
   >
     <template #mobile-action
-      ><RouterLink to="/cadastro" class="text-xs font-semibold text-[var(--ct-primary)]"
+      ><RouterLink
+        :to="{ path: '/cadastro', query: selectedPlan ? { plano: selectedPlan.id } : {} }"
+        class="text-xs font-semibold text-[var(--ct-primary)]"
         >Criar conta</RouterLink
       ></template
     >
+    <div
+      v-if="selectedPlan && selectedPlan.id !== 'free'"
+      class="mb-5 rounded-xl border border-[var(--ct-primary)]/25 bg-[var(--ct-primary-soft)] px-4 py-3"
+    >
+      <p class="text-sm font-semibold text-[var(--ct-primary)]">
+        Plano selecionado: {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês
+      </p>
+      <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+        Entre para revisar o plano e continuar para o pagamento.
+      </p>
+    </div>
     <div
       v-if="erroMensagem"
       role="alert"
@@ -162,7 +182,9 @@ const handleLogin = async () => {
       class="mt-7 border-t border-[var(--ct-border)] pt-6 text-center text-sm text-[var(--ct-text-muted)]"
     >
       Ainda não tem conta?
-      <RouterLink to="/cadastro" class="font-semibold text-[var(--ct-primary)]"
+      <RouterLink
+        :to="{ path: '/cadastro', query: selectedPlan ? { plano: selectedPlan.id } : {} }"
+        class="font-semibold text-[var(--ct-primary)]"
         >Comece gratuitamente</RouterLink
       >
     </p>

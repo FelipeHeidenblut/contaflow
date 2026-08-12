@@ -4,6 +4,7 @@ import api from '../services/api'
 import AdminLayout from '../components/AdminLayout.vue'
 import { toast } from 'vue3-toastify'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
+import { getPlan } from '@/constants/plans'
 
 // ==========================================
 // 1. KPIs (Métricas do Dashboard)
@@ -58,6 +59,7 @@ const getPlanoBadge = (plano: string) => {
   }
   return `px-2 py-0.5 rounded-full text-[11px] font-bold border ${styles[plano] || styles['free']}`
 }
+const getPlanoLabel = (plano: string) => getPlan(plano)?.name || plano
 
 const getStatusBadge = (status: string) => {
   if (status === 'ativo') return 'bg-emerald-100 text-emerald-700'
@@ -239,7 +241,7 @@ onMounted(() => {
               >
             </div>
             <div class="mt-3 flex items-center justify-between">
-              <span :class="getPlanoBadge(tenant.plano)" class="capitalize">{{ tenant.plano }}</span
+              <span :class="getPlanoBadge(tenant.plano)">{{ getPlanoLabel(tenant.plano) }}</span
               ><button
                 class="text-xs font-semibold"
                 :class="tenant.status_pagamento === 'ativo' ? 'text-red-600' : 'text-emerald-700'"
@@ -274,9 +276,7 @@ onMounted(() => {
                 <div class="text-xs text-gray-400 mt-0.5">{{ tenant.admin_email }}</div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="getPlanoBadge(tenant.plano)" class="capitalize">{{
-                  tenant.plano
-                }}</span>
+                <span :class="getPlanoBadge(tenant.plano)">{{ getPlanoLabel(tenant.plano) }}</span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-center">
                 <span

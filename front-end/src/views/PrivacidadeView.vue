@@ -1,168 +1,130 @@
-<template>
-  <div class="ct-public-page min-h-screen bg-white">
-    <PublicHeader />
-    <main class="py-8 selection:bg-[var(--ct-primary)] selection:text-white sm:py-12">
-      <div class="mx-auto max-w-3xl overflow-hidden border-x border-[var(--ct-border)] bg-white">
-        <!-- Cabeçalho -->
-        <div class="bg-[var(--ct-navy)] px-8 py-10 sm:px-12">
-          <h1 class="mb-2 text-3xl font-extrabold tracking-tight text-white">
-            Política de Privacidade
-          </h1>
-          <p class="text-sm text-white/65">
-            Última atualização: Junho de 2026 · Em conformidade com a LGPD (Lei nº 13.709/2018)
-          </p>
-        </div>
+<script setup lang="ts">
+import PublicLayout from '@/components/PublicLayout.vue'
+</script>
 
-        <!-- Conteúdo -->
-        <div class="space-y-8 p-8 leading-relaxed text-[var(--ct-text)] sm:p-12">
+<template>
+  <PublicLayout>
+    <main class="bg-white py-10 sm:py-14">
+      <article
+        class="mx-auto w-[min(100%-2rem,48rem)] overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+      >
+        <header class="bg-[var(--ct-navy)] px-7 py-9 text-white sm:px-11">
+          <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ct-accent)]">
+            Transparência e dados pessoais
+          </p>
+          <h1 class="mt-3 text-3xl font-semibold tracking-tight">Política de Privacidade</h1>
+          <p class="mt-3 text-sm text-white/70">
+            Última atualização: agosto de 2026 · Práticas orientadas pela LGPD
+          </p>
+        </header>
+
+        <div class="space-y-9 p-7 text-sm leading-7 text-[var(--ct-text)] sm:p-11 sm:text-base">
           <section>
-            <p>
-              A <strong class="text-[var(--ct-ink)]">ContablyTask</strong> compromete-se a proteger
-              a privacidade e a segurança dos dados dos escritórios de contabilidade e de seus
-              clientes. Esta política descreve como coletamos, usamos, armazenamos e protegemos as
-              informações em conformidade com a Lei Geral de Proteção de Dados (LGPD).
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              1. Papéis e responsabilidades
+            </h2>
+            <p class="mt-3">
+              A ContablyTask trata os dados de cadastro necessários para prestar e administrar o
+              serviço. Quando um escritório insere informações de seus próprios clientes, o
+              escritório atua como controlador desses dados e a ContablyTask atua como operadora,
+              processando-os para disponibilizar as funcionalidades contratadas.
             </p>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">
-              1. Dados que coletamos
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              2. Dados tratados
             </h2>
-            <ul class="mt-2 list-disc space-y-2 pl-5">
+            <ul class="mt-3 list-disc space-y-2 pl-5">
               <li>
-                <strong class="text-[var(--ct-ink)]">Dados de cadastro e acesso:</strong>
-                Nome, e-mail, nome do escritório e senhas criptografadas, fornecidos no momento do
-                registro.
+                <strong class="text-[var(--ct-ink)]">Cadastro do escritório:</strong> nome, e-mail,
+                nome do escritório e CPF ou CNPJ informado pelo responsável.
               </li>
               <li>
-                <strong class="text-[var(--ct-ink)]">Dados de navegação:</strong>
-                Endereço IP, tipo de navegador e cookies essenciais de sessão para garantir o
-                funcionamento seguro da plataforma.
+                <strong class="text-[var(--ct-ink)]">Uso da plataforma:</strong> clientes, tarefas,
+                responsáveis, vencimentos e documentos enviados pelos usuários autorizados.
               </li>
               <li>
-                <strong class="text-[var(--ct-ink)]"
-                  >Dados de terceiros (clientes do escritório):</strong
-                >
-                Informações de CNPJ, CPF, razão social e documentos inseridos na plataforma pelos
-                administradores do escritório. Nesse contexto, o
-                <strong class="text-[var(--ct-ink)]"
-                  >escritório de contabilidade atua como controlador</strong
-                >
-                dos dados de seus clientes, e a
-                <strong class="text-[var(--ct-ink)]">ContablyTask atua como operadora</strong>,
-                processando os dados exclusivamente para a prestação do serviço contratado.
+                <strong class="text-[var(--ct-ink)]">Dados técnicos:</strong> endereço IP,
+                navegador, registros de acesso e cookies essenciais. Medição de audiência só é
+                ativada após o aceite de cookies opcionais.
+              </li>
+              <li>
+                <strong class="text-[var(--ct-ink)]">Pagamento:</strong> informações necessárias à
+                criação e gestão da assinatura. Os dados do meio de pagamento são tratados no
+                checkout do provedor de cobrança.
               </li>
             </ul>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">
-              2. Como usamos seus dados
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              3. Finalidades
             </h2>
-            <p>
-              Utilizamos os dados exclusivamente para: (i) permitir o acesso e o funcionamento da
-              plataforma; (ii) fornecer suporte técnico; (iii) enviar avisos críticos de segurança e
-              atualizações do sistema; e (iv) cumprir obrigações legais.
-              <strong class="text-[var(--ct-ink)]">
-                A ContablyTask não vende, aluga nem compartilha seus dados para fins publicitários.
-              </strong>
+            <p class="mt-3">
+              Utilizamos os dados para criar e proteger contas, entregar as funções da plataforma,
+              processar assinaturas, atender solicitações, prevenir abuso, comunicar alterações
+              importantes e cumprir obrigações legais. A ContablyTask não comercializa dados
+              pessoais para publicidade.
             </p>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">
-              3. Armazenamento e segurança
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              4. Serviços utilizados
             </h2>
-            <p>
-              A comunicação entre seu navegador e nossos servidores é protegida por protocolos de
-              criptografia, como HTTPS/TLS. As senhas são convertidas em hashes irreversíveis.
-              Nossos bancos de dados podem ser hospedados em provedores de nuvem com controles de
-              segurança e acesso restrito.
+            <p class="mt-3">
+              Para operar o produto, utilizamos fornecedores especializados, incluindo Supabase para
+              autenticação e armazenamento, Asaas para cobrança, Cloudflare Turnstile para prevenção
+              de abuso e Google Analytics para métricas opcionais. Cada serviço trata somente os
+              dados necessários à sua função e conforme suas próprias condições de privacidade.
             </p>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">
-              4. Retenção e exclusão de dados
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              5. Segurança e acesso
             </h2>
-            <p>
-              Mantemos seus dados pelo tempo necessário para fornecer os serviços solicitados. Caso
-              você cancele sua assinatura ou solicite a exclusão da conta, seus dados primários
-              serão removidos dos ambientes ativos, ressalvadas as retenções exigidas por obrigações
-              legais, regulatórias ou fiscais.
+            <p class="mt-3">
+              A comunicação com a plataforma utiliza HTTPS/TLS. A autenticação é administrada pelo
+              provedor de identidade, sem armazenamento de senhas em texto legível pela aplicação.
+              As consultas são limitadas ao escritório autenticado, e downloads de documentos são
+              liberados por links assinados com validade temporária. Arquivos também passam por
+              validações de formato, conteúdo e tamanho antes do armazenamento.
             </p>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">
-              5. Seus direitos como titular
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              6. Retenção e exclusão
             </h2>
-            <p>
-              Você pode solicitar, a qualquer momento, o acesso aos seus dados, a correção de
-              informações incompletas ou incorretas, a portabilidade dos dados e a eliminação dos
-              dados pessoais armazenados em nossa plataforma, observadas as hipóteses legais
-              aplicáveis.
+            <p class="mt-3">
+              Os dados são mantidos enquanto a conta estiver ativa e pelo período necessário para
+              cumprir a prestação do serviço e obrigações aplicáveis. Solicitações de acesso,
+              correção, portabilidade ou exclusão são analisadas individualmente. Algumas
+              informações podem ser preservadas quando houver obrigação legal ou necessidade de
+              proteção contra fraude e exercício regular de direitos.
             </p>
           </section>
 
           <section>
-            <h2 class="mb-3 text-xl font-bold tracking-tight text-[var(--ct-ink)]">6. Contato</h2>
-            <p>
-              Para exercer seus direitos ou tirar dúvidas sobre privacidade, entre em contato pelo
-              e-mail:
+            <h2 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+              7. Seus direitos e contato
+            </h2>
+            <p class="mt-3">
+              Para solicitar confirmação de tratamento, acesso, correção, portabilidade, informação
+              sobre compartilhamento ou exclusão, escreva para
               <a
-                href="mailto:fheidenblut@gmail.com"
-                class="font-semibold text-[var(--ct-primary)] underline transition-colors hover:text-[var(--ct-primary-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ct-primary)] focus:ring-offset-2 rounded-sm"
+                class="font-semibold text-[var(--ct-primary)] underline"
+                href="mailto:suporte@contablytask.com.br"
               >
-                fheidenblut@gmail.com </a
-              >.
+                suporte@contablytask.com.br</a
+              >. Poderemos solicitar informações adicionais para confirmar a identidade e proteger a
+              conta antes de atender ao pedido.
             </p>
           </section>
         </div>
-
-        <!-- Rodapé -->
-        <div
-          class="border-t border-[var(--ct-border)] bg-[var(--ct-bg)] px-8 py-6 text-center sm:px-12"
-        >
-          <button
-            @click="$router.back()"
-            class="inline-flex items-center gap-2 rounded-lg border border-[var(--ct-border)] bg-white px-5 py-2.5 text-sm font-semibold text-[var(--ct-ink)] transition-colors hover:border-[var(--ct-primary)] hover:text-[var(--ct-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--ct-primary)] focus:ring-offset-2"
-          >
-            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M10 19l-7-7m0 0l7-7m-7 7h18"
-              />
-            </svg>
-            Voltar
-          </button>
-        </div>
-      </div>
+      </article>
     </main>
-    <PublicFooter />
-  </div>
+  </PublicLayout>
 </template>
-
-<script setup lang="ts">
-import PublicFooter from '@/components/PublicFooter.vue'
-import PublicHeader from '@/components/PublicHeader.vue'
-</script>
-
-<style scoped>
-:global(:root) {
-  --ct-bg: #f8fafc;
-  --ct-surface: #ffffff;
-  --ct-border: #e2e8f0;
-
-  --ct-ink: #0f172a;
-  --ct-text: rgba(15, 23, 42, 0.78);
-  --ct-text-muted: #64748b;
-
-  --ct-primary: #2563eb;
-  --ct-primary-hover: #1d4ed8;
-  --ct-primary-soft: #dbeafe;
-  --ct-navy: #172554;
-}
-</style>

@@ -7,6 +7,7 @@ import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
+import { getPlan } from '@/constants/plans'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,6 +22,8 @@ const documentoRaw = ref('')
 const acceptedTerms = ref(false)
 const captchaToken = ref('')
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const showPassword = ref(false)
+const selectedPlan = getPlan(route.query.plano)
 
 const documentoFormatado = computed({
   get() {
@@ -91,10 +94,17 @@ const handleRegister = async () => {
             },
             data.user,
           )
-          router.push('/dashboard')
+          router.push(
+            selectedPlan && selectedPlan.id !== 'free'
+              ? { path: '/faturamento', query: { plano: selectedPlan.id } }
+              : '/dashboard',
+          )
         } else {
           toast.success('Conta criada! Verifique seu e-mail para confirmar antes de entrar.')
-          router.push('/login')
+          router.push({
+            path: '/login',
+            query: selectedPlan && selectedPlan.id !== 'free' ? { plano: selectedPlan.id } : {},
+          })
         }
       } catch {
         erroMensagem.value = 'Conta criada, mas falhou ao sincronizar. Tente fazer login.'
@@ -123,6 +133,17 @@ const handleRegister = async () => {
         >Entrar</RouterLink
       ></template
     >
+    <div
+      v-if="selectedPlan && selectedPlan.id !== 'free'"
+      class="mb-5 rounded-xl border border-[var(--ct-primary)]/25 bg-[var(--ct-primary-soft)] px-4 py-3"
+    >
+      <p class="text-sm font-semibold text-[var(--ct-primary)]">
+        Você escolheu o plano {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês
+      </p>
+      <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+        Crie o escritório primeiro. O pagamento será apresentado depois do acesso.
+      </p>
+    </div>
     <div
       v-if="erroMensagem"
       role="alert"
@@ -176,21 +197,37 @@ const handleRegister = async () => {
             inputmode="numeric"
             placeholder="Documento do responsável"
           />
+          <p class="ct-help">
+            Usado para identificar o responsável pelo escritório e preparar futuras contratações.
+            Nenhuma cobrança é feita no plano gratuito.
+          </p>
         </div>
       </div>
       <div>
-        <label for="register-password" class="ct-label">Senha</label
-        ><input
-          id="register-password"
-          v-model="senha"
-          class="ct-field"
-          required
-          type="password"
-          autocomplete="new-password"
-          minlength="6"
-          placeholder="Mínimo de 6 caracteres"
-        />
-        <p class="ct-help">Use uma senha exclusiva para esta conta.</p>
+        <label for="register-password" class="ct-label">Senha</label>
+        <div class="relative">
+          <input
+            id="register-password"
+            v-model="senha"
+            class="ct-field pr-20"
+            required
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="new-password"
+            minlength="8"
+            maxlength="72"
+            placeholder="Mínimo de 8 caracteres"
+          />
+          <button
+            type="button"
+            class="absolute inset-y-0 right-0 px-4 text-xs font-semibold text-[var(--ct-primary)]"
+            :aria-label="showPassword ? 'Ocultar senha' : 'Mostrar senha'"
+            :aria-pressed="showPassword"
+            @click="showPassword = !showPassword"
+          >
+            {{ showPassword ? 'Ocultar' : 'Mostrar' }}
+          </button>
+        </div>
+        <p class="ct-help">Use pelo menos 8 caracteres e uma senha exclusiva para esta conta.</p>
       </div>
       <label class="flex items-start gap-3 text-sm leading-5 text-[var(--ct-text-muted)]"
         ><input
@@ -220,8 +257,17 @@ const handleRegister = async () => {
         :disabled="isLoading"
         class="ct-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {{ isLoading ? 'Criando conta…' : 'Criar conta gratuita' }}
+        {{
+          isLoading
+            ? 'Criando conta…'
+            : selectedPlan && selectedPlan.id !== 'free'
+              ? 'Criar escritório e continuar'
+              : 'Criar conta gratuita'
+        }}
       </button>
+      <p class="text-center text-xs text-[var(--ct-text-muted)]">
+        Gratuito para até 5 clientes · Sem cartão · Sem fidelidade
+      </p>
     </form>
     <p
       class="mt-7 border-t border-[var(--ct-border)] pt-6 text-center text-sm text-[var(--ct-text-muted)]"

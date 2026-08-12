@@ -5,6 +5,7 @@ import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from typing import Literal
 from security import get_current_user, get_super_admin
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -123,7 +124,7 @@ def list_tenants(
 @router.patch("/tenants/{tenant_id}/status")
 def update_tenant_status(
     tenant_id: UUID,
-    novo_status: str,  # "ativo" ou "inadimplente"
+    novo_status: Literal["ativo", "inadimplente", "aguardando_pagamento"],
     db: Session = Depends(get_db),
     admin_user: dict = Depends(get_super_admin),
 ):

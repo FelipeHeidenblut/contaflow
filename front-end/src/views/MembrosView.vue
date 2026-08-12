@@ -3,6 +3,10 @@ import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
+import { useAuthStore } from '../stores/auth'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { getApiErrorMessage } from '../utils/apiError'
 
 interface Membro {
   id: string
@@ -14,9 +18,12 @@ interface Membro {
 const membros = ref<Membro[]>([])
 const isLoading = ref(true)
 const isModalOpen = ref(false)
+const isSaving = ref(false)
+const memberToRemove = ref<Membro | null>(null)
+const authStore = useAuthStore()
 
-const loggedUserRole = ref('admin')
-const loggedUserId = ref('id-do-usuario-logado-aqui')
+const loggedUserRole = computed(() => authStore.role)
+const loggedUserId = computed(() => authStore.userId)
 
 const novoMembro = ref({
   name: '',
@@ -33,10 +40,9 @@ const totalColaboradores = computed(
 
 const gerarSenhaSugestao = () => {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#'
-  let senha = ''
-  for (let i = 0; i < 10; i++) {
-    senha += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
+  const random = new Uint32Array(14)
+  crypto.getRandomValues(random)
+  const senha = Array.from(random, (value) => chars[value % chars.length]).join('')
   novoMembro.value.password = senha
 }
 
@@ -64,32 +70,36 @@ const salvarMembro = async () => {
   }
 
   try {
+    isSaving.value = true
     const response = await api.post('/api/v1/membros', novoMembro.value)
     membros.value.push(response.data)
     toast.success('Membro criado com sucesso! Ele já pode fazer login com a senha definida.')
     isModalOpen.value = false
     novoMembro.value = { name: '', email: '', role: 'colaborador', password: '' }
   } catch (error: any) {
-    toast.error(error.response?.data?.detail || 'Erro ao adicionar membro.')
+    toast.error(getApiErrorMessage(error, 'Erro ao adicionar membro.'))
+  } finally {
+    isSaving.value = false
   }
 }
 
-const removerMembro = async (membro: Membro) => {
-  if (!confirm(`Tem certeza que deseja remover ${membro.name} da equipe?`)) return
-
+const removerMembro = async () => {
+  const membro = memberToRemove.value
+  if (!membro) return
   try {
     await api.delete(`/api/v1/membros/${membro.id}`)
     membros.value = membros.value.filter((m) => m.id !== membro.id)
     toast.success('Membro removido com sucesso.')
+    memberToRemove.value = null
   } catch (error: any) {
-    toast.error(error.response?.data?.detail || 'Erro ao remover membro.')
+    toast.error(getApiErrorMessage(error, 'Erro ao remover membro.'))
   }
 }
 
 const getRoleBadge = (role: string) => {
   return role === 'admin'
     ? 'bg-violet-100 text-violet-700 border-violet-200'
-    : 'bg-blue-100 text-blue-700 border-blue-200'
+    : 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]'
 }
 
 const formatRole = (role: string) => {
@@ -100,7 +110,7 @@ const formatRole = (role: string) => {
 
 const getIniciaisMembro = (nome: string) => {
   if (!nome) return '?'
-  
+
   // Renomeie de 'parts' para 'partes' para manter o padrão, ou mantenha 'parts' se preferir
   const partes = nome
     .trim()
@@ -108,13 +118,13 @@ const getIniciaisMembro = (nome: string) => {
     .filter((p) => p)
 
   if (partes.length === 0) return '?'
-  
+
   // Usando ?. e || para evitar o erro de 'Object is possibly undefined'
   if (partes.length === 1) return (partes[0]?.charAt(0) || '?').toUpperCase()
 
   const primeiraLetra = partes[0]?.charAt(0) || ''
   const ultimaLetra = partes[partes.length - 1]?.charAt(0) || ''
-  
+
   // Adicionei a crave de fechamento ` no final que estava faltando
   return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
 }
@@ -126,7 +136,9 @@ onMounted(() => fetchData())
   <Layout title="Membros e Acessos">
     <div class="space-y-6">
       <!-- cabeçalho -->
-      <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <header
+        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+      >
         <div>
           <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Membros da equipe
@@ -139,7 +151,7 @@ onMounted(() => fetchData())
         <button
           v-if="loggedUserRole === 'admin'"
           @click="isModalOpen = true"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
@@ -154,52 +166,87 @@ onMounted(() => fetchData())
       </header>
 
       <!-- indicadores -->
-      <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <section
+        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+      >
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de membros</p>
-          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
             {{ totalMembros }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Administradores</p>
-          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
             {{ totalAdmins }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Colaboradores</p>
-          <p class="mt-2 text-3xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
             {{ totalColaboradores }}
           </p>
         </div>
       </section>
 
       <!-- tabela -->
-      <section class="overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-sm">
+      <section class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
         </div>
 
-        <div v-else-if="membros.length === 0" class="p-16 text-center">
-          <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhum membro cadastrado.</p>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-            Adicione usuários para distribuir acessos e responsabilidades.
-          </p>
-        </div>
+        <EmptyState
+          v-else-if="membros.length === 0"
+          title="Nenhum membro cadastrado"
+          description="Adicione usuários para distribuir acessos e responsabilidades."
+          :action-label="loggedUserRole === 'admin' ? 'Adicionar membro' : undefined"
+          @action="isModalOpen = true"
+        />
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full">
+          <div class="divide-y divide-[var(--ct-border)] md:hidden">
+            <article
+              v-for="membro in membros"
+              :key="`mobile-${membro.id}`"
+              class="flex items-center justify-between gap-3 p-4"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">{{ membro.name }}</p>
+                <p class="truncate text-xs text-[var(--ct-text-muted)]">{{ membro.email }}</p>
+                <span
+                  class="mt-2 inline-flex rounded-lg border px-2 py-1 text-[11px] font-semibold"
+                  :class="getRoleBadge(membro.role)"
+                  >{{ formatRole(membro.role) }}</span
+                >
+              </div>
+              <button
+                v-if="loggedUserRole === 'admin' && membro.id !== loggedUserId"
+                class="text-xs font-semibold text-red-600"
+                @click="memberToRemove = membro"
+              >
+                Remover</button
+              ><span
+                v-else-if="membro.id === loggedUserId"
+                class="text-xs font-medium text-slate-400"
+                >Você</span
+              >
+            </article>
+          </div>
+          <table class="hidden min-w-full md:table">
             <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
               <tr>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Usuário
                 </th>
-                <th class="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Nível de acesso
                 </th>
                 <th
@@ -249,7 +296,7 @@ onMounted(() => fetchData())
                   <div class="flex justify-end">
                     <button
                       v-if="membro.id !== loggedUserId"
-                      @click="removerMembro(membro)"
+                      @click="memberToRemove = membro"
                       class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
                     >
                       Excluir
@@ -272,12 +319,22 @@ onMounted(() => fetchData())
       <!-- modal -->
       <div
         v-if="isModalOpen"
+        v-focus-trap
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="member-modal-title"
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
-        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5">
+        <div
+          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
+          >
             <div>
-              <h3 class="text-lg font-semibold text-[var(--ct-ink)]">Adicionar membro</h3>
+              <h3 id="member-modal-title" class="text-lg font-semibold text-[var(--ct-ink)]">
+                Adicionar membro
+              </h3>
               <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
                 Crie um novo acesso para a equipe.
               </p>
@@ -285,43 +342,66 @@ onMounted(() => fetchData())
 
             <button
               @click="isModalOpen = false"
+              aria-label="Fechar cadastro de membro"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
-          <div class="space-y-4 p-6">
+          <form id="member-form" class="space-y-4 p-6" @submit.prevent="salvarMembro">
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                for="member-name"
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Nome completo
               </label>
               <input
                 v-model="novoMembro.name"
+                id="member-name"
+                autocomplete="name"
+                required
+                autofocus
                 type="text"
                 class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
 
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                for="member-email"
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 E-mail
               </label>
               <input
                 v-model="novoMembro.email"
+                id="member-email"
+                autocomplete="email"
+                required
                 type="email"
                 class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
 
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                for="member-role"
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Nível de acesso
               </label>
               <select
                 v-model="novoMembro.role"
+                id="member-role"
                 class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               >
                 <option value="colaborador">Colaborador (visualiza e edita tarefas)</option>
@@ -330,13 +410,20 @@ onMounted(() => fetchData())
             </div>
 
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                for="member-password"
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Senha temporária
               </label>
 
               <div class="flex gap-2">
                 <input
                   v-model="novoMembro.password"
+                  id="member-password"
+                  autocomplete="new-password"
+                  required
+                  minlength="6"
                   type="text"
                   placeholder="Mínimo 6 caracteres"
                   class="flex-1 rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
@@ -345,7 +432,7 @@ onMounted(() => fetchData())
                 <button
                   type="button"
                   @click="gerarSenhaSugestao"
-                  class="rounded-xl bg-[var(--ct-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--ct-primary)] transition-colors hover:bg-[#BFDBFE] whitespace-nowrap"
+                  class="whitespace-nowrap rounded-xl bg-[var(--ct-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--ct-primary)] transition-colors hover:bg-[var(--ct-accent-soft)]"
                 >
                   Gerar senha
                 </button>
@@ -355,9 +442,11 @@ onMounted(() => fetchData())
                 Entregue esta senha ao funcionário. Ele poderá alterá-la após o primeiro login.
               </p>
             </div>
-          </div>
+          </form>
 
-          <div class="flex justify-end gap-3 border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4">
+          <div
+            class="flex justify-end gap-3 border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4"
+          >
             <button
               @click="isModalOpen = false"
               class="rounded-xl px-4 py-2.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100"
@@ -366,14 +455,24 @@ onMounted(() => fetchData())
             </button>
 
             <button
-              @click="salvarMembro"
+              type="submit"
+              form="member-form"
+              :disabled="isSaving"
               class="rounded-xl bg-[var(--ct-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
             >
-              Criar acesso
+              {{ isSaving ? 'Criando acesso...' : 'Criar acesso' }}
             </button>
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        :open="!!memberToRemove"
+        title="Remover membro"
+        :message="`Deseja remover ${memberToRemove?.name || 'este membro'} da equipe?`"
+        confirm-label="Remover membro"
+        @close="memberToRemove = null"
+        @confirm="removerMembro"
+      />
     </div>
   </Layout>
 </template>

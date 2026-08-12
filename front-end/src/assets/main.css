@@ -1,1 +1,219 @@
-@import "tailwindcss";
+@import 'tailwindcss';
+
+:root {
+  --ct-bg: #f8fafc;
+  --ct-surface: #ffffff;
+  --ct-muted: #f1f5f9;
+  --ct-border: #e2e8f0;
+  --ct-ink: #0f172a;
+  --ct-text-muted: #64748b;
+  --ct-primary: #2563eb;
+  --ct-primary-hover: #1d4ed8;
+  --ct-primary-soft: #dbeafe;
+  --ct-accent: #93c5fd;
+  --ct-accent-hover: #60a5fa;
+  --ct-accent-soft: #eff6ff;
+  --ct-accent-ink: #2563eb;
+  --ct-navy: #172554;
+  --ct-radius-sm: 0.5rem;
+  --ct-radius: 0.75rem;
+  --ct-radius-lg: 1rem;
+  --ct-content: 76rem;
+  color-scheme: light;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  background: var(--ct-bg);
+  color: var(--ct-ink);
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button,
+a {
+  touch-action: manipulation;
+}
+:focus-visible {
+  outline: 3px solid rgb(37 99 235 / 35%);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+@media (max-width: 640px) {
+  .Toastify__toast-container {
+    left: 0.75rem !important;
+    right: 0.75rem !important;
+    top: 0.75rem !important;
+    width: auto !important;
+  }
+  .Toastify__toast {
+    border-radius: 0.875rem !important;
+  }
+}
+
+.ct-card {
+  border: 1px solid var(--ct-border);
+  border-radius: 1rem;
+  background: var(--ct-surface);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+}
+
+.ct-container {
+  width: min(100% - 2rem, var(--ct-content));
+  margin-inline: auto;
+}
+
+.ct-section {
+  padding-block: clamp(4rem, 7vw, 6rem);
+}
+
+.ct-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ct-primary);
+}
+
+.ct-display {
+  max-width: 15ch;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 650;
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.ct-section-title {
+  max-width: 18ch;
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.ct-body-lg {
+  max-width: 42rem;
+  font-size: 1.0625rem;
+  line-height: 1.75;
+  color: var(--ct-text-muted);
+}
+
+.ct-button-primary,
+.ct-button-secondary {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--ct-radius-sm);
+  padding: 0.6875rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.ct-button-primary {
+  background: var(--ct-primary);
+  color: white;
+}
+
+.ct-button-primary:hover {
+  background: var(--ct-primary-hover);
+}
+
+.ct-button-secondary {
+  border: 1px solid var(--ct-border);
+  background: white;
+  color: var(--ct-ink);
+}
+
+.ct-button-secondary:hover {
+  border-color: #cbd5e1;
+  background: var(--ct-muted);
+}
+
+.ct-panel {
+  border: 1px solid var(--ct-border);
+  border-radius: var(--ct-radius);
+  background: white;
+}
+
+.ct-public-page * {
+  text-wrap: pretty;
+}
+
+.ct-public-page :is(a, button) {
+  transition-duration: 160ms;
+}
+
+.ct-public-page :is(.hover\:-translate-y-1:hover, .hover\:-translate-y-0\.5:hover) {
+  transform: none;
+}
+
+.ct-app-shell table thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.ct-field {
+  width: 100%;
+  border: 1px solid var(--ct-border);
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  color: var(--ct-ink);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.ct-field:focus {
+  border-color: var(--ct-primary);
+  outline: none;
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 10%);
+}
+.ct-label {
+  display: block;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+.ct-help {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--ct-text-muted);
+}
+.ct-error {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: #dc2626;
+}

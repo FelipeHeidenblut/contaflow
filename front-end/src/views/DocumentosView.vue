@@ -3,6 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { getApiErrorMessage } from '../utils/apiError'
 
 const documentos = ref<any[]>([])
 const clientes = ref<any[]>([])
@@ -10,6 +13,7 @@ const isLoading = ref(true)
 
 const isModalOpen = ref(false)
 const isUploading = ref(false)
+const documentToDelete = ref<{ id: string; name: string } | null>(null)
 
 const filtroClienteId = ref('')
 const filtroCategoria = ref('')
@@ -57,7 +61,7 @@ const fetchData = async () => {
     documentos.value = docsResponse.data
     clientes.value = clientesResponse.data
   } catch (error) {
-    toast.error('Erro ao carregar dados.')
+    toast.error(getApiErrorMessage(error, 'Erro ao carregar dados.'))
   } finally {
     isLoading.value = false
   }
@@ -90,8 +94,7 @@ const handleUpload = async () => {
 
     toast.success('Documento salvo com sucesso!')
   } catch (error: any) {
-    const detail = error.response?.data?.detail || 'Erro ao enviar o documento.'
-    toast.error(detail)
+    toast.error(getApiErrorMessage(error, 'Erro ao enviar o documento.'))
   } finally {
     isUploading.value = false
   }
@@ -118,16 +121,16 @@ const baixarDocumento = async (docId: string, nomeArquivo: string) => {
   }
 }
 
-const handleExcluirDocumento = async (docId: string, nomeArquivo: string) => {
-  if (!window.confirm(`Tem certeza que deseja apagar definitivamente o arquivo "${nomeArquivo}"?`))
-    return
-
+const handleExcluirDocumento = async () => {
+  const docId = documentToDelete.value?.id
+  if (!docId) return
   try {
     await api.delete(`/api/v1/documentos/${docId}`)
     documentos.value = documentos.value.filter((doc) => doc.id !== docId)
     toast.success('Documento excluído.')
+    documentToDelete.value = null
   } catch (error) {
-    toast.error('Não foi possível excluir o documento.')
+    toast.error(getApiErrorMessage(error, 'Não foi possível excluir o documento.'))
   }
 }
 
@@ -146,7 +149,7 @@ const getFileIcon = (fileName: string) => {
 
   if (ext === 'pdf') {
     return {
-      icon: '📕',
+      icon: 'PDF',
       color: 'text-red-600',
       bg: 'bg-red-100',
       label: 'PDF',
@@ -155,16 +158,16 @@ const getFileIcon = (fileName: string) => {
 
   if (ext === 'xml') {
     return {
-      icon: '📄',
-      color: 'text-blue-600',
-      bg: 'bg-blue-100',
+      icon: 'XML',
+      color: 'text-[var(--ct-primary)]',
+      bg: 'bg-[var(--ct-primary-soft)]',
       label: 'XML',
     }
   }
 
   if (['xls', 'xlsx', 'csv'].includes(ext || '')) {
     return {
-      icon: '📗',
+      icon: 'XLS',
       color: 'text-emerald-600',
       bg: 'bg-emerald-100',
       label: 'Planilha',
@@ -173,7 +176,7 @@ const getFileIcon = (fileName: string) => {
 
   if (['doc', 'docx'].includes(ext || '')) {
     return {
-      icon: '📘',
+      icon: 'DOC',
       color: 'text-indigo-600',
       bg: 'bg-indigo-100',
       label: 'Documento',
@@ -182,7 +185,7 @@ const getFileIcon = (fileName: string) => {
 
   if (['jpg', 'jpeg', 'png'].includes(ext || '')) {
     return {
-      icon: '🖼️',
+      icon: 'IMG',
       color: 'text-violet-600',
       bg: 'bg-violet-100',
       label: 'Imagem',
@@ -190,7 +193,7 @@ const getFileIcon = (fileName: string) => {
   }
 
   return {
-    icon: '📄',
+    icon: 'FILE',
     color: 'text-slate-500',
     bg: 'bg-slate-100',
     label: 'Arquivo',
@@ -199,7 +202,7 @@ const getFileIcon = (fileName: string) => {
 
 const getCategoriaBadge = (categoria: string) => {
   const styles: Record<string, string> = {
-    Fiscal: 'bg-blue-100 text-blue-700 border-blue-200',
+    Fiscal: 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]',
     Contábil: 'bg-violet-100 text-violet-700 border-violet-200',
     'Departamento Pessoal': 'bg-amber-100 text-amber-700 border-amber-200',
     Societário: 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -216,7 +219,9 @@ onMounted(() => fetchData())
   <Layout title="Repositório de Documentos">
     <div class="space-y-6">
       <!-- topo -->
-      <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <header
+        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+      >
         <div>
           <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Repositório de documentos
@@ -228,48 +233,63 @@ onMounted(() => fetchData())
 
         <button
           @click="isModalOpen = true"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           <span>Enviar documento</span>
         </button>
       </header>
 
       <!-- cards -->
-      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <section
+        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+      >
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de arquivos</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalDocumentos }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Fiscal</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalFiscal }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Contábil</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalContabil }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Geral</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalGeral }}
           </p>
         </div>
       </section>
 
       <!-- filtros -->
-      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <section class="border-b border-[var(--ct-border)] pb-5">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-3 xl:max-w-4xl">
             <div class="relative">
@@ -279,11 +299,17 @@ onMounted(() => fetchData())
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                />
               </svg>
 
               <input
                 v-model="searchQuery"
+                aria-label="Buscar documentos"
                 type="text"
                 placeholder="Buscar arquivo..."
                 class="w-full rounded-xl border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
@@ -292,6 +318,7 @@ onMounted(() => fetchData())
 
             <select
               v-model="filtroClienteId"
+              aria-label="Filtrar documentos por cliente"
               class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os clientes</option>
@@ -302,6 +329,7 @@ onMounted(() => fetchData())
 
             <select
               v-model="filtroCategoria"
+              aria-label="Filtrar documentos por categoria"
               class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todas as categorias</option>
@@ -320,7 +348,7 @@ onMounted(() => fetchData())
       </section>
 
       <!-- tabela -->
-      <section class="overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-sm">
+      <section class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -328,30 +356,73 @@ onMounted(() => fetchData())
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
         </div>
 
-        <div v-else-if="documentosFiltrados.length === 0" class="p-16 text-center">
-          <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhum documento encontrado.</p>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-            Ajuste os filtros ou envie um novo arquivo.
-          </p>
-        </div>
+        <EmptyState
+          v-else-if="documentosFiltrados.length === 0"
+          title="Nenhum documento encontrado"
+          description="Ajuste os filtros ou envie um novo arquivo."
+          action-label="Enviar documento"
+          @action="isModalOpen = true"
+        />
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full">
+          <div class="divide-y divide-[var(--ct-border)] md:hidden">
+            <article v-for="doc in documentosFiltrados" :key="`mobile-${doc.id}`" class="p-4">
+              <button class="w-full text-left" @click="baixarDocumento(doc.id, doc.nome_arquivo)">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ doc.nome_arquivo }}
+                    </p>
+                    <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+                      {{ getNomeCliente(doc.client_id) }} · {{ formatDate(doc.created_at) }}
+                    </p>
+                  </div>
+                  <span :class="getCategoriaBadge(doc.categoria || 'Geral')">{{
+                    doc.categoria || 'Geral'
+                  }}</span>
+                </div>
+              </button>
+              <div class="mt-3 flex gap-4">
+                <button
+                  class="text-xs font-semibold text-[var(--ct-primary)]"
+                  @click="baixarDocumento(doc.id, doc.nome_arquivo)"
+                >
+                  Baixar</button
+                ><button
+                  class="text-xs font-semibold text-red-600"
+                  @click="documentToDelete = { id: doc.id, name: doc.nome_arquivo }"
+                >
+                  Excluir
+                </button>
+              </div>
+            </article>
+          </div>
+          <table class="hidden min-w-full md:table">
             <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
               <tr>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Arquivo
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Categoria
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Cliente
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Data de envio
                 </th>
-                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Ações
                 </th>
               </tr>
@@ -369,7 +440,7 @@ onMounted(() => fetchData())
                     class="flex items-center gap-3 text-left transition-colors hover:text-[var(--ct-primary)]"
                   >
                     <div
-                      class="flex h-10 w-10 items-center justify-center rounded-xl text-base"
+                      class="flex h-10 w-10 items-center justify-center rounded-lg text-[9px] font-bold tracking-wide"
                       :class="getFileIcon(doc.nome_arquivo).bg"
                     >
                       {{ getFileIcon(doc.nome_arquivo).icon }}
@@ -410,7 +481,7 @@ onMounted(() => fetchData())
                     </button>
 
                     <button
-                      @click="handleExcluirDocumento(doc.id, doc.nome_arquivo)"
+                      @click="documentToDelete = { id: doc.id, name: doc.nome_arquivo }"
                       class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
                     >
                       Excluir
@@ -426,17 +497,33 @@ onMounted(() => fetchData())
       <!-- modal upload -->
       <div
         v-if="isModalOpen"
+        v-focus-trap
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="document-modal-title"
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
-        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5">
-            <h3 class="text-lg font-semibold text-[var(--ct-ink)]">Enviar novo documento</h3>
+        <div
+          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
+          >
+            <h3 id="document-modal-title" class="text-lg font-semibold text-[var(--ct-ink)]">
+              Enviar novo documento
+            </h3>
             <button
               @click="isModalOpen = false"
+              aria-label="Fechar envio de documento"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -481,10 +568,14 @@ onMounted(() => fetchData())
               </label>
               <input
                 type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx"
                 @change="handleFileChange"
                 required
-                class="w-full rounded-xl border border-[var(--ct-border)] p-2 text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--ct-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--ct-primary)] hover:file:bg-[#BFDBFE]"
+                class="w-full rounded-xl border border-[var(--ct-border)] p-2 text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--ct-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--ct-primary)] hover:file:bg-[var(--ct-accent-soft)]"
               />
+              <p class="mt-1.5 text-xs text-[var(--ct-text-muted)]">
+                PDF, PNG, JPG, DOCX ou XLSX, com até 5 MB.
+              </p>
             </div>
 
             <div
@@ -519,6 +610,14 @@ onMounted(() => fetchData())
           </form>
         </div>
       </div>
+      <ConfirmDialog
+        :open="!!documentToDelete"
+        title="Excluir documento"
+        :message="`Deseja apagar definitivamente o arquivo ${documentToDelete?.name || ''}?`"
+        confirm-label="Excluir documento"
+        @close="documentToDelete = null"
+        @confirm="handleExcluirDocumento"
+      />
     </div>
   </Layout>
 </template>

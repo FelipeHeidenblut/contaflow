@@ -1,16 +1,16 @@
 import logging
 import os
-from functools import lru_cache
+import time
 
 import models
 import requests
+import jwt
 
 # Imports locais da sua arquitetura
 from database import get_db
 from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -23,14 +23,17 @@ security_scheme = HTTPBearer()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_JWT_AUDIENCE = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
+JWKS_CACHE_TTL_SECONDS = 3600
+_jwks_cache = None
+_jwks_cached_at = 0.0
 
 # ==========================================
 # CAMADA 1: AUTENTICAÇÃO (Validando o JWT)
 # ==========================================
 
 
-@lru_cache(maxsize=1)
-def get_cached_jwks():
+def get_cached_jwks(force_refresh: bool = False):
     """
     [OTIMIZAÇÃO] Busca as chaves públicas do Supabase e as guarda na memória (cache).
     Evita gargalo de rede: Impede que o servidor faça requisições HTTP externas
@@ -42,14 +45,24 @@ def get_cached_jwks():
             status_code=500, detail="Erro de configuração interna de segurança."
         )
 
-    jwks_url = f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json"
+    global _jwks_cache, _jwks_cached_at
+    if (
+        not force_refresh
+        and _jwks_cache is not None
+        and time.monotonic() - _jwks_cached_at < JWKS_CACHE_TTL_SECONDS
+    ):
+        return _jwks_cache
+
+    jwks_url = f"{SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
     headers = {"apikey": SUPABASE_ANON_KEY}
 
     try:
         # Timeout de 5s adicionado para evitar que o seu servidor trave se o Supabase cair
         response = requests.get(jwks_url, headers=headers, timeout=5)
         response.raise_for_status()
-        return response.json()
+        _jwks_cache = response.json()
+        _jwks_cached_at = time.monotonic()
+        return _jwks_cache
     except requests.exceptions.RequestException as e:
         logger.error(f"Erro ao buscar JWKS no Supabase: {e}")
         raise HTTPException(
@@ -59,11 +72,11 @@ def get_cached_jwks():
 
 def get_supabase_public_key(kid: str):
     """Procura a chave pública correspondente ao Key ID (kid) dentro do Cache"""
-    jwks = get_cached_jwks()
-
-    for key in jwks.get("keys", []):
-        if key.get("kid") == kid:
-            return key
+    for force_refresh in (False, True):
+        jwks = get_cached_jwks(force_refresh=force_refresh)
+        for key in jwks.get("keys", []):
+            if key.get("kid") == kid:
+                return key
 
     logger.warning(f"Tentativa de acesso com 'kid' desconhecido: {kid}")
     raise HTTPException(
@@ -85,11 +98,15 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security_sc
             raise HTTPException(status_code=401, detail="Token sem Key ID (kid).")
 
         # 2. Busca a chave pública no cache local usando o kid
-        public_key = get_supabase_public_key(kid)
+        public_key = jwt.PyJWK.from_dict(get_supabase_public_key(kid))
 
         # 3. Valida o token usando a chave pública e o algoritmo ES256
         payload = jwt.decode(
-            token, public_key, algorithms=["ES256"], options={"verify_aud": False}
+            token,
+            public_key,
+            algorithms=["ES256"],
+            audience=SUPABASE_JWT_AUDIENCE,
+            issuer=f"{SUPABASE_URL.rstrip('/')}/auth/v1",
         )
 
         if not payload.get("sub"):
@@ -100,7 +117,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security_sc
 
         return payload
 
-    except JWTError as e:
+    except jwt.PyJWTError as e:
         logger.warning(f"Falha na validação do JWT: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -138,6 +155,25 @@ def get_current_user(
         "role": profile.role,
         "is_superadmin": profile.is_superadmin,
     }
+
+
+def get_active_user(
+    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Bloqueia mutações quando o escritório está inadimplente."""
+    tenant = (
+        db.query(models.Tenant)
+        .filter(models.Tenant.id == current_user["tenant_id"])
+        .first()
+    )
+    if not tenant:
+        raise HTTPException(status_code=403, detail="Escritório não encontrado.")
+    if tenant.status_pagamento == "inadimplente":
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Conta bloqueada por inadimplência. Regularize o pagamento para continuar.",
+        )
+    return current_user
 
 
 # ==========================================

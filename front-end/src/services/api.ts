@@ -46,11 +46,15 @@ api.interceptors.response.use(
       await supabase.auth.signOut()
 
       // 2. Redireciona para a tela de Login
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
+      const loginPath =
+        window.location.pathname.startsWith('/admin') || window.location.pathname === '/ops-login'
+          ? '/ops-login'
+          : '/login'
+      if (window.location.pathname !== loginPath) {
+        window.location.href = loginPath
       }
     }
-    
+
     // Se for 403 (Acesso negado / Limite de plano), NÃO desloga!
     // Apenas repassa o erro para o bloco 'catch' da função original,
     // para que o Toast vermelho apareça na tela com a mensagem do backend.

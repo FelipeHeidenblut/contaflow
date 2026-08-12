@@ -1,7 +1,7 @@
 import os
 import tempfile
 import uuid
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 import models
@@ -9,7 +9,7 @@ import schemas
 from database import get_db
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import RedirectResponse
-from security import get_current_user
+from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 
 # Configurações do Supabase Storage
@@ -25,6 +25,15 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 router = APIRouter(prefix="/api/v1/documentos", tags=["Documentos e Repositório"])
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+CHUNK_SIZE = 1024 * 1024
+ALLOWED_FILES = {
+    ".pdf": ("application/pdf", (b"%PDF-",)),
+    ".png": ("image/png", (b"\x89PNG\r\n\x1a\n",)),
+    ".jpg": ("image/jpeg", (b"\xff\xd8\xff",)),
+    ".jpeg": ("image/jpeg", (b"\xff\xd8\xff",)),
+    ".docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", (b"PK\x03\x04",)),
+    ".xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", (b"PK\x03\x04",)),
+}
 
 
 @router.get("", response_model=list[schemas.DocumentResponse])
@@ -44,9 +53,12 @@ def listar_documentos(
 async def registrar_documento(
     client_id: UUID = Form(...),
     task_id: Optional[UUID] = Form(None),
+    categoria: Literal[
+        "Fiscal", "Contábil", "Departamento Pessoal", "Societário", "Geral"
+    ] = Form("Geral"),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
     user_id = current_user.get("user_id")
@@ -63,8 +75,22 @@ async def registrar_documento(
             status_code=404, detail="Cliente não encontrado neste escritório."
         )
 
+    if task_id:
+        tarefa = db.query(models.Task).filter(
+            models.Task.id == task_id,
+            models.Task.tenant_id == tenant_id,
+            models.Task.client_id == client_id,
+        ).first()
+        if not tarefa:
+            raise HTTPException(status_code=404, detail="Tarefa não encontrada para este cliente.")
+
     # 2. Gerar nome seguro e caminho no Storage
-    extensao = os.path.splitext(file.filename)[1]
+    nome_original = os.path.basename(file.filename or "documento")[:255]
+    extensao = os.path.splitext(nome_original)[1].lower()
+    if extensao not in ALLOWED_FILES:
+        raise HTTPException(status_code=415, detail="Tipo de arquivo não permitido.")
+
+    expected_content_type, signatures = ALLOWED_FILES[extensao]
     nome_seguro = f"{uuid.uuid4()}{extensao}"
     storage_path = f"{tenant_id}/{client_id}/{nome_seguro}"
 
@@ -74,16 +100,19 @@ async def registrar_documento(
     try:
         # Cria um arquivo temporário no disco
         with tempfile.NamedTemporaryFile(delete=False, suffix=extensao) as tmp_file:
-            # Lê o arquivo que veio do Vue e escreve no arquivo temporário
-            contents = await file.read()
-
-            # Validação de tamanho
-            if len(contents) > MAX_FILE_SIZE:
-                raise HTTPException(
-                    status_code=413, detail="Arquivo excede o limite máximo de 5MB."
-                )
-
-            tmp_file.write(contents)
+            total_size = 0
+            first_chunk = True
+            while chunk := await file.read(CHUNK_SIZE):
+                total_size += len(chunk)
+                if total_size > MAX_FILE_SIZE:
+                    raise HTTPException(status_code=413, detail="Arquivo excede o limite máximo de 5MB.")
+                if first_chunk:
+                    if not any(chunk.startswith(signature) for signature in signatures):
+                        raise HTTPException(status_code=415, detail="Conteúdo do arquivo não corresponde à extensão.")
+                    first_chunk = False
+                tmp_file.write(chunk)
+            if first_chunk:
+                raise HTTPException(status_code=400, detail="Arquivo vazio.")
             tmp_file_path = (
                 tmp_file.name
             )  # Pega o caminho absoluto do arquivo temporário
@@ -94,7 +123,12 @@ async def registrar_documento(
             # 1º argumento: Caminho no bucket (destino)
             # 2º argumento: Objeto de arquivo aberto (origem)
             supabase_admin.storage.from_(BUCKET_NAME).upload(
-                storage_path, f, file_options={"content-type": file.content_type}
+                storage_path,
+                f,
+                file_options={
+                    "content-type": expected_content_type,
+                    "content-disposition": f'attachment; filename="{nome_seguro}"',
+                },
             )
 
     except HTTPException:
@@ -114,7 +148,8 @@ async def registrar_documento(
         tenant_id=tenant_id,
         client_id=client_id,
         task_id=task_id if task_id else None,
-        nome_arquivo=file.filename,
+        nome_arquivo=nome_original,
+        categoria=categoria,
         storage_path=storage_path,
         uploaded_by=user_id,
     )
@@ -171,7 +206,7 @@ def baixar_documento(
 def excluir_documento(
     doc_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 

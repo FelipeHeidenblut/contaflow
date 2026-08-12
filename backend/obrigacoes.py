@@ -8,10 +8,26 @@ import schemas
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
 from fastapi import APIRouter, Depends, HTTPException, status
-from security import get_current_user
+from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1/obrigacoes", tags=["Obrigações e Prazos"])
+
+
+def validar_relacionamentos(db: Session, tenant_id: str, tarefa: schemas.TaskCreate):
+    cliente = db.query(models.Client).filter(
+        models.Client.id == tarefa.client_id,
+        models.Client.tenant_id == tenant_id,
+    ).first()
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado neste escritório.")
+    if tarefa.assigned_to:
+        membro = db.query(models.Profile).filter(
+            models.Profile.id == tarefa.assigned_to,
+            models.Profile.tenant_id == tenant_id,
+        ).first()
+        if not membro:
+            raise HTTPException(status_code=404, detail="Responsável não encontrado neste escritório.")
 
 
 # ==========================================
@@ -47,23 +63,11 @@ def listar_obrigacoes(
 def criar_obrigacao(
     tarefa_in: schemas.TaskCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
-    cliente_existe = (
-        db.query(models.Client)
-        .filter(
-            models.Client.id == tarefa_in.client_id,
-            models.Client.tenant_id == tenant_id,
-        )
-        .first()
-    )
-
-    if not cliente_existe:
-        raise HTTPException(
-            status_code=404, detail="Cliente não encontrado neste escritório."
-        )
+    validar_relacionamentos(db, tenant_id, tarefa_in)
 
     # 🇧🇷 REGRA DE NEGÓCIO: Ajusta a data para o próximo dia útil se cair no fim de semana
     data_ajustada = ajustar_para_dia_util(tarefa_in.due_date)
@@ -94,7 +98,7 @@ def criar_obrigacao(
 def concluir_obrigacao(
     tarefa_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -160,7 +164,7 @@ def concluir_obrigacao(
 def excluir_obrigacao(
     tarefa_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -184,7 +188,7 @@ def atualizar_obrigacao(
     tarefa_id: UUID,
     tarefa_update: schemas.TaskCreate,  # Reaproveitamos o schema de validação para garantir a consistência
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -197,6 +201,8 @@ def atualizar_obrigacao(
 
     if not tarefa:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+
+    validar_relacionamentos(db, tenant_id, tarefa_update)
 
     # 🇧🇷 REGRA DE NEGÓCIO: Se a data foi alterada, ajustamos novamente para o próximo dia útil
     data_ajustada = ajustar_para_dia_util(tarefa_update.due_date)
@@ -215,8 +221,7 @@ def atualizar_obrigacao(
         else tarefa_update.status
     )
 
-    if tarefa_update.assigned_to:
-        tarefa.assigned_to = tarefa_update.assigned_to
+    tarefa.assigned_to = tarefa_update.assigned_to
 
     # ADICIONE ESTAS DUAS LINHAS:
     tarefa.is_recurring = tarefa_update.is_recurring

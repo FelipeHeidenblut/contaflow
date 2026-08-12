@@ -4,8 +4,8 @@ from uuid import UUID
 import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field, field_validator
-from security import get_current_user
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from security import get_current_user, verify_token
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -14,8 +14,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["Autenticação e Sincronizaçã
 
 # Schema Refatorado: Incluída validação rigorosa de Documento (Shift-Left)
 class SincronizarCadastroSchema(BaseModel):
-    supabase_user_id: UUID
-    email: EmailStr
+    model_config = ConfigDict(extra="forbid")
     nome_completo: str = Field(..., min_length=2, max_length=150)
     nome_escritorio: str = Field(..., min_length=2, max_length=150)
     documento: str = Field(..., description="CPF ou CNPJ contendo apenas números")
@@ -30,25 +29,28 @@ class SincronizarCadastroSchema(BaseModel):
             raise ValueError(
                 "Documento deve ser um CPF (11 dígitos) ou CNPJ (14 dígitos) válido."
             )
-
         return v
 
 
 @router.post("/sincronizar-cadastro", status_code=status.HTTP_201_CREATED)
 def sincronizar_cadastro(
-    payload: SincronizarCadastroSchema, db: Session = Depends(get_db)
+    payload: SincronizarCadastroSchema,
+    token_payload: dict = Depends(verify_token),
+    db: Session = Depends(get_db),
 ):
+    user_id = UUID(token_payload["sub"])
+    email = token_payload.get("email")
+    if not email:
+        raise HTTPException(status_code=401, detail="Token sem e-mail.")
 
-    # 1. Fail-Fast: Verifica duplicidade de usuário
-    usuario_existente = (
-        db.query(models.Profile).filter(models.Profile.email == payload.email).first()
-    )
+    usuario_existente = db.query(models.Profile).filter(models.Profile.id == user_id).first()
     if usuario_existente:
         return {
             "status": "ja_existente",
             "message": "Usuário já sincronizado no sistema local.",
-            "tenant_id": usuario_existente.tenant_id,
         }
+    if db.query(models.Profile).filter(models.Profile.email == email).first():
+        raise HTTPException(status_code=409, detail="E-mail associado a outra identidade.")
 
     # 2. Fail-Fast: Verifica duplicidade de CNPJ/CPF no Tenant (Garante integridade fiscal)
     tenant_existente = (
@@ -71,9 +73,9 @@ def sincronizar_cadastro(
 
         # 4. Criação do Profile vinculado ao Tenant (Isolamento Multi-tenant)[cite: 5]
         novo_perfil = models.Profile(
-            id=payload.supabase_user_id,
+            id=user_id,
             tenant_id=novo_tenant.id,
-            email=payload.email,
+            email=email,
             name=payload.nome_completo,
             role="admin",  # Padrão RBAC: O criador do tenant é o admin[cite: 5]
         )
@@ -89,18 +91,16 @@ def sincronizar_cadastro(
         }
 
     # Tratamento específico para erros de banco de dados[cite: 5]
-    except IntegrityError as e:
+    except IntegrityError:
         db.rollback()
-        print(f"[IntegrityError] Falha na sincronização: {str(e.orig)}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Conflito de dados: O registro já existe ou viola uma restrição do banco.",
         )
 
     # Fallback para erros genéricos[cite: 5]
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"[Exception] Erro inesperado na sincronização: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro interno ao persistir a estrutura do escritório.",
@@ -111,6 +111,7 @@ def sincronizar_cadastro(
 def get_me(current_user: dict = Depends(get_current_user)):
     """Retorna os dados de permissão do usuário logado."""
     return {
+        "user_id": current_user.get("user_id"),
         "role": current_user.get("role"),
         "is_superadmin": current_user.get("is_superadmin"),
         "tenant_id": current_user.get("tenant_id"),

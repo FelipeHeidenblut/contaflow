@@ -5,8 +5,13 @@ import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { vMaska } from 'maska/vue'
 import { useAuthStore } from '../stores/auth'
+import { useRoute } from 'vue-router'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import EmptyState from '../components/EmptyState.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
+const clientToArchive = ref<{ id: string; name: string } | null>(null)
 const clients = ref<any[]>([])
 const isLoading = ref(true)
 
@@ -32,6 +37,20 @@ const formErrors = ref({
   nome: '',
   cpf: '',
 })
+
+const getApiErrorMessage = (error: any, fallback: string): string => {
+  const detail = error?.response?.data?.detail
+  if (typeof detail === 'string') return detail
+  if (Array.isArray(detail)) {
+    return (
+      detail
+        .map((item) => item?.msg)
+        .filter(Boolean)
+        .join(' ') || fallback
+    )
+  }
+  return fallback
+}
 
 const isDossierOpen = ref(false)
 const selectedClient = ref<any>(null)
@@ -78,9 +97,22 @@ const formatDocDate = (dateString: string) => {
   return `${day}/${month}/${year}`
 }
 
+const formatDocumento = (client: any): string => {
+  if (client.tipo_pessoa === 'PF' || client.cpf) {
+    const cpf = String(client.cpf || '')
+      .replace(/\D/g, '')
+      .slice(0, 11)
+    return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')
+  }
+  const cnpj = String(client.cnpj || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, 14)
+  return cnpj.replace(/(.{2})(.{3})(.{3})(.{4})(.{2})/, '$1.$2.$3/$4-$5')
+}
+
 const getStatusColor = (status: string) => {
   if (status === 'concluida') return 'bg-emerald-100 text-emerald-700'
-  if (status === 'em_andamento') return 'bg-blue-100 text-blue-700'
+  if (status === 'em_andamento') return 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]'
   if (status === 'aguardando_cliente') return 'bg-amber-100 text-amber-700'
   return 'bg-slate-100 text-slate-600'
 }
@@ -212,27 +244,22 @@ const handleCreateClient = async () => {
 
     isModalOpen.value = false
     toast.success('Cliente cadastrado com sucesso!')
+    await abrirDossier(response.data)
   } catch (error: any) {
-    const detail = error.response?.data?.detail || 'Erro ao cadastrar o cliente.'
-    toast.error(detail)
+    toast.error(getApiErrorMessage(error, 'Erro ao cadastrar o cliente.'))
   } finally {
     isSubmitting.value = false
   }
 }
 
-const handleDesativar = async (clientId: string) => {
-  if (
-    !window.confirm(
-      'Tem certeza que deseja arquivar este cliente? Ele não aparecerá mais na listagem principal.',
-    )
-  ) {
-    return
-  }
-
+const handleDesativar = async () => {
+  const clientId = clientToArchive.value?.id
+  if (!clientId) return
   try {
     await api.patch(`/api/v1/clientes/${clientId}/desativar`)
     clients.value = clients.value.filter((c) => c.id !== clientId)
     toast.success('Cliente arquivado com sucesso.')
+    clientToArchive.value = null
   } catch (error) {
     toast.error('Erro ao arquivar o cliente.')
   }
@@ -275,8 +302,7 @@ const handleUploadCsv = async () => {
     isImportModalOpen.value = false
     csvFile.value = null
   } catch (error: any) {
-    const detail = error.response?.data?.detail || 'Erro ao processar arquivo CSV.'
-    toast.error(detail)
+    toast.error(getApiErrorMessage(error, 'Erro ao processar arquivo CSV.'))
   } finally {
     isUploadingCsv.value = false
   }
@@ -303,6 +329,7 @@ const baixarTemplate = () => {
 
 onMounted(() => {
   fetchClients()
+  if (route.query.novo === '1') isModalOpen.value = true
 })
 </script>
 
@@ -310,65 +337,87 @@ onMounted(() => {
   <Layout title="Gerenciar Clientes">
     <div class="relative space-y-6">
       <!-- topo -->
-      <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <div
+        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+      >
         <div>
           <h2 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Carteira de clientes
           </h2>
           <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-            Busque, filtre, cadastre e consulte o dossiê de cada cliente.
+            Consulte a carteira e acesse rapidamente o histórico de cada cliente.
           </p>
         </div>
 
         <div class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
           <button
             @click="isImportModalOpen = true"
-            class="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm font-medium text-[var(--ct-ink)] shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ct-border)] bg-white px-3.5 py-2 text-sm font-medium text-[var(--ct-ink)] transition-colors hover:bg-slate-50 sm:w-auto"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+              />
             </svg>
             <span>Importar CSV</span>
           </button>
 
           <button
             @click="isModalOpen = true"
-            class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+            class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
           >
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             <span>Novo cliente</span>
           </button>
         </div>
       </div>
 
-      <!-- cards -->
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <!-- resumo compacto -->
+      <div
+        class="flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-[var(--ct-border)] pb-4"
+      >
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Clientes ativos</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ clients.length }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <span class="hidden h-4 w-px bg-[var(--ct-border)] sm:block"></span>
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pessoa jurídica</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalPJ }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <span class="hidden h-4 w-px bg-[var(--ct-border)] sm:block"></span>
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pessoa física</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalPF }}
           </p>
         </div>
       </div>
 
       <!-- filtros -->
-      <div class="rounded-2xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <div>
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
             <div class="relative w-full sm:flex-1">
@@ -378,20 +427,27 @@ onMounted(() => {
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                />
               </svg>
 
               <input
                 v-model="searchQuery"
+                aria-label="Buscar clientes"
                 type="text"
                 placeholder="Buscar por nome, razão social, CPF ou CNPJ..."
-                class="w-full rounded-xl border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                class="w-full rounded-lg border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
 
             <select
               v-model="filtroNatureza"
-              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10 sm:w-56"
+              aria-label="Filtrar clientes por natureza"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10 sm:w-56"
             >
               <option value="Todos">Todas as naturezas</option>
               <option value="Comércio">Comércio</option>
@@ -407,7 +463,7 @@ onMounted(() => {
       </div>
 
       <!-- tabela -->
-      <div class="overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-sm">
+      <div class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -415,12 +471,13 @@ onMounted(() => {
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
         </div>
 
-        <div v-else-if="clients.length === 0" class="p-12 text-center">
-          <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhum cliente ativo cadastrado.</p>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-            Cadastre o primeiro cliente para começar a montar sua carteira.
-          </p>
-        </div>
+        <EmptyState
+          v-else-if="clients.length === 0"
+          title="Nenhum cliente ativo cadastrado"
+          description="Cadastre o primeiro cliente para começar a montar sua carteira."
+          action-label="Cadastrar primeiro cliente"
+          @action="isModalOpen = true"
+        />
 
         <div v-else-if="clientsFiltrados.length === 0" class="p-12 text-center">
           <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhum cliente encontrado.</p>
@@ -430,22 +487,65 @@ onMounted(() => {
         </div>
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full">
-            <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
+          <div class="divide-y divide-[var(--ct-border)] md:hidden">
+            <article v-for="client in clientsFiltrados" :key="`mobile-${client.id}`" class="p-4">
+              <button class="w-full text-left" @click="abrirDossier(client)">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ client.razao_social || client.nome }}
+                    </p>
+                    <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+                      {{ formatDocumento(client) }}
+                    </p>
+                  </div>
+                  <span
+                    class="shrink-0 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600"
+                    >{{ client.regime_tributario }}</span
+                  >
+                </div>
+                <p class="mt-3 text-xs font-medium text-[var(--ct-primary)]">Abrir dossiê →</p>
+              </button>
+              <button
+                v-if="authStore.role === 'admin'"
+                class="mt-3 text-xs font-medium text-red-600"
+                @click="
+                  clientToArchive = {
+                    id: client.id,
+                    name: client.razao_social || client.nome || 'este cliente',
+                  }
+                "
+              >
+                Arquivar cliente
+              </button>
+            </article>
+          </div>
+          <table class="hidden min-w-full md:table">
+            <thead class="border-b border-[var(--ct-border)] bg-slate-50/60">
               <tr>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Cliente
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Documento
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Regime
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Natureza
                 </th>
-                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Ações
                 </th>
               </tr>
@@ -457,14 +557,14 @@ onMounted(() => {
                 :key="client.id"
                 class="transition-colors hover:bg-slate-50/70"
               >
-                <td class="px-6 py-4">
+                <td class="px-4 py-3">
                   <button
                     @click="abrirDossier(client)"
                     class="text-left transition-colors hover:text-[var(--ct-primary)]"
                   >
                     <div class="flex items-start gap-3">
                       <div
-                        class="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-xs font-semibold text-[var(--ct-primary)]"
+                        class="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--ct-primary-soft)] text-[11px] font-semibold text-[var(--ct-primary)]"
                       >
                         {{ (client.razao_social || client.nome || '?').slice(0, 2).toUpperCase() }}
                       </div>
@@ -474,42 +574,50 @@ onMounted(() => {
                           {{ client.razao_social || client.nome }}
                         </p>
                         <p class="mt-0.5 text-xs text-[var(--ct-text-muted)]">
-                          {{ client.razao_social ? 'Pessoa jurídica' : 'Pessoa física' }} · Abrir dossiê
+                          {{ client.razao_social ? 'Pessoa jurídica' : 'Pessoa física' }} · Abrir
+                          dossiê
                         </p>
                       </div>
                     </div>
                   </button>
                 </td>
 
-                <td class="px-6 py-4 text-sm text-[var(--ct-ink)]">
-                  {{ client.cnpj || client.cpf }}
+                <td class="px-4 py-3 text-sm text-[var(--ct-ink)]">
+                  {{ formatDocumento(client) }}
                 </td>
 
-                <td class="px-6 py-4">
-                  <span class="inline-flex rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                <td class="px-4 py-3">
+                  <span
+                    class="inline-flex rounded-md border border-[var(--ct-border)] bg-white px-2 py-1 text-[11px] font-medium text-slate-600"
+                  >
                     {{ client.regime_tributario }}
                   </span>
                 </td>
 
-                <td class="px-6 py-4">
+                <td class="px-4 py-3">
                   <span
-                    class="inline-flex rounded-lg px-2.5 py-1 text-xs font-medium"
+                    class="inline-flex rounded-md border px-2 py-1 text-[11px] font-medium"
                     :class="
                       client.natureza_operacao === 'Comércio'
-                        ? 'bg-blue-100 text-blue-700'
+                        ? 'border-[var(--ct-border)] bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]'
                         : client.natureza_operacao === 'Indústria'
-                          ? 'bg-violet-100 text-violet-700'
-                          : 'bg-amber-100 text-amber-700'
+                          ? 'border-violet-200 bg-violet-50 text-violet-700'
+                          : 'border-amber-200 bg-amber-50 text-amber-700'
                     "
                   >
                     {{ client.natureza_operacao || 'Não definido' }}
                   </span>
                 </td>
 
-                <td class="px-6 py-4 text-right">
+                <td class="px-4 py-3 text-right">
                   <button
                     v-if="authStore.role === 'admin'"
-                    @click="handleDesativar(client.id)"
+                    @click="
+                      clientToArchive = {
+                        id: client.id,
+                        name: client.razao_social || client.nome || 'este cliente',
+                      }
+                    "
                     class="text-xs font-medium text-slate-500 transition-colors hover:text-red-600"
                   >
                     Arquivar
@@ -525,12 +633,16 @@ onMounted(() => {
       <!-- DOSSIÊ LATERAL (DRAWER) -->
       <div
         v-if="isDossierOpen"
+        v-focus-trap
         class="fixed inset-0 z-50 overflow-hidden"
         aria-labelledby="dossier-title"
         role="dialog"
         aria-modal="true"
       >
-        <div class="absolute inset-0 bg-slate-950/50 transition-opacity" @click="isDossierOpen = false"></div>
+        <div
+          class="absolute inset-0 bg-slate-950/50 transition-opacity"
+          @click="isDossierOpen = false"
+        ></div>
 
         <div class="pointer-events-none fixed inset-y-0 right-0 flex max-w-full pl-10">
           <div
@@ -546,16 +658,22 @@ onMounted(() => {
                       {{ selectedClient?.razao_social || selectedClient?.nome }}
                     </h3>
                     <p class="mt-1 text-sm text-white/65">
-                      {{ selectedClient?.cnpj || selectedClient?.cpf }}
+                      {{ selectedClient ? formatDocumento(selectedClient) : '' }}
                     </p>
                   </div>
 
                   <button
                     @click="isDossierOpen = false"
+                    aria-label="Fechar dossiê"
                     class="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
                   >
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -617,7 +735,9 @@ onMounted(() => {
                   </div>
 
                   <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
-                    <span class="block text-xs text-[var(--ct-text-muted)]">Natureza da operação</span>
+                    <span class="block text-xs text-[var(--ct-text-muted)]"
+                      >Natureza da operação</span
+                    >
                     <span class="mt-1 block text-sm font-semibold text-[var(--ct-ink)]">
                       {{ selectedClient?.natureza_operacao || 'Não definido' }}
                     </span>
@@ -682,7 +802,9 @@ onMounted(() => {
                       class="flex items-center justify-between rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4"
                     >
                       <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                        <div
+                          class="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600"
+                        >
                           <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
                             <path
                               fill-rule="evenodd"
@@ -693,7 +815,9 @@ onMounted(() => {
                         </div>
 
                         <div>
-                          <p class="text-sm font-semibold text-[var(--ct-ink)]">{{ doc.nome_arquivo }}</p>
+                          <p class="text-sm font-semibold text-[var(--ct-ink)]">
+                            {{ doc.nome_arquivo }}
+                          </p>
                           <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
                             Enviado em: {{ formatDocDate(doc.created_at) }}
                           </p>
@@ -718,17 +842,33 @@ onMounted(() => {
       <!-- modal cadastro -->
       <div
         v-if="isModalOpen"
+        v-focus-trap
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="client-modal-title"
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
-        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b border-[var(--ct-border)] px-6 py-5">
-            <h3 class="text-lg font-semibold text-[var(--ct-ink)]">Cadastrar cliente</h3>
+        <div
+          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--ct-border)] px-6 py-5"
+          >
+            <h3 id="client-modal-title" class="text-lg font-semibold text-[var(--ct-ink)]">
+              Cadastrar cliente
+            </h3>
             <button
               @click="isModalOpen = false"
+              aria-label="Fechar cadastro de cliente"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -765,32 +905,61 @@ onMounted(() => {
             <!-- formulário como antes -->
             <template v-if="newClient.tipo_pessoa === 'PJ'">
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">Razão social</label>
+                <label
+                  for="client-company-name"
+                  class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >Razão social</label
+                >
                 <input
                   v-model="newClient.razao_social"
+                  id="client-company-name"
+                  autocomplete="organization"
+                  autofocus
+                  :aria-invalid="!!formErrors.razao_social"
+                  aria-describedby="client-company-error"
                   type="text"
                   required
                   placeholder="Empresa LTDA"
                   class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                   :class="formErrors.razao_social ? 'border-red-400 bg-red-50/30' : ''"
                 />
-                <p v-if="formErrors.razao_social" class="mt-1.5 text-xs text-red-500">
+                <p
+                  v-if="formErrors.razao_social"
+                  id="client-company-error"
+                  class="mt-1.5 text-xs text-red-500"
+                >
                   {{ formErrors.razao_social }}
                 </p>
               </div>
 
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">CNPJ</label>
+                <label
+                  for="client-cnpj"
+                  class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >CNPJ</label
+                >
                 <input
                   v-model="newClient.cnpj"
-                  v-maska="{ mask: 'XX.XXX.XXX/XXXX-XX', tokens: { 'X': { pattern: /[a-zA-Z0-9]/ } } }"
+                  id="client-cnpj"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  :aria-invalid="!!formErrors.cnpj"
+                  aria-describedby="client-cnpj-error"
+                  v-maska="{
+                    mask: 'XX.XXX.XXX/XXXX-XX',
+                    tokens: { X: { pattern: /[a-zA-Z0-9]/ } },
+                  }"
                   type="text"
                   required
                   placeholder="00.000.000/0000-00"
                   class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                   :class="formErrors.cnpj ? 'border-red-400 bg-red-50/30' : ''"
                 />
-                <p v-if="formErrors.cnpj" class="mt-1.5 text-xs text-red-500">
+                <p
+                  v-if="formErrors.cnpj"
+                  id="client-cnpj-error"
+                  class="mt-1.5 text-xs text-red-500"
+                >
                   {{ formErrors.cnpj }}
                 </p>
               </div>
@@ -798,24 +967,46 @@ onMounted(() => {
 
             <template v-if="newClient.tipo_pessoa === 'PF'">
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">Nome completo</label>
+                <label
+                  for="client-full-name"
+                  class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >Nome completo</label
+                >
                 <input
                   v-model="newClient.nome"
+                  id="client-full-name"
+                  autocomplete="name"
+                  autofocus
+                  :aria-invalid="!!formErrors.nome"
+                  aria-describedby="client-name-error"
                   type="text"
                   required
                   placeholder="João da Silva"
                   class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                   :class="formErrors.nome ? 'border-red-400 bg-red-50/30' : ''"
                 />
-                <p v-if="formErrors.nome" class="mt-1.5 text-xs text-red-500">
+                <p
+                  v-if="formErrors.nome"
+                  id="client-name-error"
+                  class="mt-1.5 text-xs text-red-500"
+                >
                   {{ formErrors.nome }}
                 </p>
               </div>
 
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">CPF</label>
+                <label
+                  for="client-cpf"
+                  class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >CPF</label
+                >
                 <input
                   v-model="newClient.cpf"
+                  id="client-cpf"
+                  inputmode="numeric"
+                  autocomplete="off"
+                  :aria-invalid="!!formErrors.cpf"
+                  aria-describedby="client-cpf-error"
                   v-maska="'###.###.###-##'"
                   type="text"
                   required
@@ -823,7 +1014,7 @@ onMounted(() => {
                   class="w-full rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                   :class="formErrors.cpf ? 'border-red-400 bg-red-50/30' : ''"
                 />
-                <p v-if="formErrors.cpf" class="mt-1.5 text-xs text-red-500">
+                <p v-if="formErrors.cpf" id="client-cpf-error" class="mt-1.5 text-xs text-red-500">
                   {{ formErrors.cpf }}
                 </p>
               </div>
@@ -831,7 +1022,9 @@ onMounted(() => {
 
             <div class="grid grid-cols-2 gap-4">
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">Regime tributário</label>
+                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >Regime tributário</label
+                >
                 <select
                   v-model="newClient.regime_tributario"
                   class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
@@ -844,7 +1037,9 @@ onMounted(() => {
               </div>
 
               <div>
-                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">Natureza</label>
+                <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+                  >Natureza</label
+                >
                 <select
                   v-model="newClient.natureza_operacao"
                   class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
@@ -880,25 +1075,42 @@ onMounted(() => {
       <!-- modal csv -->
       <div
         v-if="isImportModalOpen"
+        v-focus-trap
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="import-modal-title"
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
-        <div class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5">
-            <h3 class="text-lg font-semibold text-[var(--ct-ink)]">Importar clientes</h3>
+        <div
+          class="w-full max-w-md overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
+          >
+            <h3 id="import-modal-title" class="text-lg font-semibold text-[var(--ct-ink)]">
+              Importar clientes
+            </h3>
             <button
               @click="isImportModalOpen = false"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
           <div class="space-y-6 p-6">
-            <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <h4 class="mb-2 text-sm font-semibold text-blue-800">Como importar</h4>
-              <ol class="list-inside list-decimal space-y-1 text-xs text-blue-700">
+            <div
+              class="rounded-xl border border-[var(--ct-border)] bg-[var(--ct-primary-soft)] p-4"
+            >
+              <h4 class="mb-2 text-sm font-semibold text-[var(--ct-primary)]">Como importar</h4>
+              <ol class="list-inside list-decimal space-y-1 text-xs text-[var(--ct-primary)]/80">
                 <li>Baixe o template de exemplo.</li>
                 <li>Preencha os dados sem alterar os cabeçalhos.</li>
                 <li>Salve como CSV.</li>
@@ -907,22 +1119,29 @@ onMounted(() => {
 
               <button
                 @click="baixarTemplate"
-                class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-blue-700 underline transition-colors hover:text-blue-900"
+                class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--ct-primary)] underline transition-colors hover:text-[var(--ct-primary-hover)]"
               >
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                  />
                 </svg>
                 Baixar template CSV
               </button>
             </div>
 
             <div>
-              <label class="mb-2 block text-sm font-medium text-[var(--ct-ink)]/80">Arquivo CSV</label>
+              <label class="mb-2 block text-sm font-medium text-[var(--ct-ink)]/80"
+                >Arquivo CSV</label
+              >
               <input
                 type="file"
                 accept=".csv"
                 @change="handleCsvChange"
-                class="w-full rounded-xl border border-[var(--ct-border)] p-2 text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--ct-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--ct-primary)] hover:file:bg-[#BFDBFE]"
+                class="w-full rounded-xl border border-[var(--ct-border)] p-2 text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-[var(--ct-primary-soft)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[var(--ct-primary)] hover:file:bg-[var(--ct-accent-soft)]"
               />
             </div>
 
@@ -937,7 +1156,7 @@ onMounted(() => {
               <button
                 @click="handleUploadCsv"
                 :disabled="isUploadingCsv || !csvFile"
-                class="rounded-xl bg-[var(--ct-navy)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F1B46] disabled:opacity-50"
+                class="rounded-xl bg-[var(--ct-navy)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] disabled:opacity-50"
               >
                 {{ isUploadingCsv ? 'Processando...' : 'Iniciar importação' }}
               </button>
@@ -945,6 +1164,14 @@ onMounted(() => {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        :open="!!clientToArchive"
+        title="Arquivar cliente"
+        :message="`Deseja arquivar ${clientToArchive?.name || 'este cliente'}? Ele deixará de aparecer na carteira principal.`"
+        confirm-label="Arquivar cliente"
+        @close="clientToArchive = null"
+        @confirm="handleDesativar"
+      />
     </div>
   </Layout>
 </template>

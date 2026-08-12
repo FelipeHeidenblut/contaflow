@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
+import { getApiErrorMessage } from '../utils/apiError'
 
 const isLoadingPlano = ref<string | null>(null)
+const isLoadingCurrent = ref(true)
+const planoAtual = ref('free')
+const statusPagamento = ref('ativo')
+const router = useRouter()
 
 const planos = [
   {
     nome: 'Free',
     price: '0',
     desc: 'Para testar a plataforma.',
-    cta: 'Plano atual',
     isFree: true,
     features: [
       'Até 5 clientes',
@@ -25,7 +30,6 @@ const planos = [
     nome: 'Básico',
     price: '79,90',
     desc: 'Para contadores autônomos.',
-    cta: 'Assinar Básico',
     features: [
       'Até 40 clientes',
       'Até 5 usuários',
@@ -39,7 +43,6 @@ const planos = [
     price: '149,90',
     featured: true,
     desc: 'Para escritórios em crescimento.',
-    cta: 'Assinar Profissional',
     features: [
       'Até 100 clientes',
       'Até 10 usuários',
@@ -53,7 +56,7 @@ const planos = [
     nome: 'Business',
     price: '449',
     desc: 'Para grandes operações.',
-    cta: 'Falar com vendas',
+    sales: true,
     features: [
       'Clientes ilimitados',
       'Usuários ilimitados',
@@ -65,9 +68,49 @@ const planos = [
   },
 ]
 
-const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
-  if (isFree) {
-    toast.info('Você já pode utilizar os recursos do plano Free. Faça upgrade para liberar mais.')
+const normalizePlan = (name: string) =>
+  name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+const isCurrentPlan = (name: string) => normalizePlan(name) === planoAtual.value
+const currentPlanLabel = computed(
+  () => planoAtual.value.charAt(0).toUpperCase() + planoAtual.value.slice(1),
+)
+
+type Plan = (typeof planos)[number]
+
+const getCta = (plan: Plan) => {
+  if (isCurrentPlan(plan.nome)) return 'Plano atual'
+  if (plan.sales) return 'Falar com vendas'
+  if (plan.isFree) return 'Plano gratuito'
+  return `Assinar ${plan.nome}`
+}
+
+const loadCurrentPlan = async () => {
+  try {
+    const { data } = await api.get('/api/v1/dashboard/')
+    planoAtual.value = data.plano || 'free'
+    statusPagamento.value = data.status_pagamento || 'ativo'
+  } catch {
+    toast.error('Não foi possível identificar seu plano atual.')
+  } finally {
+    isLoadingCurrent.value = false
+  }
+}
+
+const assinarPlano = async (plano: Plan) => {
+  const nomePlano = plano.nome
+  if (isCurrentPlan(nomePlano) || plano.isFree) {
+    toast.info(
+      isCurrentPlan(nomePlano)
+        ? 'Este já é o seu plano atual.'
+        : 'Entre em contato com o suporte para fazer downgrade.',
+    )
+    return
+  }
+  if (plano.sales) {
+    router.push({ path: '/contato', query: { assunto: 'Plano Business' } })
     return
   }
 
@@ -87,41 +130,69 @@ const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
     } else {
       toast.error('Assinatura criada, mas o link de pagamento ainda está sendo gerado.')
     }
-  } catch (error: any) {
-    const detail = error.response?.data?.detail || 'Erro ao gerar a cobrança do plano.'
-    toast.error(detail)
+  } catch (error: unknown) {
+    toast.error(getApiErrorMessage(error, 'Erro ao gerar a cobrança do plano.'))
   } finally {
     isLoadingPlano.value = null
   }
 }
+
+onMounted(loadCurrentPlan)
 </script>
 
 <template>
   <Layout title="Planos e Faturamento">
-    <div class="space-y-8">
+    <div class="space-y-7">
       <!-- hero -->
-      <header class="mx-auto max-w-3xl text-center">
-        <h1 class="text-3xl font-semibold tracking-tight text-[var(--ct-ink)] md:text-4xl">
+      <header class="border-b border-[var(--ct-border)] pb-6 text-left">
+        <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)] md:text-3xl">
           Escolha o plano ideal para o seu escritório
         </h1>
         <p class="mt-3 text-sm leading-relaxed text-[var(--ct-text-muted)] md:text-base">
-          Cancele quando quiser. Sem fidelidade. Pague com PIX, boleto ou cartão.
+          Sem fidelidade. Pague com PIX, boleto ou cartão e solicite alterações pelo suporte.
         </p>
       </header>
 
+      <section
+        v-if="!isLoadingCurrent"
+        class="flex flex-col items-center justify-between gap-3 rounded-xl border border-[var(--ct-border)] bg-[var(--ct-primary-soft)] px-5 py-4 text-center sm:flex-row sm:text-left"
+        role="status"
+      >
+        <div>
+          <p class="text-sm font-semibold text-[var(--ct-primary)]">
+            Seu plano: {{ currentPlanLabel }}
+          </p>
+          <p class="mt-0.5 text-xs text-[var(--ct-text-muted)]">
+            Status:
+            {{
+              statusPagamento === 'ativo'
+                ? 'Ativo'
+                : statusPagamento === 'aguardando_pagamento'
+                  ? 'Pagamento pendente'
+                  : 'Requer atenção'
+            }}
+          </p>
+        </div>
+        <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--ct-primary)]"
+          >Assinatura mensal</span
+        >
+      </section>
+
       <!-- trust strip -->
-      <section class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+      <section
+        class="grid border-y border-[var(--ct-border)] sm:grid-cols-3 sm:divide-x sm:divide-[var(--ct-border)]"
+      >
+        <div class="px-4 py-3 text-center">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Sem fidelidade</p>
           <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cancele quando quiser</p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+        <div class="border-t border-[var(--ct-border)] px-4 py-3 text-center sm:border-t-0">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pagamento seguro</p>
           <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Checkout protegido</p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 text-center shadow-sm">
+        <div class="border-t border-[var(--ct-border)] px-4 py-3 text-center sm:border-t-0">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Escalável</p>
           <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cresça no seu ritmo</p>
         </div>
@@ -132,16 +203,18 @@ const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
         <article
           v-for="plano in planos"
           :key="plano.nome"
-          class="relative flex h-full flex-col rounded-2xl border bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+          class="relative flex h-full flex-col rounded-xl border bg-white p-6 transition-colors duration-200"
           :class="
-            plano.featured
-              ? 'border-[var(--ct-primary)] shadow-[0_20px_60px_rgba(37,99,235,0.14)]'
-              : 'border-[var(--ct-border)]'
+            isCurrentPlan(plano.nome)
+              ? 'border-emerald-400 ring-2 ring-emerald-100'
+              : plano.featured
+                ? 'border-[var(--ct-primary)] ring-1 ring-[var(--ct-primary)]/20'
+                : 'border-[var(--ct-border)]'
           "
         >
           <div
             v-if="plano.featured"
-            class="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ct-primary)] px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-white shadow-md"
+            class="absolute right-4 top-4 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--ct-primary)]"
           >
             Mais popular
           </div>
@@ -174,7 +247,12 @@ const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
                 class="mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]"
               >
                 <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="3"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
               </span>
               <span>{{ f }}</span>
@@ -183,25 +261,27 @@ const assinarPlano = async (nomePlano: string, isFree: boolean = false) => {
 
           <div class="mt-auto">
             <button
-              @click="assinarPlano(plano.nome, plano.isFree)"
-              :disabled="isLoadingPlano === plano.nome || plano.isFree"
+              @click="assinarPlano(plano)"
+              :disabled="
+                isLoadingPlano === plano.nome || isCurrentPlan(plano.nome) || isLoadingCurrent
+              "
               class="w-full rounded-xl py-3 text-sm font-semibold transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-50"
               :class="
                 plano.featured
-                  ? 'bg-[var(--ct-primary)] text-white hover:bg-[var(--ct-primary-hover)] shadow-sm'
-                  : plano.isFree
+                  ? 'bg-[var(--ct-primary)] text-white hover:bg-[var(--ct-primary-hover)]'
+                  : isCurrentPlan(plano.nome) || plano.isFree
                     ? 'border border-[var(--ct-border)] bg-slate-50 text-slate-400'
                     : 'border border-[var(--ct-border)] bg-white text-[var(--ct-ink)] hover:border-[var(--ct-primary)] hover:text-[var(--ct-primary)]'
               "
             >
-              {{ isLoadingPlano === plano.nome ? 'Gerando cobrança...' : plano.cta }}
+              {{ isLoadingPlano === plano.nome ? 'Gerando cobrança...' : getCta(plano) }}
             </button>
           </div>
         </article>
       </section>
 
       <!-- info box -->
-      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-5 shadow-sm">
+      <section class="border-t border-[var(--ct-border)] pt-6">
         <div class="grid gap-4 md:grid-cols-3">
           <div>
             <p class="text-sm font-semibold text-[var(--ct-ink)]">Upgrade simples</p>

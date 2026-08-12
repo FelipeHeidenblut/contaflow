@@ -19,30 +19,34 @@ import calendario
 from database import get_db
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
-from jose import jwt
+import jwt
 from security import get_current_user
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-app = FastAPI(title="ContaFlow API")
+is_production = os.getenv("ENVIRONMENT") == "production"
+app = FastAPI(
+    title="ContaFlow API",
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
+)
 
 # ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA DO CORS
 # ==========================================
 # Pega a URL do frontend do .env. Se não achar, usa o localhost como padrão.
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
+allowed_origins = [frontend_url]
+if not is_production:
+    allowed_origins.extend(["http://localhost:5173", "http://localhost:3000"])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://www.contablytask.com.br",
-        "https://contablytask.com.br",
-        "http://localhost:5173",
-        "http://localhost:3000",
-    ],
+    allow_origins=list(dict.fromkeys(allowed_origins)),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Registrando os routers
@@ -68,8 +72,8 @@ def test_db_connection(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
         return {"status": "Conexão com o Supabase realizada com sucesso! 🟢"}
-    except Exception as e:
-        return {"error": f"Falha na conexão: {str(e)}"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível.")
 
 
 # ==========================================

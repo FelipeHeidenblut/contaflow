@@ -1,4 +1,5 @@
 import json
+import hmac
 import logging
 import os
 import re
@@ -37,6 +38,7 @@ BASE_URL = (
 )
 
 headers = {"access_token": ASAAS_API_KEY, "Content-Type": "application/json"}
+HTTP_TIMEOUT = 10.0
 
 
 @router.post("/criar-assinatura/{plano}")
@@ -50,6 +52,10 @@ def criar_assinatura(
 
     if not tenant:
         raise HTTPException(status_code=404, detail="Escritório não encontrado.")
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Apenas administradores podem contratar planos.")
+    if tenant.status_pagamento == "aguardando_pagamento" and tenant.asaas_subscription_id:
+        raise HTTPException(status_code=409, detail="Já existe uma assinatura aguardando pagamento.")
 
     # 1. Criação ou recuperação do Cliente no Asaas
     if not tenant.asaas_customer_id:
@@ -68,7 +74,7 @@ def criar_assinatura(
             # Proteção extra: se em produção e não tiver CNPJ, o Asaas pode barrar a cobrança.
             logger.warning(f"Tenant {tenant_id} tentou assinar sem CNPJ em produção.")
 
-        with httpx.Client() as client:
+        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             response = client.post(
                 f"{BASE_URL}/customers", json=cliente_payload, headers=headers
             )
@@ -108,7 +114,7 @@ def criar_assinatura(
         "nextDueDate": vencimento_amanha,
     }
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=HTTP_TIMEOUT) as client:
         response = client.post(
             f"{BASE_URL}/subscriptions", json=assinatura_payload, headers=headers
         )
@@ -118,7 +124,7 @@ def criar_assinatura(
         subscription_id = dados.get("id")
 
         invoice_url = None
-        with httpx.Client() as client:
+        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
             resp_faturas = client.get(
                 f"{BASE_URL}/payments?subscription={subscription_id}", headers=headers
             )
@@ -127,8 +133,8 @@ def criar_assinatura(
                 if faturas:
                     invoice_url = faturas[0].get("invoiceUrl")
 
-        tenant.plano = plano
         tenant.status_pagamento = "aguardando_pagamento"
+        tenant.asaas_subscription_id = subscription_id
         db.commit()
         logger.info(f"Assinatura gerada para o tenant {tenant_id}. Aguardando pagamento.")
 
@@ -154,7 +160,10 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
     """
     # 1. Segurança: Validação do Token do Webhook
     incoming_token = request.headers.get("asaas-access-token")
-    if ASAAS_WEBHOOK_TOKEN and incoming_token != ASAAS_WEBHOOK_TOKEN:
+    if not ASAAS_WEBHOOK_TOKEN:
+        logger.error("[WEBHOOK] ASAAS_WEBHOOK_TOKEN não configurado.")
+        raise HTTPException(status_code=503, detail="Webhook indisponível.")
+    if not incoming_token or not hmac.compare_digest(incoming_token, ASAAS_WEBHOOK_TOKEN):
         logger.warning("[WEBHOOK] Tentativa de acesso não autorizada ao webhook.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido."
@@ -165,6 +174,14 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
         payload = json.loads(body)
 
         event = payload.get("event")
+        event_id = payload.get("id")
+        if not event or not event_id:
+            raise HTTPException(status_code=400, detail="Evento inválido.")
+        event_id = str(event_id)
+        if len(event_id) > 100:
+            raise HTTPException(status_code=400, detail="Identificador de evento inválido.")
+        if db.query(models.AsaasWebhookEvent).filter(models.AsaasWebhookEvent.id == event_id).first():
+            return {"status": "already_processed"}
         logger.info(f"[WEBHOOK RECEBIDO] Evento: {event}")
 
         # 2. Liberação de Acesso (Pagamento Confirmado)
@@ -174,13 +191,17 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
 
             # Pega o valor que o cliente pagou
             payment_value = payment_data.get("value")
+            subscription_id = payment_data.get("subscription")
 
             if customer_id:
                 tenant = db.query(models.Tenant).filter(models.Tenant.asaas_customer_id == customer_id).first()
 
                 if tenant:
+                    if tenant.asaas_subscription_id and subscription_id != tenant.asaas_subscription_id:
+                        raise HTTPException(status_code=400, detail="Assinatura não corresponde ao cliente.")
                     # Descobre qual plano ele pagou baseado no valor
                     plano_ativado = None
+                    payment_value = round(float(payment_value or 0), 2)
                     if payment_value == 79.90:
                         plano_ativado = "basico"
                     elif payment_value == 149.90:
@@ -212,6 +233,7 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
             # O Asaas pode mandar o objeto em "payment" ou "subscription"
             data = payload.get("payment", payload.get("subscription", payload))
             customer_id = data.get("customer") or payload.get("customer")
+            subscription_id = data.get("subscription") or data.get("id")
 
             if customer_id:
                 tenant = (
@@ -220,6 +242,8 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                     .first()
                 )
                 if tenant:
+                    if tenant.asaas_subscription_id and subscription_id != tenant.asaas_subscription_id:
+                        raise HTTPException(status_code=400, detail="Assinatura não corresponde ao cliente.")
                     db.execute(
                         update(models.Tenant)
                         .where(models.Tenant.id == tenant.id)
@@ -230,9 +254,14 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                         f"[WEBHOOK AVISO] Evento {event}. Escritório {tenant.razao_social} bloqueado."
                     )
 
-        # Responde 200 OK rapidamente para evitar Timeout (Erro 408)
+        db.add(models.AsaasWebhookEvent(id=event_id, event_type=event))
+        db.commit()
         return {"status": "received"}
 
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
+        db.rollback()
         logger.error(f"[ERRO WEBHOOK] {str(e)}")
-        return {"status": "error"}
+        raise HTTPException(status_code=500, detail="Falha ao processar webhook.")

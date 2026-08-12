@@ -7,8 +7,9 @@ import models
 from database import get_db
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
-from security import get_current_user
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from typing import Literal
+from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -30,10 +31,10 @@ LIMITES_MEMBROS = {"free": 1, "basico": 5, "profissional": 10, "business": float
 # SCHEMAS LOCAIS (Pydantic)
 # ==========================================
 class ProfileCreate(BaseModel):
-    name: str
-    email: str
-    role: str
-    password: str
+    name: str = Field(..., min_length=2, max_length=150)
+    email: EmailStr
+    role: Literal["admin", "colaborador"]
+    password: str = Field(..., min_length=6, max_length=72)
 
 
 class ProfileResponse(BaseModel):
@@ -47,7 +48,7 @@ class ProfileResponse(BaseModel):
 # ==========================================
 # DEPENDÊNCIA DE SEGURANÇA (RBAC)
 # ==========================================
-def verificar_admin(current_user: dict = Depends(get_current_user)):
+def verificar_admin(current_user: dict = Depends(get_active_user)):
     """
     Verifica se o usuário logado tem permissão de 'admin'.
     Otimização: A role já vem no current_user (buscada no security.py), não precisamos de DB aqui.
@@ -119,13 +120,13 @@ def adicionar_membro(
     }
 
     try:
-        with httpx.Client() as client:
+        with httpx.Client(timeout=10.0) as client:
             response = client.post(url_create, json=payload_create, headers=headers)
 
             if response.status_code not in [200, 201]:
                 raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"Erro no Supabase Auth: {response.text}",
+                    status_code=502,
+                    detail="Não foi possível criar o usuário no provedor de autenticação.",
                 )
 
             dados_supabase = response.json()
@@ -166,13 +167,13 @@ def adicionar_membro(
             except Exception as e:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Usuário criado, mas falha ao criar Profile local: {str(e)}",
+                    detail="Usuário criado no provedor, mas o perfil local não pôde ser concluído.",
                 )
 
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Falha de rede ao conectar com o Supabase: {str(e)}",
+            detail="Falha de comunicação com o provedor de autenticação.",
         )
 
 
@@ -208,7 +209,7 @@ def remover_membro(
     }
 
     try:
-        with httpx.Client() as client:
+        with httpx.Client(timeout=10.0) as client:
             # Faz a requisição DELETE para o Supabase
             response = client.delete(url_delete, headers=headers)
             
@@ -217,12 +218,12 @@ def remover_membro(
             if response.status_code not in [200, 204, 404]:
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Erro ao remover usuário do Supabase Auth: {response.text}"
+                    detail="Não foi possível remover o usuário do provedor de autenticação."
                 )
     except httpx.RequestError as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Falha de rede ao remover usuário do Auth: {str(e)}"
+            detail="Falha de comunicação com o provedor de autenticação."
         )
 
     # Agora sim, apaga o perfil do banco de dados local

@@ -1,5 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 
 // As rotas privadas serão carregadas via Lazy Loading abaixo para otimizar performance.
 
@@ -7,17 +6,57 @@ const routes = [
   // ==========================================
   // ROTAS PÚBLICAS
   // ==========================================
-  { path: '/', component: () => import('@/views/LandingView.vue') },
-  { path: '/login', component: () => import('@/views/LoginView.vue'), meta: { guestOnly: true } },
-  { path: '/cadastro', component: () => import('@/views/CadastroView.vue'), meta: { guestOnly: true } },
-  { path: '/esqueceu-senha', component: () => import('@/views/ForgotPasswordView.vue'), meta: { guestOnly: true } },
-  { path: '/redefinir-senha', component: () => import('@/views/ResetPasswordView.vue'), meta: { guestOnly: true } },
-  { path: '/privacidade', component: () => import('@/views/PrivacidadeView.vue') },
-  { path: '/termos', component: () => import('@/views/TermosView.vue') },
-  {path: '/sobre', component: () => import('@/views/SobreNosView.vue')},
-  {path: '/contato', component: () => import('@/views/ContatoView.vue')},
-  {path: '/planos', component: () => import('@/views/PlanosView.vue')},
-  {path: '/como-funciona', component: () => import('@/views/ComoFuncionaView.vue')},
+  {
+    path: '/',
+    component: () => import('@/views/LandingView.vue'),
+    meta: { title: 'Gestão contábil' },
+  },
+  {
+    path: '/login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { guestOnly: true, authenticatedRedirect: '/dashboard', title: 'Entrar' },
+  },
+  {
+    path: '/cadastro',
+    component: () => import('@/views/CadastroView.vue'),
+    meta: { guestOnly: true, title: 'Criar conta' },
+  },
+  {
+    path: '/esqueceu-senha',
+    component: () => import('@/views/ForgotPasswordView.vue'),
+    meta: { guestOnly: true, title: 'Recuperar senha' },
+  },
+  {
+    path: '/redefinir-senha',
+    component: () => import('@/views/ResetPasswordView.vue'),
+    meta: { guestOnly: true, title: 'Redefinir senha' },
+  },
+  {
+    path: '/privacidade',
+    component: () => import('@/views/PrivacidadeView.vue'),
+    meta: { title: 'Privacidade' },
+  },
+  {
+    path: '/termos',
+    component: () => import('@/views/TermosView.vue'),
+    meta: { title: 'Termos de uso' },
+  },
+  {
+    path: '/sobre',
+    component: () => import('@/views/SobreNosView.vue'),
+    meta: { title: 'Sobre nós' },
+  },
+  {
+    path: '/contato',
+    component: () => import('@/views/ContatoView.vue'),
+    meta: { title: 'Contato' },
+  },
+  { path: '/planos', component: () => import('@/views/PlanosView.vue'), meta: { title: 'Planos' } },
+  {
+    path: '/como-funciona',
+    component: () => import('@/views/ComoFuncionaView.vue'),
+    meta: { title: 'Como funciona' },
+  },
 
   // ==========================================
   // ROTAS PRIVADAS (Painel do Cliente SaaS)
@@ -25,37 +64,37 @@ const routes = [
   {
     path: '/dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Dashboard' },
   },
   {
     path: '/clientes',
     component: () => import('@/views/ClientsView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Clientes' },
   },
   {
     path: '/obrigacoes',
     component: () => import('@/views/ObrigacoesView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Obrigações' },
   },
   {
     path: '/documentos',
     component: () => import('@/views/DocumentosView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Documentos' },
   },
   {
     path: '/membros',
     component: () => import('@/views/MembrosView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Membros' },
   },
   {
     path: '/calendario',
     component: () => import('@/views/CalendarioView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Calendário' },
   },
   {
     path: '/faturamento',
     component: () => import('@/views/FaturamentoView.vue'),
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, title: 'Planos e faturamento' },
   },
 
   // ==========================================
@@ -64,12 +103,17 @@ const routes = [
   {
     path: '/ops-login',
     component: () => import('@/views/AdminLoginView.vue'),
-    meta: { guestOnly: true },
+    meta: { guestOnly: true, authenticatedRedirect: '/admin', title: 'Acesso ao backoffice' },
   },
   {
     path: '/admin',
     component: () => import('@/views/AdminDashboardView.vue'),
-    meta: { requiresAuth: true, requiresSuperAdmin: true },
+    meta: { requiresAuth: true, requiresSuperAdmin: true, title: 'Backoffice' },
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    component: () => import('@/views/NotFoundView.vue'),
+    meta: { title: 'Página não encontrada' },
   },
 ]
 
@@ -82,15 +126,17 @@ const router = createRouter({
 // GUARDIÃO DE ROTAS (Shift-Left Security)
 // ==========================================
 router.beforeEach(async (to) => {
-  // Instanciamos a store AQUI DENTRO para evitar erros de ciclo de vida do Vue/Pinia
-  const authStore = useAuthStore()
-
-  // Sincroniza o estado local com a sessão real do Supabase
-  const activeSession = await authStore.checkSession()
-
   const requiresAuth = to.meta.requiresAuth
   const requiresSuperAdmin = to.meta.requiresSuperAdmin
   const guestOnly = to.meta.guestOnly
+
+  // Páginas institucionais não precisam baixar nem inicializar o cliente de autenticação.
+  if (!requiresAuth && !requiresSuperAdmin && !guestOnly) return true
+
+  // A store e o Supabase só entram no bundle quando a rota depende de uma sessão.
+  const { useAuthStore } = await import('../stores/auth')
+  const authStore = useAuthStore()
+  const activeSession = await authStore.checkSession()
 
   // 1. Regra de Proteção Padrão: Tentar acessar área logada sem estar logado
   if (requiresAuth && !activeSession) {
@@ -104,12 +150,19 @@ router.beforeEach(async (to) => {
 
   // 3. Regra de UX: Usuário logado tentando acessar telas de Login/Cadastro
   if (guestOnly && activeSession) {
-    // Se for o dono do SaaS, manda pro backoffice. Se for contador, manda pro app.
-    return authStore.isSuperAdmin ? '/admin' : '/dashboard'
+    // Os dois logins são fluxos distintos: o login comum nunca abre o backoffice.
+    if (to.meta.authenticatedRedirect === '/admin') {
+      return authStore.isSuperAdmin ? '/admin' : '/dashboard'
+    }
+    return '/dashboard'
   }
 
   // Se passou por todas as barreiras, caminho livre! (return true ou apenas return vazio)
   return true
+})
+
+router.afterEach((to) => {
+  document.title = to.meta.title ? `${String(to.meta.title)} · ContablyTask` : 'ContablyTask'
 })
 
 export default router

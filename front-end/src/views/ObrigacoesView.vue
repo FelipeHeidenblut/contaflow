@@ -3,6 +3,12 @@ import { ref, onMounted, computed } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
+import ConfirmDialog from '../components/ConfirmDialog.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { getApiErrorMessage } from '../utils/apiError'
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
 
 interface Cliente {
   id: string | number
@@ -28,6 +34,7 @@ interface Obrigacao {
   is_recurring?: boolean
   recurrence_day?: number | null
 }
+const taskToDelete = ref<string | number | null>(null)
 
 interface TemplateContabil {
   nome: string
@@ -67,33 +74,33 @@ const formularioObrigacao = ref({
 
 const templatesContabeis: TemplateContabil[] = [
   {
-    nome: '🧾 Apuração DAS (Simples Nacional)',
+    nome: 'Apuração DAS (Simples Nacional)',
     title: 'Apuração DAS - Simples Nacional',
     description:
       'Verificar receitas do período, calcular tributos devidos e gerar guia de DAS para pagamento.',
     grau_importancia: 'Alta',
   },
   {
-    nome: '💼 Folha de Pagamento Mensal',
+    nome: 'Folha de Pagamento Mensal',
     title: 'Folha de Pagamento',
     description: 'Conferir ponto, calcular salários, encargos sociais e gerar holerites.',
     grau_importancia: 'Alta',
   },
   {
-    nome: '📄 SPED Fiscal',
+    nome: 'SPED Fiscal',
     title: 'SPED Fiscal',
     description:
       'Validar livros fiscais, conferir notas fiscais de entrada/saída e gerar arquivo do SPED.',
     grau_importancia: 'Urgente',
   },
   {
-    nome: '🏛️ DCTFWeb',
+    nome: 'DCTFWeb',
     title: 'DCTFWeb',
     description: 'Gerar e transmitir a DCTFWeb com as apurações do eSocial e EFD-Contribuições.',
     grau_importancia: 'Alta',
   },
   {
-    nome: '🤝 Solicitar Documentos (Aguardando Cliente)',
+    nome: 'Solicitar documentos (aguardando cliente)',
     title: 'Aguardando Documentos do Cliente',
     description:
       'Solicitar e organizar documentos enviados pelo cliente para fechamento da competência.',
@@ -167,8 +174,7 @@ const totalAguardando = computed(
   () => obrigacoes.value.filter((o) => o.status === 'aguardando_cliente').length,
 )
 const totalAtrasadas = computed(
-  () =>
-    obrigacoes.value.filter((o) => isAtrasada(o.due_date, o.status)).length,
+  () => obrigacoes.value.filter((o) => isAtrasada(o.due_date, o.status)).length,
 )
 
 const abrirDetalhes = (obrigacao: Obrigacao) => {
@@ -257,7 +263,7 @@ const salvarObrigacao = async () => {
 
     fecharCadastro()
   } catch (error) {
-    toast.error('Erro ao salvar a obrigação.')
+    toast.error(getApiErrorMessage(error, 'Erro ao salvar a obrigação.'))
     console.error(error)
   }
 }
@@ -277,20 +283,21 @@ const concluirTarefa = async (obrigacao: Obrigacao) => {
       toast.success('Obrigação concluída!')
     }
   } catch (error) {
-    toast.error('Erro ao concluir tarefa.')
+    toast.error(getApiErrorMessage(error, 'Erro ao concluir tarefa.'))
   }
 }
 
-const excluirTarefa = async (id: string | number) => {
-  if (!confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) return
-
+const excluirTarefa = async () => {
+  const id = taskToDelete.value
+  if (id === null) return
   try {
     await api.delete(`/api/v1/obrigacoes/${id}`)
     obrigacoes.value = obrigacoes.value.filter((o) => o.id !== id)
     fecharDetalhes()
     toast.success('Tarefa excluída.')
+    taskToDelete.value = null
   } catch (error) {
-    toast.error('Erro ao excluir tarefa.')
+    toast.error(getApiErrorMessage(error, 'Erro ao excluir tarefa.'))
   }
 }
 
@@ -307,7 +314,7 @@ const fetchData = async () => {
     clientes.value = clientesRes.data
     membros.value = membrosRes.data
   } catch (error) {
-    toast.error('Erro ao carregar os dados.')
+    toast.error(getApiErrorMessage(error, 'Erro ao carregar os dados.'))
     console.error(error)
   } finally {
     isLoading.value = false
@@ -357,7 +364,7 @@ const isAtrasada = (dateString: string, status: string) => {
 const getStatusBadge = (status: string) => {
   const styles: Record<string, string> = {
     concluida: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    em_andamento: 'bg-blue-100 text-blue-700 border-blue-200',
+    em_andamento: 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]',
     aguardando_cliente: 'bg-amber-100 text-amber-700 border-amber-200',
     pendente: 'bg-slate-100 text-slate-700 border-slate-200',
   }
@@ -380,7 +387,7 @@ const getImportanciaBadge = (grau?: string) => {
   const styles: Record<string, string> = {
     Urgente: 'bg-red-50 text-red-700 border-red-200',
     Alta: 'bg-orange-50 text-orange-700 border-orange-200',
-    Média: 'bg-blue-50 text-blue-700 border-blue-200',
+    Média: 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]',
     Baixa: 'bg-slate-50 text-slate-700 border-slate-200',
   }
 
@@ -390,14 +397,19 @@ const getImportanciaBadge = (grau?: string) => {
   }
 }
 
-onMounted(() => fetchData())
+onMounted(async () => {
+  await fetchData()
+  if (route.query.novo === '1') abrirCadastro()
+})
 </script>
 
 <template>
   <Layout title="Controle de Obrigações">
     <div class="space-y-6">
       <!-- topo -->
-      <header class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <header
+        class="flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
+      >
         <div>
           <h1 class="text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Obrigações e tarefas
@@ -409,48 +421,63 @@ onMounted(() => fetchData())
 
         <button
           @click="abrirCadastro"
-          class="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
+          class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           <span>Nova obrigação</span>
         </button>
       </header>
 
       <!-- kpis -->
-      <section class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <section
+        class="flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
+      >
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalPendentes }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Em espera do cliente</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalAguardando }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Concluídas</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+          >
             {{ totalConcluidas }}
           </p>
         </div>
 
-        <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+        <div class="flex items-baseline gap-2">
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Atrasadas</p>
-          <p class="mt-2 text-3xl font-semibold tracking-tight text-red-600 [font-variant-numeric:tabular-nums]">
+          <p
+            class="text-xl font-semibold tracking-tight text-red-600 [font-variant-numeric:tabular-nums]"
+          >
             {{ totalAtrasadas }}
           </p>
         </div>
       </section>
 
       <!-- filtros -->
-      <section class="rounded-2xl border border-[var(--ct-border)] bg-white p-4 shadow-sm">
+      <section class="border-b border-[var(--ct-border)] pb-5">
         <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
             <div class="relative">
@@ -460,19 +487,26 @@ onMounted(() => fetchData())
                 stroke="currentColor"
                 viewBox="0 0 24 24"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z"
+                />
               </svg>
               <input
                 v-model="searchQuery"
+                aria-label="Buscar obrigações"
                 type="text"
                 placeholder="Buscar tarefa..."
-                class="w-full rounded-xl border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                class="w-full rounded-lg border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
 
             <select
               v-model="filtroClienteId"
-              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              aria-label="Filtrar obrigações por cliente"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os clientes</option>
               <option v-for="c in clientes" :key="c.id" :value="c.id">
@@ -482,7 +516,8 @@ onMounted(() => fetchData())
 
             <select
               v-model="filtroResponsavel"
-              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              aria-label="Filtrar obrigações por responsável"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os responsáveis</option>
               <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
@@ -490,7 +525,8 @@ onMounted(() => fetchData())
 
             <select
               v-model="filtroStatus"
-              class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              aria-label="Filtrar obrigações por status"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os status</option>
               <option value="pendente">Pendentes</option>
@@ -507,7 +543,7 @@ onMounted(() => fetchData())
       </section>
 
       <!-- tabela -->
-      <section class="overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-sm">
+      <section class="overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white">
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -515,36 +551,95 @@ onMounted(() => fetchData())
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
         </div>
 
-        <div v-else-if="obrigacoesFiltradas.length === 0" class="p-16 text-center">
-          <p class="text-sm font-medium text-[var(--ct-ink)]">Nenhuma obrigação encontrada.</p>
-          <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-            Ajuste os filtros ou crie uma nova obrigação para começar.
-          </p>
-        </div>
+        <EmptyState
+          v-else-if="obrigacoesFiltradas.length === 0"
+          title="Nenhuma obrigação encontrada"
+          description="Ajuste os filtros ou crie uma nova obrigação para começar."
+          action-label="Criar obrigação"
+          @action="abrirCadastro"
+        />
 
         <div v-else class="overflow-x-auto">
-          <table class="min-w-full">
+          <div class="divide-y divide-[var(--ct-border)] md:hidden">
+            <article
+              v-for="obrigacao in obrigacoesFiltradas"
+              :key="`mobile-${obrigacao.id}`"
+              class="p-4"
+            >
+              <button class="w-full text-left" @click="abrirDetalhes(obrigacao)">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ obrigacao.title }}
+                    </p>
+                    <p class="mt-1 truncate text-xs text-[var(--ct-text-muted)]">
+                      {{ getNomeCliente(obrigacao.client_id) }}
+                    </p>
+                  </div>
+                  <span :class="getStatusBadge(obrigacao.status).class">{{
+                    getStatusBadge(obrigacao.status).label
+                  }}</span>
+                </div>
+                <div class="mt-3 flex items-center justify-between">
+                  <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">{{
+                    getImportanciaBadge(obrigacao.grau_importancia).label
+                  }}</span
+                  ><span
+                    class="text-xs"
+                    :class="
+                      isAtrasada(obrigacao.due_date, obrigacao.status)
+                        ? 'font-semibold text-red-600'
+                        : 'text-slate-500'
+                    "
+                    >{{ formatDate(obrigacao.due_date) }}</span
+                  >
+                </div>
+              </button>
+              <button
+                v-if="obrigacao.status !== 'concluida'"
+                class="mt-3 text-xs font-semibold text-emerald-700"
+                @click="concluirTarefa(obrigacao)"
+              >
+                Marcar como concluída
+              </button>
+            </article>
+          </div>
+          <table class="hidden min-w-full md:table">
             <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
               <tr>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Tarefa
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Cliente
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Responsável
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Prazo
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Prioridade
                 </th>
-                <th class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Status
                 </th>
-                <th class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <th
+                  class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
                   Ações
                 </th>
               </tr>
@@ -563,7 +658,11 @@ onMounted(() => fetchData())
                   >
                     <div
                       class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl"
-                      :class="obrigacao.is_recurring ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-500'"
+                      :class="
+                        obrigacao.is_recurring
+                          ? 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]'
+                          : 'bg-slate-100 text-slate-500'
+                      "
                     >
                       <svg
                         v-if="obrigacao.is_recurring"
@@ -572,7 +671,12 @@ onMounted(() => fetchData())
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
                       </svg>
                       <svg
                         v-else
@@ -581,7 +685,12 @@ onMounted(() => fetchData())
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-7-4h6m0 0v6m0-6L10 14"/>
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-7-4h6m0 0v6m0-6L10 14"
+                        />
                       </svg>
                     </div>
 
@@ -592,7 +701,7 @@ onMounted(() => fetchData())
                         </p>
                         <span
                           v-if="obrigacao.is_recurring"
-                          class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700"
+                          class="inline-flex rounded-full bg-[var(--ct-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ct-primary)]"
                         >
                           Recorrente
                         </span>
@@ -610,7 +719,10 @@ onMounted(() => fetchData())
                 </td>
 
                 <td class="px-6 py-4">
-                  <div class="flex items-center gap-2" :title="getNomeMembro(obrigacao.assigned_to)">
+                  <div
+                    class="flex items-center gap-2"
+                    :title="getNomeMembro(obrigacao.assigned_to)"
+                  >
                     <div
                       class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-[10px] font-semibold text-[var(--ct-primary)]"
                     >
@@ -624,7 +736,11 @@ onMounted(() => fetchData())
 
                 <td
                   class="px-6 py-4 text-sm"
-                  :class="isAtrasada(obrigacao.due_date, obrigacao.status) ? 'font-semibold text-red-600' : 'text-[var(--ct-ink)]'"
+                  :class="
+                    isAtrasada(obrigacao.due_date, obrigacao.status)
+                      ? 'font-semibold text-red-600'
+                      : 'text-[var(--ct-ink)]'
+                  "
                 >
                   {{ formatDate(obrigacao.due_date) }}
                 </td>
@@ -668,26 +784,45 @@ onMounted(() => fetchData())
       <!-- modal cadastro/edição -->
       <div
         v-if="isCadastroModalOpen"
+        v-focus-trap
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="task-modal-title"
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
-        <div class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl">
-          <div class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5">
-            <h3 class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]">
+        <div
+          class="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--ct-border)] bg-white shadow-2xl"
+        >
+          <div
+            class="flex items-center justify-between border-b border-[var(--ct-border)] bg-slate-50 px-6 py-5"
+          >
+            <h3
+              id="task-modal-title"
+              class="text-xl font-semibold tracking-tight text-[var(--ct-ink)]"
+            >
               {{ isEditando ? 'Editar obrigação' : 'Nova obrigação' }}
             </h3>
             <button
               @click="fecharCadastro"
+              aria-label="Fechar formulário de obrigação"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
 
           <div class="max-h-[80vh] space-y-5 overflow-y-auto p-6">
             <div v-if="!isEditando">
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Modelo rápido
               </label>
               <select
@@ -702,7 +837,9 @@ onMounted(() => fetchData())
             </div>
 
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Título *
               </label>
               <input
@@ -713,7 +850,9 @@ onMounted(() => fetchData())
             </div>
 
             <div>
-              <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+              <label
+                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+              >
                 Descrição
               </label>
               <textarea
@@ -725,7 +864,9 @@ onMounted(() => fetchData())
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Cliente *
                 </label>
                 <select
@@ -740,7 +881,9 @@ onMounted(() => fetchData())
               </div>
 
               <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Atribuir para
                 </label>
                 <select
@@ -755,7 +898,9 @@ onMounted(() => fetchData())
 
             <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Prazo *
                 </label>
                 <input
@@ -766,7 +911,9 @@ onMounted(() => fetchData())
               </div>
 
               <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Prioridade
                 </label>
                 <select
@@ -781,7 +928,9 @@ onMounted(() => fetchData())
               </div>
 
               <div>
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Status
                 </label>
                 <select
@@ -814,7 +963,9 @@ onMounted(() => fetchData())
               </label>
 
               <div v-if="formularioObrigacao.is_recurring" class="mt-4">
-                <label class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                <label
+                  class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
+                >
                   Vence todo dia
                 </label>
                 <select
@@ -828,10 +979,12 @@ onMounted(() => fetchData())
             </div>
           </div>
 
-          <div class="flex items-center justify-between border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4">
+          <div
+            class="flex items-center justify-between border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4"
+          >
             <button
               v-if="isEditando"
-              @click="excluirTarefa(idSendoEditado!)"
+              @click="taskToDelete = idSendoEditado"
               class="text-sm font-semibold text-red-600 transition-colors hover:text-red-700"
             >
               Excluir
@@ -859,6 +1012,7 @@ onMounted(() => fetchData())
       <!-- drawer detalhes -->
       <div
         v-if="isDetalhesModalOpen && obrigacaoSelecionada"
+        v-focus-trap
         class="fixed inset-0 z-50 overflow-hidden"
         role="dialog"
         aria-modal="true"
@@ -876,7 +1030,9 @@ onMounted(() => fetchData())
                         {{ getStatusBadge(obrigacaoSelecionada.status).label }}
                       </span>
 
-                      <span :class="getImportanciaBadge(obrigacaoSelecionada.grau_importancia).class">
+                      <span
+                        :class="getImportanciaBadge(obrigacaoSelecionada.grau_importancia).class"
+                      >
                         {{ getImportanciaBadge(obrigacaoSelecionada.grau_importancia).label }}
                       </span>
 
@@ -899,10 +1055,16 @@ onMounted(() => fetchData())
 
                   <button
                     @click="fecharDetalhes"
+                    aria-label="Fechar detalhes da obrigação"
                     class="rounded-lg p-1 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
                   >
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -928,7 +1090,11 @@ onMounted(() => fetchData())
                     <span class="block text-xs text-[var(--ct-text-muted)]">Prazo</span>
                     <span
                       class="mt-1 block text-sm font-semibold"
-                      :class="isAtrasada(obrigacaoSelecionada.due_date, obrigacaoSelecionada.status) ? 'text-red-600' : 'text-[var(--ct-ink)]'"
+                      :class="
+                        isAtrasada(obrigacaoSelecionada.due_date, obrigacaoSelecionada.status)
+                          ? 'text-red-600'
+                          : 'text-[var(--ct-ink)]'
+                      "
                     >
                       {{ formatDate(obrigacaoSelecionada.due_date) }}
                     </span>
@@ -948,7 +1114,10 @@ onMounted(() => fetchData())
                 <div class="rounded-xl border border-[var(--ct-border)] bg-white p-4">
                   <h4 class="text-sm font-semibold text-[var(--ct-ink)]">Resumo</h4>
                   <p class="mt-2 text-sm leading-6 text-[var(--ct-text-muted)]">
-                    {{ obrigacaoSelecionada.description || 'Esta obrigação não possui descrição cadastrada.' }}
+                    {{
+                      obrigacaoSelecionada.description ||
+                      'Esta obrigação não possui descrição cadastrada.'
+                    }}
                   </p>
                 </div>
               </div>
@@ -965,7 +1134,7 @@ onMounted(() => fetchData())
 
                   <button
                     @click="abrirEdicao(obrigacaoSelecionada)"
-                    class="rounded-xl bg-[var(--ct-navy)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F1B46]"
+                    class="rounded-xl bg-[var(--ct-navy)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
                   >
                     Editar
                   </button>
@@ -975,6 +1144,14 @@ onMounted(() => fetchData())
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        :open="taskToDelete !== null"
+        title="Excluir obrigação"
+        message="Deseja excluir esta obrigação permanentemente?"
+        confirm-label="Excluir obrigação"
+        @close="taskToDelete = null"
+        @confirm="excluirTarefa"
+      />
     </div>
   </Layout>
 </template>

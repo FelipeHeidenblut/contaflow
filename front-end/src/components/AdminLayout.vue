@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, RouterLink, useRoute } from 'vue-router'
-import { supabase } from '../services/supabase'
+import { useAuthStore } from '../stores/auth'
+import BrandMark from './BrandMark.vue'
 
 defineProps<{
   title?: string
 }>()
 
 const router = useRouter()
+const authStore = useAuthStore()
 const route = useRoute()
 const isSidebarOpen = ref(false)
 
 const handleLogout = async () => {
-  await supabase.auth.signOut()
-  router.push('/login')
+  await authStore.logout()
+  router.push('/ops-login')
 }
 
 // Menu exclusivo do Super Admin
@@ -23,38 +25,39 @@ const adminMenu = [
     path: '/admin',
     icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
   },
-  {
-    name: 'Escritórios (Tenants)',
-    path: '/admin/escritorios',
-    icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-  },
-  {
-    name: 'Faturamento Asaas',
-    path: '/admin/financeiro',
-    icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-  },
 ]
+
+watch(route, () => {
+  isSidebarOpen.value = false
+})
+const closeOnEscape = (event: KeyboardEvent) => {
+  if (event.key === 'Escape') isSidebarOpen.value = false
+}
+onMounted(() => document.addEventListener('keydown', closeOnEscape))
+onBeforeUnmount(() => document.removeEventListener('keydown', closeOnEscape))
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#f4f7f6] flex">
+  <div class="ct-app-shell flex min-h-screen bg-[var(--ct-bg)]">
     <!-- Sidebar Super Admin (Estilo Escuro/Diferenciado para "God Mode") -->
     <aside
-      class="w-64 bg-[#0a192f] text-white flex-col fixed h-full z-20 transition-transform duration-300 md:flex"
+      class="fixed z-20 flex h-full w-64 flex-col bg-[var(--ct-navy)] text-white transition-transform duration-300"
       :class="isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'"
     >
-      <div class="p-6 flex items-center justify-between border-b border-white/10">
+      <div class="flex h-16 items-center justify-between border-b border-white/10 px-5">
         <div>
-          <h2 class="text-2xl font-extrabold tracking-tight">
-            ContaFlow<span class="text-[#ff8a65]">Admin</span>
-          </h2>
+          <BrandMark inverse />
           <span
-            class="text-xs font-medium bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full mt-1 inline-block border border-red-500/30"
+            class="mt-1 inline-block text-[10px] font-semibold uppercase tracking-[0.1em] text-red-300"
           >
             Super Acesso
           </span>
         </div>
-        <button @click="isSidebarOpen = false" class="md:hidden text-gray-400 hover:text-white">
+        <button
+          aria-label="Fechar menu"
+          @click="isSidebarOpen = false"
+          class="text-gray-400 hover:text-white md:hidden"
+        >
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
@@ -74,7 +77,7 @@ const adminMenu = [
           class="flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors"
           :class="
             route.path === item.path
-              ? 'bg-[#ff8a65] text-white shadow-md'
+              ? 'bg-white/10 text-white'
               : 'text-gray-400 hover:bg-white/5 hover:text-white'
           "
         >
@@ -111,6 +114,8 @@ const adminMenu = [
     <!-- Overlay Mobile -->
     <div
       v-if="isSidebarOpen"
+      role="button"
+      aria-label="Fechar menu"
       @click="isSidebarOpen = false"
       class="fixed inset-0 bg-black/50 z-10 md:hidden"
     ></div>
@@ -122,7 +127,11 @@ const adminMenu = [
         class="bg-white h-16 border-b flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10"
       >
         <div class="flex items-center gap-4">
-          <button @click="isSidebarOpen = true" class="md:hidden text-gray-500 hover:text-gray-700">
+          <button
+            aria-label="Abrir menu"
+            @click="isSidebarOpen = true"
+            class="text-gray-500 hover:text-gray-700 md:hidden"
+          >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 stroke-linecap="round"
@@ -132,13 +141,18 @@ const adminMenu = [
               ></path>
             </svg>
           </button>
-          <h1 v-if="title" class="text-xl font-bold text-[#19341a]">{{ title }}</h1>
+          <p
+            v-if="title"
+            class="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--ct-text-muted)]"
+          >
+            {{ title }}
+          </p>
         </div>
       </header>
 
       <!-- Slot para o conteúdo da página -->
-      <div class="p-6 md:p-8 flex-1 overflow-x-hidden">
-        <div class="max-w-7xl mx-auto">
+      <div class="flex-1 overflow-x-hidden p-4 md:p-6">
+        <div class="mx-auto max-w-7xl">
           <slot />
         </div>
       </div>

@@ -27,8 +27,10 @@ class Tenant(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     asaas_customer_id = Column(String, nullable=True)
+    asaas_subscription_id = Column(String, nullable=True, unique=True)
     plano = Column(String, default="free")
     status_pagamento = Column(String, default="ativo")
+    calendar_token = Column(String(64), unique=True, nullable=True, index=True)
 
 
 class Profile(Base):
@@ -50,9 +52,15 @@ class Profile(Base):
 
 class Client(Base):
     __tablename__ = "clients"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "cnpj", name="uq_clients_tenant_cnpj"),
+        UniqueConstraint("tenant_id", "cpf", name="uq_clients_tenant_cpf"),
+    )
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     # Novos campos
     tipo_pessoa = Column(String, default="PJ")  # PJ ou PF
@@ -110,6 +118,7 @@ class Document(Base):
     )
     task_id = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"))
     nome_arquivo = Column(String(255), nullable=False)
+    categoria = Column(String(40), nullable=False, default="Geral", server_default="Geral")
     storage_path = Column(String(500), nullable=False)
     uploaded_by = Column(
         UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="SET NULL")
@@ -128,3 +137,11 @@ class TaxDeadline(Base):
     deadline_date = Column(Date, nullable=False)
     is_monthly = Column(Boolean, default=False)
     reference_link = Column(String, nullable=True)
+
+
+class AsaasWebhookEvent(Base):
+    __tablename__ = "asaas_webhook_events"
+
+    id = Column(String(100), primary_key=True)
+    event_type = Column(String(80), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

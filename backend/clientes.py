@@ -9,10 +9,13 @@ import schemas
 import re
 from database import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from security import get_current_user
+from security import get_active_user, get_current_user
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1/clientes", tags=["Clientes"])
+MAX_CSV_SIZE = 2 * 1024 * 1024
 
 # Limites de clientes por plano (Plano: Limite de Clientes)
 LIMITES_CLIENTES = {
@@ -29,7 +32,7 @@ LIMITES_CLIENTES = {
 def criar_cliente(
     cliente: schemas.ClientCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -54,7 +57,11 @@ def criar_cliente(
         cnpj_existente = (
             db.query(models.Client)
             .filter(
-                models.Client.tenant_id == tenant_id, models.Client.cnpj == cliente.cnpj
+                models.Client.tenant_id == tenant_id,
+                func.upper(
+                    func.regexp_replace(models.Client.cnpj, "[^A-Za-z0-9]", "", "g")
+                )
+                == cliente.cnpj,
             )
             .first()
         )
@@ -68,7 +75,8 @@ def criar_cliente(
         cpf_existente = (
             db.query(models.Client)
             .filter(
-                models.Client.tenant_id == tenant_id, models.Client.cpf == cliente.cpf
+                models.Client.tenant_id == tenant_id,
+                func.regexp_replace(models.Client.cpf, "[^0-9]", "", "g") == cliente.cpf,
             )
             .first()
         )
@@ -90,7 +98,11 @@ def criar_cliente(
     )
 
     db.add(novo_cliente)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="CPF/CNPJ já cadastrado neste escritório.")
     db.refresh(novo_cliente)
 
     return novo_cliente
@@ -117,7 +129,7 @@ def listar_clientes(
 def desativar_cliente(
     cliente_id: UUID,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
 
@@ -148,7 +160,7 @@ def desativar_cliente(
 async def importar_clientes_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user) # Autenticação reativada!
+    current_user: dict = Depends(get_active_user)
 ):
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="O arquivo deve ser .csv")
@@ -168,7 +180,9 @@ async def importar_clientes_csv(
     ).count()
 
     try:
-        contents = await file.read()
+        contents = await file.read(MAX_CSV_SIZE + 1)
+        if len(contents) > MAX_CSV_SIZE:
+            raise HTTPException(status_code=413, detail="CSV excede o limite máximo de 2MB.")
         try:
             decoded_content = contents.decode("utf-8")
         except UnicodeDecodeError:
@@ -205,6 +219,20 @@ async def importar_clientes_csv(
 
             # Limpa a pontuação, mas MANTÉM letras e números (para o novo CNPJ alfanumérico)
             documento_limpo = re.sub(r'[^a-zA-Z0-9]', '', documento)
+            if tipo_pessoa == "PF" and (not documento_limpo.isdigit() or len(documento_limpo) != 11):
+                linhas_com_erro += 1
+                continue
+            if tipo_pessoa != "PF" and len(documento_limpo) != 14:
+                linhas_com_erro += 1
+                continue
+
+            duplicado = db.query(models.Client.id).filter(
+                models.Client.tenant_id == tenant_id,
+                (models.Client.cpf == documento_limpo) if tipo_pessoa == "PF" else (models.Client.cnpj == documento_limpo),
+            ).first()
+            if duplicado:
+                linhas_com_erro += 1
+                continue
 
             # Usa o tenant_id do usuário logado!
             novo_cliente = models.Client(
@@ -236,9 +264,6 @@ async def importar_clientes_csv(
         # Já fizemos o commit dos válidos acima antes de levantar o erro.
         # Apenas repassamos a exceção para o frontend.
         raise
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"[ERRO CSV] {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Erro ao processar arquivo: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail="Erro interno ao processar o CSV.")

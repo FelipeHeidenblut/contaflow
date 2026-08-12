@@ -14,8 +14,8 @@ class ClientBase(BaseModel):
     cnpj: Optional[str] = None  # Agora opcional
     nome: Optional[str] = None  # Novo campo PF
     cpf: Optional[str] = None  # Novo campo PF
-    regime_tributario: Optional[str] = None
-    natureza_operacao: Optional[str] = "Serviços"
+    regime_tributario: str = Field(..., min_length=2, max_length=80)
+    natureza_operacao: str = Field(default="Serviços", min_length=2, max_length=80)
 
 
 class ClientCreate(ClientBase):
@@ -24,21 +24,17 @@ class ClientCreate(ClientBase):
         if self.tipo_pessoa == "PJ":
             if not self.razao_social:
                 raise ValueError("Razão Social é obrigatória para Pessoa Jurídica")
-            # Validação de formato de CNPJ (Agora aceita Alfanuméricos - Letras e Números)
-            if not self.cnpj or not re.match(
-                r"^[A-Za-z0-9]{2}\.[A-Za-z0-9]{3}\.[A-Za-z0-9]{3}\/[A-Za-z0-9]{4}\-[A-Za-z0-9]{2}$", self.cnpj
-            ):
-                raise ValueError(
-                    "CNPJ inválido para Pessoa Jurídica (Formato: XX.XXX.XXXX/XXXX-XX)"
-                )
+            normalized = re.sub(r"[^A-Za-z0-9]", "", self.cnpj or "").upper()
+            if len(normalized) != 14:
+                raise ValueError("CNPJ deve conter 14 caracteres.")
+            self.cnpj = normalized
         elif self.tipo_pessoa == "PF":
             if not self.nome:
                 raise ValueError("Nome completo é obrigatório para Pessoa Física")
-            # Validação de formato de CPF
-            if not self.cpf or not re.match(r"^\d{3}\.\d{3}\.\d{3}\-\d{2}$", self.cpf):
-                raise ValueError(
-                    "CPF inválido para Pessoa Física (Formato: XXX.XXX.XXX-XX)"
-                )
+            normalized = re.sub(r"\D", "", self.cpf or "")
+            if len(normalized) != 11:
+                raise ValueError("CPF deve conter 11 dígitos.")
+            self.cpf = normalized
         else:
             raise ValueError('tipo_pessoa deve ser "PF" ou "PJ"')
 
@@ -55,15 +51,24 @@ class ClientResponse(ClientBase):
 # ================== TAREFAS ==================
 class TaskBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    title: str
-    description: Optional[str] = None
+    title: str = Field(..., min_length=2, max_length=255)
+    description: Optional[str] = Field(default=None, max_length=4000)
     due_date: date
     status: TaskStatus = TaskStatus.PENDENTE  # Usando Enum
     client_id: UUID
     assigned_to: Optional[UUID] = None
-    grau_importancia: str = "Média"
+    grau_importancia: str = Field(default="Média", pattern="^(Baixa|Média|Alta|Urgente)$")
     is_recurring: bool = False
-    recurrence_day: Optional[int] = None
+    recurrence_day: Optional[int] = Field(default=None, ge=1, le=31)
+
+    @model_validator(mode="after")
+    def check_recurrence(self):
+        if self.is_recurring and self.recurrence_day is None:
+            raise ValueError("recurrence_day é obrigatório para tarefas recorrentes")
+        if not self.is_recurring:
+            self.recurrence_day = None
+
+        return self
 
 
 class TaskCreate(TaskBase):
@@ -82,6 +87,7 @@ class DocumentBase(BaseModel):
     client_id: UUID
     task_id: Optional[UUID] = None
     nome_arquivo: str
+    categoria: str = "Geral"
     storage_path: str
 
 

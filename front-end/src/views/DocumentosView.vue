@@ -6,9 +6,27 @@ import { toast } from 'vue3-toastify'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
+import { useAuthStore } from '../stores/auth'
 
-const documentos = ref<any[]>([])
-const clientes = ref<any[]>([])
+const authStore = useAuthStore()
+const canManageDocuments = computed(() => ['admin', 'gerente'].includes(authStore.role))
+
+interface DocumentRecord {
+  id: string
+  client_id: string
+  nome_arquivo: string
+  categoria: string
+  created_at: string
+}
+
+interface ClientRecord {
+  id: string
+  nome?: string
+  razao_social?: string
+}
+
+const documentos = ref<DocumentRecord[]>([])
+const clientes = ref<ClientRecord[]>([])
 const isLoading = ref(true)
 
 const isModalOpen = ref(false)
@@ -55,8 +73,8 @@ const selectedFile = ref<File | null>(null)
 const fetchData = async () => {
   try {
     const [docsResponse, clientesResponse] = await Promise.all([
-      api.get('/api/v1/documentos'),
-      api.get('/api/v1/clientes'),
+      api.get<DocumentRecord[]>('/api/v1/documentos'),
+      api.get<ClientRecord[]>('/api/v1/clientes'),
     ])
     documentos.value = docsResponse.data
     clientes.value = clientesResponse.data
@@ -67,8 +85,8 @@ const fetchData = async () => {
   }
 }
 
-const handleFileChange = (event: any) => {
-  const file = event.target.files[0]
+const handleFileChange = (event: Event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]
   if (file) selectedFile.value = file
 }
 
@@ -93,7 +111,7 @@ const handleUpload = async () => {
     selectedFile.value = null
 
     toast.success('Documento salvo com sucesso!')
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao enviar o documento.'))
   } finally {
     isUploading.value = false
@@ -391,6 +409,7 @@ onMounted(() => fetchData())
                 >
                   Baixar</button
                 ><button
+                  v-if="canManageDocuments"
                   class="text-xs font-semibold text-red-600"
                   @click="documentToDelete = { id: doc.id, name: doc.nome_arquivo }"
                 >
@@ -483,6 +502,7 @@ onMounted(() => fetchData())
                     </button>
 
                     <button
+                      v-if="canManageDocuments"
                       @click="documentToDelete = { id: doc.id, name: doc.nome_arquivo }"
                       class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-100"
                     >

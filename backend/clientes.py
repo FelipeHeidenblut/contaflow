@@ -7,8 +7,15 @@ from uuid import UUID
 import models
 import schemas
 import re
+from access_control import (
+    apply_client_scope,
+    require_management_access,
+    validate_responsible_profile,
+)
 from database import get_db
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel, ConfigDict
+from plan_config import PLAN_CONFIG
 from security import get_active_user, get_current_user
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import func
@@ -19,17 +26,15 @@ MAX_CSV_SIZE = 2 * 1024 * 1024
 
 # Limites de clientes por plano (Plano: Limite de Clientes)
 LIMITES_CLIENTES = {
-    "free": 5,
-    "basico": 40,
-    "profissional": 100,
-    "business": float("inf"),  # Infinito
+    plan_id: config["clients"] if config["clients"] is not None else float("inf")
+    for plan_id, config in PLAN_CONFIG.items()
 }
-NOMES_PLANOS = {
-    "free": "Gratuito",
-    "basico": "Essencial",
-    "profissional": "Profissional",
-    "business": "Empresarial",
-}
+NOMES_PLANOS = {plan_id: config["name"] for plan_id, config in PLAN_CONFIG.items()}
+
+
+class ClientResponsibleUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    responsible_profile_id: UUID | None = None
 
 
 @router.post(
@@ -41,6 +46,8 @@ def criar_cliente(
     current_user: dict = Depends(get_active_user),
 ):
     tenant_id = current_user.get("tenant_id")
+    require_management_access(current_user)
+    validate_responsible_profile(db, tenant_id, cliente.responsible_profile_id)
 
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     limite = LIMITES_CLIENTES.get(tenant.plano, 5)  # Padrão é Free se não achar o plano
@@ -101,6 +108,8 @@ def criar_cliente(
         cnpj=cliente.cnpj,
         regime_tributario=cliente.regime_tributario,
         natureza_operacao=cliente.natureza_operacao,
+        email=str(cliente.email) if cliente.email else None,
+        responsible_profile_id=cliente.responsible_profile_id,
     )
 
     db.add(novo_cliente)
@@ -121,11 +130,11 @@ def listar_clientes(
     tenant_id = current_user.get("tenant_id")
 
     # MUDANÇA AQUI: Filtra apenas clientes onde ativo == True
-    clientes = (
+    query = (
         db.query(models.Client)
         .filter(models.Client.tenant_id == tenant_id, models.Client.ativo == True)
-        .all()
     )
+    clientes = apply_client_scope(query, current_user).all()
 
     return clientes
 
@@ -140,11 +149,7 @@ def desativar_cliente(
     tenant_id = current_user.get("tenant_id")
 
     # NOVA REGRA RBAC: Apenas admin pode arquivar
-    if current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Apenas administradores podem arquivar clientes.",
-        )
+    require_management_access(current_user)
 
     cliente = (
         db.query(models.Client)
@@ -162,12 +167,39 @@ def desativar_cliente(
     return cliente
 
 
+@router.patch("/{cliente_id}/responsavel", response_model=schemas.ClientResponse)
+def atribuir_responsavel(
+    cliente_id: UUID,
+    payload: ClientResponsibleUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_active_user),
+):
+    require_management_access(current_user)
+    tenant_id = current_user["tenant_id"]
+    cliente = (
+        db.query(models.Client)
+        .filter(
+            models.Client.id == cliente_id,
+            models.Client.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente não encontrado.")
+    validate_responsible_profile(db, tenant_id, payload.responsible_profile_id)
+    cliente.responsible_profile_id = payload.responsible_profile_id
+    db.commit()
+    db.refresh(cliente)
+    return cliente
+
+
 @router.post("/importar-csv")
 async def importar_clientes_csv(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user)
 ):
+    require_management_access(current_user)
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="O arquivo deve ser .csv")
 

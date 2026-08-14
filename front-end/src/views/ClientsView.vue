@@ -8,18 +8,60 @@ import { useAuthStore } from '../stores/auth'
 import { useRoute } from 'vue-router'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
+import CommentsPanel from '../components/CommentsPanel.vue'
+
+interface Client {
+  id: string
+  tipo_pessoa: string
+  razao_social: string | null
+  cnpj: string | null
+  nome: string | null
+  cpf: string | null
+  regime_tributario: string
+  natureza_operacao: string
+  email: string | null
+  responsible_profile_id: string | null
+}
+
+interface Member {
+  id: string
+  name: string
+  role: 'admin' | 'gerente' | 'colaborador'
+}
+
+interface ClientTask {
+  id: string
+  client_id: string
+  title: string
+  due_date: string
+  status: string
+}
+
+interface ClientDocument {
+  id: string
+  client_id: string
+  nome_arquivo: string
+  created_at: string
+}
+
+interface ApiError {
+  response?: { data?: { detail?: string | Array<{ msg?: string }> } }
+}
 
 const authStore = useAuthStore()
 const route = useRoute()
 const clientToArchive = ref<{ id: string; name: string } | null>(null)
-const clients = ref<any[]>([])
+const clients = ref<Client[]>([])
+const members = ref<Member[]>([])
 const isLoading = ref(true)
+const canManageClients = computed(() => ['admin', 'gerente'].includes(authStore.role))
 
 const isModalOpen = ref(false)
 const isSubmitting = ref(false)
 
 const searchQuery = ref('')
 const filtroNatureza = ref('Todos')
+const filtroResponsavel = ref('Todos')
 
 const newClient = ref({
   tipo_pessoa: 'PJ',
@@ -29,6 +71,7 @@ const newClient = ref({
   cpf: '',
   regime_tributario: 'Simples Nacional',
   natureza_operacao: 'Serviços',
+  responsible_profile_id: null as string | null,
 })
 
 const formErrors = ref({
@@ -38,8 +81,8 @@ const formErrors = ref({
   cpf: '',
 })
 
-const getApiErrorMessage = (error: any, fallback: string): string => {
-  const detail = error?.response?.data?.detail
+const getApiErrorMessage = (error: unknown, fallback: string): string => {
+  const detail = (error as ApiError)?.response?.data?.detail
   if (typeof detail === 'string') return detail
   if (Array.isArray(detail)) {
     return (
@@ -53,9 +96,9 @@ const getApiErrorMessage = (error: any, fallback: string): string => {
 }
 
 const isDossierOpen = ref(false)
-const selectedClient = ref<any>(null)
-const clientTasks = ref<any[]>([])
-const clientDocuments = ref<any[]>([])
+const selectedClient = ref<Client | null>(null)
+const clientTasks = ref<ClientTask[]>([])
+const clientDocuments = ref<ClientDocument[]>([])
 const isLoadingDossier = ref(false)
 const activeTab = ref('info')
 
@@ -63,7 +106,7 @@ const isImportModalOpen = ref(false)
 const isUploadingCsv = ref(false)
 const csvFile = ref<File | null>(null)
 
-const abrirDossier = async (client: any) => {
+const abrirDossier = async (client: Client) => {
   selectedClient.value = client
   activeTab.value = 'info'
   isDossierOpen.value = true
@@ -71,20 +114,20 @@ const abrirDossier = async (client: any) => {
 
   try {
     const [tasksRes, docsRes] = await Promise.all([
-      api.get('/api/v1/obrigacoes'),
-      api.get('/api/v1/documentos'),
+      api.get<ClientTask[]>('/api/v1/obrigacoes'),
+      api.get<ClientDocument[]>('/api/v1/documentos'),
     ])
 
     clientTasks.value = tasksRes.data
-      .filter((t: any) => t.client_id === client.id)
-      .sort((a: any, b: any) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
+      .filter((task) => task.client_id === client.id)
+      .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
       .slice(0, 5)
 
     clientDocuments.value = docsRes.data
-      .filter((d: any) => d.client_id === client.id)
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .filter((document) => document.client_id === client.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5)
-  } catch (error) {
+  } catch {
     toast.error('Erro ao carregar o dossiê do cliente.')
   } finally {
     isLoadingDossier.value = false
@@ -97,7 +140,7 @@ const formatDocDate = (dateString: string) => {
   return `${day}/${month}/${year}`
 }
 
-const formatDocumento = (client: any): string => {
+const formatDocumento = (client: Client): string => {
   if (client.tipo_pessoa === 'PF' || client.cpf) {
     const cpf = String(client.cpf || '')
       .replace(/\D/g, '')
@@ -129,7 +172,7 @@ const baixarDocDossier = async (docId: string, nomeArquivo: string) => {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
-  } catch (error) {
+  } catch {
     toast.error('Erro ao baixar arquivo.')
   }
 }
@@ -140,6 +183,14 @@ const clientsFiltrados = computed(() => {
   if (filtroNatureza.value !== 'Todos') {
     listaFiltrada = listaFiltrada.filter(
       (client) => client.natureza_operacao === filtroNatureza.value,
+    )
+  }
+
+  if (filtroResponsavel.value !== 'Todos') {
+    listaFiltrada = listaFiltrada.filter((client) =>
+      filtroResponsavel.value === 'Sem responsável'
+        ? !client.responsible_profile_id
+        : client.responsible_profile_id === filtroResponsavel.value,
     )
   }
 
@@ -164,10 +215,8 @@ const clientsFiltrados = computed(() => {
 
 const totalPJ = computed(() => clients.value.filter((c) => !!c.razao_social).length)
 const totalPF = computed(() => clients.value.filter((c) => !c.razao_social).length)
-const totalServicos = computed(
-  () => clients.value.filter((c) => c.natureza_operacao === 'Serviços').length,
-)
-
+const getResponsibleName = (profileId: string | null) =>
+  members.value.find((member) => member.id === profileId)?.name || 'Sem responsável'
 const setTipoPessoa = (tipo: string) => {
   newClient.value.tipo_pessoa = tipo
   if (tipo === 'PJ') {
@@ -183,9 +232,13 @@ const setTipoPessoa = (tipo: string) => {
 const fetchClients = async () => {
   isLoading.value = true
   try {
-    const response = await api.get('/api/v1/clientes')
-    clients.value = response.data
-  } catch (error) {
+    const [clientsResponse, membersResponse] = await Promise.all([
+      api.get<Client[]>('/api/v1/clientes'),
+      api.get<Member[]>('/api/v1/membros'),
+    ])
+    clients.value = clientsResponse.data
+    members.value = membersResponse.data
+  } catch {
     toast.error('Erro ao carregar a lista de clientes.')
   } finally {
     isLoading.value = false
@@ -229,7 +282,7 @@ const handleCreateClient = async () => {
 
   isSubmitting.value = true
   try {
-    const response = await api.post('/api/v1/clientes', newClient.value)
+    const response = await api.post<Client>('/api/v1/clientes', newClient.value)
     clients.value.unshift(response.data)
 
     newClient.value = {
@@ -240,16 +293,37 @@ const handleCreateClient = async () => {
       cpf: '',
       regime_tributario: 'Simples Nacional',
       natureza_operacao: 'Serviços',
+      responsible_profile_id: null,
     }
 
     isModalOpen.value = false
     toast.success('Cliente cadastrado com sucesso!')
     await abrirDossier(response.data)
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao cadastrar o cliente.'))
   } finally {
     isSubmitting.value = false
   }
+}
+
+const updateResponsible = async (client: Client, profileId: string | null) => {
+  try {
+    const { data } = await api.patch<Client>(`/api/v1/clientes/${client.id}/responsavel`, {
+      responsible_profile_id: profileId || null,
+    })
+    const index = clients.value.findIndex((item) => item.id === client.id)
+    if (index >= 0) clients.value[index] = data
+    if (selectedClient.value?.id === client.id) selectedClient.value = data
+    toast.success('Responsável pela carteira atualizado.')
+  } catch (error: unknown) {
+    toast.error(getApiErrorMessage(error, 'Não foi possível atualizar o responsável.'))
+  }
+}
+
+const handleResponsibleSelection = (event: Event) => {
+  if (!selectedClient.value) return
+  const profileId = (event.target as HTMLSelectElement).value || null
+  updateResponsible(selectedClient.value, profileId)
 }
 
 const handleDesativar = async () => {
@@ -260,18 +334,19 @@ const handleDesativar = async () => {
     clients.value = clients.value.filter((c) => c.id !== clientId)
     toast.success('Cliente arquivado com sucesso.')
     clientToArchive.value = null
-  } catch (error) {
+  } catch {
     toast.error('Erro ao arquivar o cliente.')
   }
 }
 
-const handleCsvChange = (event: any) => {
-  const file = event.target.files[0]
+const handleCsvChange = (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
   if (file && file.name.endsWith('.csv')) {
     csvFile.value = file
   } else {
     toast.error('Por favor, selecione apenas arquivos .csv')
-    event.target.value = ''
+    input.value = ''
     csvFile.value = null
   }
 }
@@ -301,7 +376,7 @@ const handleUploadCsv = async () => {
 
     isImportModalOpen.value = false
     csvFile.value = null
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao processar arquivo CSV.'))
   } finally {
     isUploadingCsv.value = false
@@ -329,7 +404,7 @@ const baixarTemplate = () => {
 
 onMounted(() => {
   fetchClients()
-  if (route.query.novo === '1') isModalOpen.value = true
+  if (route.query.novo === '1' && canManageClients.value) isModalOpen.value = true
 })
 </script>
 
@@ -349,7 +424,7 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
+        <div v-if="canManageClients" class="flex w-full flex-col gap-3 sm:flex-row xl:w-auto">
           <button
             @click="isImportModalOpen = true"
             class="ct-secondary-action inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--ct-border)] bg-white px-3.5 py-2 text-sm font-medium text-[var(--ct-ink)] transition-colors hover:bg-slate-50 sm:w-auto"
@@ -419,7 +494,7 @@ onMounted(() => {
       <!-- filtros -->
       <div class="ct-filter-panel">
         <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-2xl">
+          <div class="flex w-full flex-col gap-3 sm:flex-row lg:max-w-4xl">
             <div class="relative w-full sm:flex-1">
               <svg
                 class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -454,6 +529,19 @@ onMounted(() => {
               <option value="Serviços">Serviços</option>
               <option value="Indústria">Indústria</option>
             </select>
+
+            <select
+              v-if="canManageClients"
+              v-model="filtroResponsavel"
+              aria-label="Filtrar clientes por responsável"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10 sm:w-56"
+            >
+              <option value="Todos">Todos os responsáveis</option>
+              <option value="Sem responsável">Sem responsável</option>
+              <option v-for="member in members" :key="member.id" :value="member.id">
+                {{ member.name }}
+              </option>
+            </select>
           </div>
 
           <div class="text-xs text-[var(--ct-text-muted)]">
@@ -476,8 +564,12 @@ onMounted(() => {
         <EmptyState
           v-else-if="clients.length === 0"
           title="Nenhum cliente ativo cadastrado"
-          description="Cadastre o primeiro cliente para começar a montar sua carteira."
-          action-label="Cadastrar primeiro cliente"
+          :description="
+            canManageClients
+              ? 'Cadastre o primeiro cliente para começar a montar sua carteira.'
+              : 'Nenhum cliente foi atribuído à sua carteira até o momento.'
+          "
+          :action-label="canManageClients ? 'Cadastrar primeiro cliente' : undefined"
           @action="isModalOpen = true"
         />
 
@@ -507,9 +599,12 @@ onMounted(() => {
                   >
                 </div>
                 <p class="mt-3 text-xs font-medium text-[var(--ct-primary)]">Abrir dossiê →</p>
+                <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+                  Responsável: {{ getResponsibleName(client.responsible_profile_id) }}
+                </p>
               </button>
               <button
-                v-if="authStore.role === 'admin'"
+                v-if="canManageClients"
                 class="mt-3 text-xs font-medium text-red-600"
                 @click="
                   clientToArchive = {
@@ -544,6 +639,11 @@ onMounted(() => {
                   class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
                 >
                   Natureza
+                </th>
+                <th
+                  class="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Responsável
                 </th>
                 <th
                   class="px-4 py-3 text-right text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500"
@@ -611,9 +711,13 @@ onMounted(() => {
                   </span>
                 </td>
 
+                <td class="px-4 py-3 text-xs font-medium text-[#52617a]">
+                  {{ getResponsibleName(client.responsible_profile_id) }}
+                </td>
+
                 <td class="px-4 py-3 text-right">
                   <button
-                    v-if="authStore.role === 'admin'"
+                    v-if="canManageClients"
                     @click="
                       clientToArchive = {
                         id: client.id,
@@ -721,6 +825,18 @@ onMounted(() => {
                 >
                   Documentos
                 </button>
+
+                <button
+                  @click="activeTab = 'comments'"
+                  :class="
+                    activeTab === 'comments'
+                      ? 'border-[var(--ct-primary)] text-[var(--ct-primary)]'
+                      : 'border-transparent text-slate-500'
+                  "
+                  class="flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors"
+                >
+                  Comentários
+                </button>
               </div>
 
               <!-- conteúdo -->
@@ -758,6 +874,35 @@ onMounted(() => {
                   <div class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4">
                     <span class="block text-xs text-[var(--ct-text-muted)]">Status no sistema</span>
                     <span class="mt-1 block text-sm font-semibold text-emerald-600">Ativo</span>
+                  </div>
+
+                  <div
+                    class="rounded-xl border border-[var(--ct-border)] bg-slate-50 p-4 md:col-span-2"
+                  >
+                    <label class="block text-xs text-[var(--ct-text-muted)]"
+                      >Responsável pela carteira</label
+                    >
+                    <select
+                      v-if="canManageClients"
+                      :value="selectedClient?.responsible_profile_id || ''"
+                      class="mt-2 w-full rounded-lg border border-[var(--ct-border)] bg-white px-3 py-2.5 text-sm font-medium text-[var(--ct-ink)] outline-none focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                      @change="handleResponsibleSelection"
+                    >
+                      <option value="">Sem responsável</option>
+                      <option v-for="member in members" :key="member.id" :value="member.id">
+                        {{ member.name }} ·
+                        {{
+                          member.role === 'gerente'
+                            ? 'Gerente'
+                            : member.role === 'admin'
+                              ? 'Administrador'
+                              : 'Colaborador'
+                        }}
+                      </option>
+                    </select>
+                    <span v-else class="mt-1 block text-sm font-semibold text-[var(--ct-ink)]">
+                      {{ getResponsibleName(selectedClient?.responsible_profile_id || null) }}
+                    </span>
                   </div>
                 </div>
 
@@ -838,6 +983,11 @@ onMounted(() => {
                     </div>
                   </div>
                 </div>
+
+                <CommentsPanel
+                  v-else-if="activeTab === 'comments' && selectedClient"
+                  :client-id="selectedClient.id"
+                />
               </div>
             </div>
           </div>
@@ -854,7 +1004,7 @@ onMounted(() => {
         class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
       >
         <div
-          class="w-full max-w-md overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
+          class="flex max-h-[calc(100vh-2rem)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white shadow-2xl"
         >
           <div
             class="flex items-center justify-between border-b border-[var(--ct-border)] px-6 py-5"
@@ -878,7 +1028,7 @@ onMounted(() => {
             </button>
           </div>
 
-          <form @submit.prevent="handleCreateClient" class="space-y-5 p-6">
+          <form @submit.prevent="handleCreateClient" class="space-y-5 overflow-y-auto p-6">
             <div class="flex gap-2 rounded-xl bg-slate-100 p-1">
               <button
                 type="button"
@@ -1054,6 +1204,28 @@ onMounted(() => {
                   <option value="Indústria">Indústria</option>
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label
+                for="client-responsible"
+                class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+              >
+                Responsável pela carteira
+              </label>
+              <select
+                id="client-responsible"
+                v-model="newClient.responsible_profile_id"
+                class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              >
+                <option :value="null">Definir depois</option>
+                <option v-for="member in members" :key="member.id" :value="member.id">
+                  {{ member.name }}
+                </option>
+              </select>
+              <p class="mt-1.5 text-xs text-[var(--ct-text-muted)]">
+                O colaborador selecionado verá este cliente na própria carteira.
+              </p>
             </div>
 
             <div class="flex justify-end gap-3 pt-2">

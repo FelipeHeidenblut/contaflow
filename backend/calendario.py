@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timezone
 
 import models
+from access_control import apply_task_scope
 from database import get_db
 from enums import TaskStatus
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -12,50 +13,64 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/api/v1/calendario", tags=["Calendário e Sincronização"])
 
 
-def ensure_calendar_token(tenant: models.Tenant, db: Session) -> str:
-    if not tenant.calendar_token:
-        tenant.calendar_token = secrets.token_urlsafe(32)
+def ensure_calendar_token(profile: models.Profile, db: Session) -> str:
+    if not profile.calendar_token:
+        profile.calendar_token = secrets.token_urlsafe(32)
         db.commit()
-        db.refresh(tenant)
-    return tenant.calendar_token
+        db.refresh(profile)
+    return profile.calendar_token
 
 
 @router.get("/feed-url")
 def obter_feed_url(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user["tenant_id"]).first()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Escritório não encontrado.")
-    return {"token": ensure_calendar_token(tenant, db)}
+    profile = db.query(models.Profile).filter(
+        models.Profile.id == current_user["user_id"],
+        models.Profile.tenant_id == current_user["tenant_id"],
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado.")
+    return {"token": ensure_calendar_token(profile, db)}
 
 
 @router.post("/feed-token/rotate")
 def rotacionar_feed_token(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Apenas administradores podem renovar o link.")
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == current_user["tenant_id"]).first()
-    if not tenant:
-        raise HTTPException(status_code=404, detail="Escritório não encontrado.")
-    tenant.calendar_token = secrets.token_urlsafe(32)
+    profile = db.query(models.Profile).filter(
+        models.Profile.id == current_user["user_id"],
+        models.Profile.tenant_id == current_user["tenant_id"],
+    ).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Perfil não encontrado.")
+    profile.calendar_token = secrets.token_urlsafe(32)
     db.commit()
-    return {"token": tenant.calendar_token}
+    return {"token": profile.calendar_token}
 
 
 @router.get("/feed/{calendar_token}.ics")
 def gerar_ics_feed(calendar_token: str, db: Session = Depends(get_db)):
-    tenant = db.query(models.Tenant).filter(models.Tenant.calendar_token == calendar_token).first()
-    if not tenant:
+    profile = db.query(models.Profile).filter(
+        models.Profile.calendar_token == calendar_token
+    ).first()
+    if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Feed não encontrado.")
 
     cal = Calendar()
     cal.add("prodid", "-//ContablyTask//Contabil//BR")
     cal.add("version", "2.0")
-    tarefas = db.query(models.Task).filter(
-        models.Task.tenant_id == tenant.id,
+    task_query = db.query(models.Task).filter(
+        models.Task.tenant_id == profile.tenant_id,
         models.Task.status != TaskStatus.CONCLUIDA.value,
+    )
+    tarefas = apply_task_scope(
+        task_query,
+        {
+            "user_id": str(profile.id),
+            "tenant_id": str(profile.tenant_id),
+            "role": profile.role,
+        },
     ).all()
 
     for tarefa in tarefas:

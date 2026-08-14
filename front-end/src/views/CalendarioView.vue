@@ -4,7 +4,6 @@ import { RouterLink } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
-import { useAuthStore } from '../stores/auth'
 
 interface TaskData {
   id: string | number
@@ -22,8 +21,31 @@ interface CalendarDay {
   tasks: TaskData[]
 }
 
+interface ApiTask {
+  id: string
+  title: string
+  description?: string
+  status: string
+  due_date: string
+  grau_importancia?: string
+}
+
+interface FiscalDeadline {
+  id: number
+  title: string
+  description?: string
+  deadline_date: string
+}
+
+type AlertAdvanceHours = 48 | 72 | 168
+
+interface AlertPreferences {
+  email: string | null
+  deadline_alerts_enabled: boolean
+  alert_advance_hours: AlertAdvanceHours
+}
+
 const isLoading = ref(true)
-const authStore = useAuthStore()
 const tasks = ref<TaskData[]>([])
 const currentDate = ref(new Date())
 
@@ -35,6 +57,41 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.contablytask.c
 const icsUrl = ref('')
 const copied = ref(false)
 const isRotatingFeed = ref(false)
+const isLoadingAlertPreferences = ref(true)
+const isSavingAlertPreferences = ref(false)
+const alertPreferences = ref<AlertPreferences>({
+  email: '',
+  deadline_alerts_enabled: false,
+  alert_advance_hours: 72,
+})
+
+const loadAlertPreferences = async () => {
+  isLoadingAlertPreferences.value = true
+  try {
+    const { data } = await api.get<AlertPreferences>('/api/v1/alertas/preferencias')
+    alertPreferences.value = data
+  } catch {
+    toast.error('Não foi possível carregar suas preferências de alerta.')
+  } finally {
+    isLoadingAlertPreferences.value = false
+  }
+}
+
+const saveAlertPreferences = async () => {
+  isSavingAlertPreferences.value = true
+  try {
+    const { data } = await api.put<AlertPreferences>('/api/v1/alertas/preferencias', {
+      deadline_alerts_enabled: alertPreferences.value.deadline_alerts_enabled,
+      alert_advance_hours: alertPreferences.value.alert_advance_hours,
+    })
+    alertPreferences.value = data
+    toast.success('Preferências de alerta atualizadas.')
+  } catch {
+    toast.error('Não foi possível salvar suas preferências de alerta.')
+  } finally {
+    isSavingAlertPreferences.value = false
+  }
+}
 
 const carregarIcsUrl = async () => {
   try {
@@ -44,8 +101,8 @@ const carregarIcsUrl = async () => {
     } else {
       console.warn('Backend não retornou token para o link ICS')
     }
-  } catch (error) {
-    console.error('Erro ao buscar tenant_id para o link ICS:', error)
+  } catch {
+    console.warn('Não foi possível carregar o link de calendário.')
   }
 }
 
@@ -55,7 +112,7 @@ const copyLink = async () => {
     copied.value = true
     toast.success('Link copiado! Cole no Google Agenda ou Outlook.')
     setTimeout(() => (copied.value = false), 3000)
-  } catch (error) {
+  } catch {
     toast.error('Não foi possível copiar o link.')
   }
 }
@@ -151,23 +208,24 @@ const openDayModal = (day: CalendarDay) => {
 const fetchData = async () => {
   isLoading.value = true
   try {
-    const tasksRes = await api.get('/api/v1/obrigacoes')
-    const apiTasks: TaskData[] = tasksRes.data.map((t: any) => ({ ...t, type: 'task' }))
+    const tasksRes = await api.get<ApiTask[]>('/api/v1/obrigacoes')
+    const apiTasks: TaskData[] = tasksRes.data.map((task) => ({ ...task, type: 'task' }))
 
     let federalTasks: TaskData[] = []
     try {
-      const fiscalRes = await api.get('/api/v1/fiscal-deadlines')
-      federalTasks = fiscalRes.data.map((f: any) => ({
-        ...f,
-        date: f.deadline_date,
+      const fiscalRes = await api.get<FiscalDeadline[]>('/api/v1/fiscal-deadlines')
+      federalTasks = fiscalRes.data.map((deadline) => ({
+        ...deadline,
+        status: 'pendente',
+        date: deadline.deadline_date,
         type: 'receita_federal',
       }))
-    } catch (fiscalError) {
+    } catch {
       console.warn('Rota de prazos fiscais com erro.')
     }
 
     tasks.value = [...apiTasks, ...federalTasks]
-  } catch (error) {
+  } catch {
     toast.error('Erro ao carregar o calendário.')
   } finally {
     isLoading.value = false
@@ -220,6 +278,7 @@ const isToday = (day: number) => {
 onMounted(() => {
   fetchData()
   carregarIcsUrl()
+  loadAlertPreferences()
 })
 </script>
 
@@ -273,6 +332,75 @@ onMounted(() => {
         </div>
       </section>
 
+      <!-- preferências individuais de alerta -->
+      <section
+        class="ct-information-panel rounded-xl border border-blue-200 bg-blue-50/60 p-4 sm:p-5"
+      >
+        <div
+          v-if="isLoadingAlertPreferences"
+          class="h-24 animate-pulse rounded-lg bg-blue-100/60"
+        ></div>
+        <form
+          v-else
+          class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
+          @submit.prevent="saveAlertPreferences"
+        >
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--ct-primary)] shadow-sm"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="1.8"
+                  d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 01-6 0"
+                />
+              </svg>
+            </div>
+            <div>
+              <div class="flex flex-wrap items-center gap-3">
+                <p class="text-sm font-semibold text-[var(--ct-ink)]">Meus alertas por e-mail</p>
+                <label class="inline-flex items-center gap-2 text-xs font-semibold text-[#26344f]">
+                  <input
+                    v-model="alertPreferences.deadline_alerts_enabled"
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-slate-300 text-[var(--ct-primary)] focus:ring-[var(--ct-primary)]"
+                  />
+                  Receber alertas
+                </label>
+              </div>
+              <p class="mt-1 max-w-2xl text-xs leading-5 text-[var(--ct-text-muted)]">
+                Você receberá lembretes em
+                <strong>{{ alertPreferences.email || 'seu e-mail de acesso' }}</strong> somente das
+                tarefas atribuídas a você. Tarefas sem responsável não geram alerta.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex w-full flex-col gap-3 sm:flex-row lg:w-auto lg:items-end">
+            <label class="text-xs font-medium text-[#52617a]">
+              Avisar antes do vencimento
+              <select
+                v-model.number="alertPreferences.alert_advance_hours"
+                class="mt-1 w-full rounded-lg border border-[var(--ct-border)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10 sm:w-44"
+              >
+                <option :value="48">48 horas</option>
+                <option :value="72">72 horas</option>
+                <option :value="168">1 semana</option>
+              </select>
+            </label>
+            <button
+              type="submit"
+              class="ct-button-primary min-h-10"
+              :disabled="isSavingAlertPreferences"
+            >
+              {{ isSavingAlertPreferences ? 'Salvando...' : 'Salvar preferência' }}
+            </button>
+          </div>
+        </form>
+      </section>
+
       <!-- card ics -->
       <section
         v-if="icsUrl"
@@ -315,7 +443,6 @@ onMounted(() => {
             {{ copied ? 'Copiado!' : 'Copiar link' }}
           </button>
           <button
-            v-if="authStore.role === 'admin'"
             @click="rotateFeedLink"
             :disabled="isRotatingFeed"
             class="inline-flex items-center justify-center rounded-xl border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"

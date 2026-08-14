@@ -8,6 +8,7 @@ from database import get_db
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from plan_config import PLAN_CONFIG
 from typing import Literal
 from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
@@ -24,13 +25,11 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 router = APIRouter(prefix="/api/v1/membros", tags=["Equipe e Membros"])
 
 # Limites de membros por plano
-LIMITES_MEMBROS = {"free": 1, "basico": 5, "profissional": 10, "business": float("inf")}
-NOMES_PLANOS = {
-    "free": "Gratuito",
-    "basico": "Essencial",
-    "profissional": "Profissional",
-    "business": "Empresarial",
+LIMITES_MEMBROS = {
+    plan_id: config["members"] if config["members"] is not None else float("inf")
+    for plan_id, config in PLAN_CONFIG.items()
 }
+NOMES_PLANOS = {plan_id: config["name"] for plan_id, config in PLAN_CONFIG.items()}
 
 
 # ==========================================
@@ -39,7 +38,7 @@ NOMES_PLANOS = {
 class ProfileCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=150)
     email: EmailStr
-    role: Literal["admin", "colaborador"]
+    role: Literal["admin", "gerente", "colaborador"]
     password: str = Field(..., min_length=8, max_length=72)
 
 

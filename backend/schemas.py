@@ -4,7 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 from enums import TaskStatus  # Importando o Enum
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 # ================== CLIENTES ==================
@@ -16,6 +16,8 @@ class ClientBase(BaseModel):
     cpf: Optional[str] = None  # Novo campo PF
     regime_tributario: str = Field(..., min_length=2, max_length=80)
     natureza_operacao: str = Field(default="Serviços", min_length=2, max_length=80)
+    email: Optional[EmailStr] = None
+    responsible_profile_id: Optional[UUID] = None
 
 
 class ClientCreate(ClientBase):

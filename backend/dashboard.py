@@ -3,6 +3,7 @@ from typing import List
 
 import models
 import schemas
+from access_control import apply_client_scope, apply_task_scope
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
 from fastapi import APIRouter, Depends
@@ -24,26 +25,28 @@ def obter_resumo_dashboard(
     plano = tenant.plano if tenant else "free"
     status_pagamento = tenant.status_pagamento if tenant else "ativo"
 
-    total_clientes = (
-        db.query(models.Client).filter(models.Client.tenant_id == tenant_id).count()
+    client_query = db.query(models.Client).filter(
+        models.Client.tenant_id == tenant_id,
+        models.Client.ativo.is_(True),
     )
-    tarefas_abertas = (
+    total_clientes = apply_client_scope(client_query, current_user).count()
+    open_query = (
         db.query(models.Task)
         .filter(
             models.Task.tenant_id == tenant_id,
             models.Task.status != TaskStatus.CONCLUIDA.value,
         )
-        .count()
     )
-    tarefas_atrasadas = (
+    tarefas_abertas = apply_task_scope(open_query, current_user).count()
+    overdue_query = (
         db.query(models.Task)
         .filter(
             models.Task.tenant_id == tenant_id,
             models.Task.status != TaskStatus.CONCLUIDA.value,
             models.Task.due_date < hoje,
         )
-        .count()
     )
+    tarefas_atrasadas = apply_task_scope(overdue_query, current_user).count()
 
     return {
         "total_clientes": total_clientes,

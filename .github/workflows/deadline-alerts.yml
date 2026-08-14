@@ -1,0 +1,32 @@
+name: Processar alertas de vencimento
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deadline-alerts
+  cancel-in-progress: false
+
+jobs:
+  process-alerts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Acionar processador protegido
+        env:
+          ALERT_PROCESS_URL: ${{ secrets.ALERT_PROCESS_URL }}
+          ALERT_CRON_SECRET: ${{ secrets.ALERT_CRON_SECRET }}
+        run: |
+          test -n "$ALERT_PROCESS_URL"
+          test -n "$ALERT_CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --max-time 120 \
+            --request POST \
+            --header "X-Cron-Secret: $ALERT_CRON_SECRET" \
+            "${ALERT_PROCESS_URL%/}/api/v1/alertas/processar"

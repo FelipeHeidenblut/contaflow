@@ -4,6 +4,7 @@ from typing import Optional
 from uuid import UUID
 
 import models
+from access_control import apply_client_scope, apply_task_scope
 from database import get_db
 from enums import TaskStatus
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -266,8 +267,10 @@ def get_reports(
         query = query.filter(models.Task.assigned_to == member_id)
     if task_status:
         query = query.filter(models.Task.status == task_status)
+    query = apply_task_scope(query, current_user)
 
-    clients = db.query(models.Client).filter(models.Client.tenant_id == tenant_id).all()
+    client_query = db.query(models.Client).filter(models.Client.tenant_id == tenant_id)
+    clients = apply_client_scope(client_query, current_user).all()
     members = db.query(models.Profile).filter(models.Profile.tenant_id == tenant_id).all()
     report = build_report(query.all(), clients, members, start_date, end_date, date.today())
     if not capabilities["advanced"]:

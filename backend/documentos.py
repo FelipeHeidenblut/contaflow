@@ -6,6 +6,7 @@ from uuid import UUID
 
 import models
 import schemas
+from access_control import apply_client_scope, get_accessible_client, require_management_access
 from database import get_db
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import RedirectResponse
@@ -41,9 +42,16 @@ def listar_documentos(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     tenant_id = current_user.get("tenant_id")
-    documentos = (
-        db.query(models.Document).filter(models.Document.tenant_id == tenant_id).all()
+    query = (
+        db.query(models.Document)
+        .join(
+            models.Client,
+            (models.Document.client_id == models.Client.id)
+            & (models.Document.tenant_id == models.Client.tenant_id),
+        )
+        .filter(models.Document.tenant_id == tenant_id)
     )
+    documentos = apply_client_scope(query, current_user).all()
     return documentos
 
 
@@ -64,16 +72,7 @@ async def registrar_documento(
     user_id = current_user.get("user_id")
 
     # 1. Validação de Segurança (Tenant)
-    cliente = (
-        db.query(models.Client)
-        .filter(models.Client.id == client_id, models.Client.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not cliente:
-        raise HTTPException(
-            status_code=404, detail="Cliente não encontrado neste escritório."
-        )
+    get_accessible_client(db, client_id, current_user, active_only=True)
 
     if task_id:
         tarefa = db.query(models.Task).filter(
@@ -180,6 +179,7 @@ def baixar_documento(
         raise HTTPException(
             status_code=404, detail="Registro do documento não encontrado."
         )
+    get_accessible_client(db, doc.client_id, current_user)
 
     # Gera uma URL assinada (válida por 1 hora) para o usuário baixar o arquivo
     try:
@@ -218,6 +218,8 @@ def excluir_documento(
 
     if not doc:
         raise HTTPException(status_code=404, detail="Documento não encontrado.")
+    get_accessible_client(db, doc.client_id, current_user)
+    require_management_access(current_user)
 
     # Apaga o arquivo do Supabase Storage
     try:

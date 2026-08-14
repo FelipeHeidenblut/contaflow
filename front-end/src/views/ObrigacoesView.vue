@@ -7,8 +7,12 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
+import CommentsPanel from '../components/CommentsPanel.vue'
 
 const route = useRoute()
+const authStore = useAuthStore()
+const canManageTasks = computed(() => ['admin', 'gerente'].includes(authStore.role))
 
 interface Cliente {
   id: string | number
@@ -194,7 +198,7 @@ const abrirCadastro = () => {
     title: '',
     description: '',
     client_id: '',
-    assigned_to: '',
+    assigned_to: canManageTasks.value ? '' : authStore.userId,
     due_date: '',
     status: 'pendente',
     grau_importancia: 'Média',
@@ -247,8 +251,10 @@ const salvarObrigacao = async () => {
   }
 
   try {
-    const payload = { ...formularioObrigacao.value }
-    if (!payload.assigned_to) payload.assigned_to = null as any
+    const payload = {
+      ...formularioObrigacao.value,
+      assigned_to: formularioObrigacao.value.assigned_to || null,
+    }
 
     if (isEditando.value && idSendoEditado.value) {
       const response = await api.put(`/api/v1/obrigacoes/${idSendoEditado.value}`, payload)
@@ -889,12 +895,19 @@ onMounted(async () => {
                   Atribuir para
                 </label>
                 <select
+                  v-if="canManageTasks"
                   v-model="formularioObrigacao.assigned_to"
                   class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
                 >
                   <option value="">Não atribuído</option>
                   <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
                 </select>
+                <div
+                  v-else
+                  class="w-full rounded-xl border border-[var(--ct-border)] bg-slate-50 px-4 py-3 text-sm font-medium text-[var(--ct-ink)]"
+                >
+                  {{ authStore.userName || 'Você' }}
+                </div>
               </div>
             </div>
 
@@ -985,7 +998,7 @@ onMounted(async () => {
             class="flex items-center justify-between border-t border-[var(--ct-border)] bg-slate-50 px-6 py-4"
           >
             <button
-              v-if="isEditando"
+              v-if="isEditando && canManageTasks"
               @click="taskToDelete = idSendoEditado"
               class="text-sm font-semibold text-red-600 transition-colors hover:text-red-700"
             >
@@ -1121,6 +1134,21 @@ onMounted(async () => {
                       'Esta obrigação não possui descrição cadastrada.'
                     }}
                   </p>
+                </div>
+
+                <div>
+                  <div class="mb-3">
+                    <h4 class="text-sm font-semibold text-[var(--ct-ink)]">
+                      Comentários da equipe
+                    </h4>
+                    <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
+                      Registre decisões e observações relacionadas a esta tarefa.
+                    </p>
+                  </div>
+                  <CommentsPanel
+                    :client-id="obrigacaoSelecionada.client_id"
+                    :task-id="obrigacaoSelecionada.id"
+                  />
                 </div>
               </div>
 

@@ -42,7 +42,8 @@ import PublicLayout from '@/components/PublicLayout.vue'
               </li>
               <li>
                 <strong class="text-[var(--ct-ink)]">Uso da plataforma:</strong> clientes, tarefas,
-                responsáveis, vencimentos e documentos enviados pelos usuários autorizados.
+                responsáveis, carteiras de clientes, vencimentos, documentos, comentários internos e
+                preferências de alerta dos usuários autorizados do escritório.
               </li>
               <li>
                 <strong class="text-[var(--ct-ink)]">Dados técnicos:</strong> endereço IP,
@@ -51,8 +52,8 @@ import PublicLayout from '@/components/PublicLayout.vue'
               </li>
               <li>
                 <strong class="text-[var(--ct-ink)]">Pagamento:</strong> informações necessárias à
-                criação e gestão da assinatura. Os dados do meio de pagamento são tratados no
-                checkout do provedor de cobrança.
+                criação e gestão da assinatura, incluindo valor, situação e datas das cobranças. Os
+                dados do meio de pagamento são tratados no checkout do provedor de cobrança.
               </li>
             </ul>
           </section>
@@ -64,7 +65,8 @@ import PublicLayout from '@/components/PublicLayout.vue'
             <p class="mt-3">
               Utilizamos os dados para criar e proteger contas, entregar as funções da plataforma,
               processar assinaturas, atender solicitações, prevenir abuso, comunicar alterações
-              importantes e cumprir obrigações legais. A ContablyTask não comercializa dados
+              importantes, enviar aos usuários autorizados alertas das tarefas sob sua
+              responsabilidade e cumprir obrigações legais. A ContablyTask não comercializa dados
               pessoais para publicidade.
             </p>
           </section>
@@ -76,8 +78,9 @@ import PublicLayout from '@/components/PublicLayout.vue'
             <p class="mt-3">
               Para operar o produto, utilizamos fornecedores especializados, incluindo Supabase para
               autenticação e armazenamento, Asaas para cobrança, Cloudflare Turnstile para prevenção
-              de abuso e Google Analytics para métricas opcionais. Cada serviço trata somente os
-              dados necessários à sua função e conforme suas próprias condições de privacidade.
+              de abuso, serviço de e-mail transacional para mensagens solicitadas e Google Analytics
+              para métricas opcionais. Cada serviço trata somente os dados necessários à sua função
+              e conforme suas próprias condições de privacidade.
             </p>
           </section>
 
@@ -90,7 +93,9 @@ import PublicLayout from '@/components/PublicLayout.vue'
               provedor de identidade, sem armazenamento de senhas em texto legível pela aplicação.
               As consultas são limitadas ao escritório autenticado, e downloads de documentos são
               liberados por links assinados com validade temporária. Arquivos também passam por
-              validações de formato, conteúdo e tamanho antes do armazenamento.
+              validações de formato, conteúdo e tamanho antes do armazenamento. Alterações
+              administrativas sensíveis são registradas com autor, data e justificativa para fins de
+              segurança e auditoria.
             </p>
           </section>
 

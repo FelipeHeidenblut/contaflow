@@ -84,7 +84,7 @@ const routes = [
   {
     path: '/membros',
     component: () => import('@/views/MembrosView.vue'),
-    meta: { requiresAuth: true, title: 'Membros' },
+    meta: { requiresAuth: true, allowedRoles: ['admin', 'gerente'], title: 'Membros' },
   },
   {
     path: '/calendario',
@@ -99,7 +99,7 @@ const routes = [
   {
     path: '/faturamento',
     component: () => import('@/views/FaturamentoView.vue'),
-    meta: { requiresAuth: true, title: 'Planos e faturamento' },
+    meta: { requiresAuth: true, allowedRoles: ['admin'], title: 'Planos e faturamento' },
   },
 
   // ==========================================
@@ -150,6 +150,11 @@ router.beforeEach(async (to) => {
 
   // 2. Regra RBAC (Role-Based Access Control): Cliente tentando acessar o painel Admin
   if (requiresSuperAdmin && !authStore.isSuperAdmin) {
+    return '/dashboard'
+  }
+
+  const allowedRoles = Array.isArray(to.meta.allowedRoles) ? to.meta.allowedRoles : null
+  if (requiresAuth && allowedRoles && !allowedRoles.includes(authStore.role)) {
     return '/dashboard'
   }
 

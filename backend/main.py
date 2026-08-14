@@ -5,9 +5,11 @@ from typing import List
 from uuid import UUID
 
 import admin
+import alertas
 import asaas
 import auth
 import clientes
+import comentarios
 import dashboard
 import documentos
 import fiscal_deadlines
@@ -53,6 +55,7 @@ app.add_middleware(
 
 # Registrando os routers
 app.include_router(clientes.router)
+app.include_router(comentarios.router)
 app.include_router(obrigacoes.router)
 app.include_router(documentos.router)
 app.include_router(dashboard.router)
@@ -64,6 +67,7 @@ app.include_router(admin.router)
 app.include_router(calendario.router)
 app.include_router(contact.router)
 app.include_router(relatorios.router)
+app.include_router(alertas.router)
 
 
 @app.get("/")

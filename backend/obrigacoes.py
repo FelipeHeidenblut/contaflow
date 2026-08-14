@@ -5,6 +5,13 @@ from uuid import UUID
 
 import models
 import schemas
+from access_control import (
+    apply_task_scope,
+    get_accessible_client,
+    has_management_access,
+    require_management_access,
+    validate_responsible_profile,
+)
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,20 +21,20 @@ from sqlalchemy.orm import Session
 router = APIRouter(prefix="/api/v1/obrigacoes", tags=["Obrigações e Prazos"])
 
 
-def validar_relacionamentos(db: Session, tenant_id: str, tarefa: schemas.TaskCreate):
-    cliente = db.query(models.Client).filter(
-        models.Client.id == tarefa.client_id,
-        models.Client.tenant_id == tenant_id,
-    ).first()
-    if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado neste escritório.")
+def validar_relacionamentos(
+    db: Session, current_user: dict, tarefa: schemas.TaskCreate
+):
+    tenant_id = current_user["tenant_id"]
+    get_accessible_client(db, tarefa.client_id, current_user, active_only=True)
     if tarefa.assigned_to:
-        membro = db.query(models.Profile).filter(
-            models.Profile.id == tarefa.assigned_to,
-            models.Profile.tenant_id == tenant_id,
-        ).first()
-        if not membro:
-            raise HTTPException(status_code=404, detail="Responsável não encontrado neste escritório.")
+        validate_responsible_profile(db, tenant_id, tarefa.assigned_to)
+    if not has_management_access(current_user) and tarefa.assigned_to and str(
+        tarefa.assigned_to
+    ) != str(current_user["user_id"]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Colaboradores só podem atribuir tarefas a si mesmos.",
+        )
 
 
 # ==========================================
@@ -53,7 +60,8 @@ def listar_obrigacoes(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     tenant_id = current_user.get("tenant_id")
-    tarefas = db.query(models.Task).filter(models.Task.tenant_id == tenant_id).all()
+    query = db.query(models.Task).filter(models.Task.tenant_id == tenant_id)
+    tarefas = apply_task_scope(query, current_user).all()
     return tarefas
 
 
@@ -67,7 +75,10 @@ def criar_obrigacao(
 ):
     tenant_id = current_user.get("tenant_id")
 
-    validar_relacionamentos(db, tenant_id, tarefa_in)
+    validar_relacionamentos(db, current_user, tarefa_in)
+    assigned_to = tarefa_in.assigned_to
+    if not has_management_access(current_user) and not assigned_to:
+        assigned_to = current_user["user_id"]
 
     # 🇧🇷 REGRA DE NEGÓCIO: Ajusta a data para o próximo dia útil se cair no fim de semana
     data_ajustada = ajustar_para_dia_util(tarefa_in.due_date)
@@ -81,7 +92,7 @@ def criar_obrigacao(
         status=tarefa_in.status.value
         if isinstance(tarefa_in.status, TaskStatus)
         else tarefa_in.status,
-        assigned_to=tarefa_in.assigned_to,
+        assigned_to=assigned_to,
         grau_importancia=tarefa_in.grau_importancia,
         is_recurring=tarefa_in.is_recurring,  # <--- ADICIONADO
         recurrence_day=tarefa_in.recurrence_day,  # <--- ADICIONADO
@@ -110,6 +121,7 @@ def concluir_obrigacao(
 
     if not tarefa:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    get_accessible_client(db, tarefa.client_id, current_user)
 
     # Marca a tarefa atual como concluída
     tarefa.status = TaskStatus.CONCLUIDA.value
@@ -176,6 +188,8 @@ def excluir_obrigacao(
 
     if not tarefa:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    get_accessible_client(db, tarefa.client_id, current_user)
+    require_management_access(current_user)
 
     db.delete(tarefa)
     db.commit()
@@ -202,7 +216,8 @@ def atualizar_obrigacao(
     if not tarefa:
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
 
-    validar_relacionamentos(db, tenant_id, tarefa_update)
+    get_accessible_client(db, tarefa.client_id, current_user)
+    validar_relacionamentos(db, current_user, tarefa_update)
 
     # 🇧🇷 REGRA DE NEGÓCIO: Se a data foi alterada, ajustamos novamente para o próximo dia útil
     data_ajustada = ajustar_para_dia_util(tarefa_update.due_date)
@@ -221,7 +236,11 @@ def atualizar_obrigacao(
         else tarefa_update.status
     )
 
-    tarefa.assigned_to = tarefa_update.assigned_to
+    tarefa.assigned_to = (
+        tarefa_update.assigned_to
+        if has_management_access(current_user)
+        else current_user["user_id"]
+    )
 
     # ADICIONE ESTAS DUAS LINHAS:
     tarefa.is_recurring = tarefa_update.is_recurring

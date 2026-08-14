@@ -93,7 +93,11 @@ def test_fluxo_de_criacao_de_cliente_do_escritorio():
         natureza_operacao="Serviços",
     )
     tenant_id = str(uuid4())
-    cliente = criar_cliente(payload, FakeDb(), {"tenant_id": tenant_id})
+    cliente = criar_cliente(
+        payload,
+        FakeDb(),
+        {"tenant_id": tenant_id, "role": "admin", "user_id": str(uuid4())},
+    )
     assert cliente.cnpj == "12345678000190"
     assert str(cliente.tenant_id) == tenant_id
 

@@ -12,7 +12,7 @@ interface Membro {
   id: string
   name: string
   email: string
-  role: 'admin' | 'colaborador'
+  role: 'admin' | 'gerente' | 'colaborador'
 }
 
 const membros = ref<Membro[]>([])
@@ -34,6 +34,7 @@ const novoMembro = ref({
 
 const totalMembros = computed(() => membros.value.length)
 const totalAdmins = computed(() => membros.value.filter((m) => m.role === 'admin').length)
+const totalGerentes = computed(() => membros.value.filter((m) => m.role === 'gerente').length)
 const totalColaboradores = computed(
   () => membros.value.filter((m) => m.role === 'colaborador').length,
 )
@@ -51,7 +52,7 @@ const fetchData = async () => {
   try {
     const response = await api.get('/api/v1/membros')
     membros.value = response.data
-  } catch (error) {
+  } catch {
     toast.error('Erro ao carregar a equipe.')
   } finally {
     isLoading.value = false
@@ -76,7 +77,7 @@ const salvarMembro = async () => {
     toast.success('Membro criado com sucesso! Ele já pode fazer login com a senha definida.')
     isModalOpen.value = false
     novoMembro.value = { name: '', email: '', role: 'colaborador', password: '' }
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao adicionar membro.'))
   } finally {
     isSaving.value = false
@@ -91,19 +92,20 @@ const removerMembro = async () => {
     membros.value = membros.value.filter((m) => m.id !== membro.id)
     toast.success('Membro removido com sucesso.')
     memberToRemove.value = null
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao remover membro.'))
   }
 }
 
 const getRoleBadge = (role: string) => {
-  return role === 'admin'
-    ? 'bg-violet-100 text-violet-700 border-violet-200'
-    : 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]'
+  if (role === 'admin') return 'bg-violet-100 text-violet-700 border-violet-200'
+  if (role === 'gerente') return 'bg-amber-100 text-amber-700 border-amber-200'
+  return 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]'
 }
 
 const formatRole = (role: string) => {
   if (role === 'admin') return 'Administrador'
+  if (role === 'gerente') return 'Gerente'
   if (role === 'colaborador') return 'Colaborador'
   return role
 }
@@ -173,6 +175,13 @@ onMounted(() => fetchData())
           <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de membros</p>
           <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
             {{ totalMembros }}
+          </p>
+        </div>
+
+        <div class="flex items-baseline gap-2">
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Gerentes</p>
+          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
+            {{ totalGerentes }}
           </p>
         </div>
 
@@ -407,7 +416,8 @@ onMounted(() => fetchData())
                 class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               >
                 <option value="colaborador">Colaborador (visualiza e edita tarefas)</option>
-                <option value="admin">Administrador (acesso total)</option>
+                <option value="gerente">Gerente (distribui clientes e gerencia a operação)</option>
+                <option value="admin">Administrador (acesso completo, equipe e cobrança)</option>
               </select>
             </div>
 

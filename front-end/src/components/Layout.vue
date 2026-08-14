@@ -5,6 +5,8 @@ import AppNavIcon from './AppNavIcon.vue'
 import BrandMark from './BrandMark.vue'
 import { useAuthStore } from '../stores/auth'
 
+defineOptions({ name: 'AppLayout' })
+
 defineProps<{ title?: string }>()
 
 const authStore = useAuthStore()
@@ -20,20 +22,26 @@ const allNavLinks = [
   { name: 'Calendário', path: '/calendario', icon: 'calendar' },
   { name: 'Documentos', path: '/documentos', icon: 'folder' },
   { name: 'Relatórios', path: '/relatorios', icon: 'reports', paidOnly: true },
-  { name: 'Membros', path: '/membros', icon: 'team', adminOnly: true },
+  { name: 'Membros', path: '/membros', icon: 'team', managerOnly: true },
   { name: 'Planos', path: '/faturamento', icon: 'card', adminOnly: true },
 ]
 
-const navLinks = computed(() =>
-  authStore.role === 'admin' ? allNavLinks : allNavLinks.filter((link) => !link.adminOnly),
-)
+const navLinks = computed(() => {
+  if (authStore.role === 'admin') return allNavLinks
+  if (authStore.role === 'gerente') return allNavLinks.filter((link) => !link.adminOnly)
+  return allNavLinks.filter((link) => !link.adminOnly && !link.managerOnly)
+})
 
 const initials = computed(() => {
   const parts = (authStore.userName || authStore.userEmail || 'U').trim().split(/\s+/)
   return `${parts[0]?.[0] || ''}${parts.length > 1 ? parts.at(-1)?.[0] || '' : ''}`.toUpperCase()
 })
 
-const roleLabel = computed(() => (authStore.role === 'admin' ? 'Administrador' : 'Colaborador'))
+const roleLabel = computed(() => {
+  if (authStore.role === 'admin') return 'Administrador'
+  if (authStore.role === 'gerente') return 'Gerente'
+  return 'Colaborador'
+})
 const hasReportsAccess = computed(
   () => authStore.plan !== 'free' && authStore.paymentStatus === 'ativo',
 )

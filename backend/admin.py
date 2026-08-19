@@ -9,7 +9,7 @@ import models
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from plan_config import PAID_PLAN_IDS, PLAN_CONFIG, get_plan_price
+from plan_config import PAID_PLAN_IDS, PLAN_CONFIG, get_monthly_equivalent
 from pydantic import BaseModel, ConfigDict, Field
 from security import get_super_admin
 from sqlalchemy import case, func, or_
@@ -145,6 +145,7 @@ def _serialize_tenant(row) -> dict:
         "id": tenant.id,
         "razao_social": tenant.razao_social,
         "plano": tenant.plano,
+        "billing_cycle": tenant.billing_cycle,
         "status_pagamento": tenant.status_pagamento,
         "admin_email": email or "N/A",
         "created_at": tenant.created_at,
@@ -182,7 +183,16 @@ def _financial_metrics(db: Session, tenants: list[models.Tenant], month: date) -
     )
     actual = {str(payment.tenant_id): Decimal(payment.value) for payment in payments}
     mrr = sum(
-        (actual.get(str(tenant.id), get_plan_price(tenant.plano)) for tenant in active_paid),
+        (
+            (
+                actual[str(tenant.id)] / 12
+                if tenant.billing_cycle == "annual" and str(tenant.id) in actual
+                else actual[str(tenant.id)]
+                if str(tenant.id) in actual
+                else get_monthly_equivalent(tenant.plano, tenant.billing_cycle)
+            )
+            for tenant in active_paid
+        ),
         Decimal("0.00"),
     )
     next_month = _shift_month(month, 1)
@@ -380,7 +390,9 @@ def get_legacy_dashboard_stats(
 @router.get("/tenants")
 def list_tenants(
     search: Optional[str] = Query(None, max_length=120),
-    plan: Optional[Literal["free", "basico", "profissional", "business"]] = None,
+    plan: Optional[
+        Literal["free", "basico", "profissional", "escritorio", "business"]
+    ] = None,
     payment_status: Optional[Literal["ativo", "inadimplente", "aguardando_pagamento"]] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=5, le=100),
@@ -414,7 +426,9 @@ def list_tenants(
 @router.get("/tenants/export")
 def export_tenants(
     search: Optional[str] = Query(None, max_length=120),
-    plan: Optional[Literal["free", "basico", "profissional", "business"]] = None,
+    plan: Optional[
+        Literal["free", "basico", "profissional", "escritorio", "business"]
+    ] = None,
     payment_status: Optional[Literal["ativo", "inadimplente", "aguardando_pagamento"]] = None,
     db: Session = Depends(get_db),
     _admin_user: dict = Depends(get_super_admin),
@@ -425,13 +439,25 @@ def export_tenants(
     ).all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
-    writer.writerow(["Escritório", "Administrador", "Plano", "Status", "Usuários", "Clientes", "Cadastro", "Última atividade"])
+    writer.writerow(
+        [
+            "Escritório",
+            "Administrador",
+            "Plano",
+            "Ciclo",
+            "Status",
+            "Usuários",
+            "Clientes",
+            "Cadastro",
+            "Última atividade",
+        ]
+    )
     for row in rows:
         item = _serialize_tenant(row)
         writer.writerow(
             [
                 item["razao_social"], item["admin_email"], item["plano"],
-                item["status_pagamento"], item["user_count"], item["client_count"],
+                item["billing_cycle"], item["status_pagamento"], item["user_count"], item["client_count"],
                 item["created_at"].isoformat(),
                 item["last_activity_at"].isoformat() if item["last_activity_at"] else "",
             ]
@@ -470,6 +496,7 @@ def get_tenant_detail(
         "razao_social": tenant.razao_social,
         "cnpj": tenant.cnpj,
         "plano": tenant.plano,
+        "billing_cycle": tenant.billing_cycle,
         "status_pagamento": tenant.status_pagamento,
         "created_at": tenant.created_at,
         "last_activity_at": last_activity,

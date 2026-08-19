@@ -63,6 +63,7 @@ interface Tenant {
   id: string
   razao_social: string
   plano: string
+  billing_cycle: string
   status_pagamento: string
   admin_email: string
   created_at: string
@@ -85,6 +86,7 @@ interface TenantDetail {
   razao_social: string
   cnpj: string | null
   plano: string
+  billing_cycle: string
   status_pagamento: string
   created_at: string
   last_activity_at: string | null
@@ -158,6 +160,7 @@ const getPlanBadge = (plan: string) => {
     free: 'border-slate-200 bg-slate-50 text-slate-600',
     basico: 'border-blue-200 bg-blue-50 text-blue-700',
     profissional: 'border-indigo-200 bg-indigo-50 text-indigo-700',
+    escritorio: 'border-cyan-200 bg-cyan-50 text-cyan-700',
     business: 'border-violet-200 bg-violet-50 text-violet-700',
   }
   return `inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${styles[plan] || styles.free}`
@@ -231,7 +234,7 @@ const planData = computed(() => ({
   datasets: [
     {
       data: overview.value?.plans.map((plan) => plan.count) || [],
-      backgroundColor: ['#cbd5e1', '#60a5fa', '#2563eb', '#7c3aed'],
+      backgroundColor: ['#cbd5e1', '#60a5fa', '#2563eb', '#0891b2', '#7c3aed'],
       borderWidth: 0,
       hoverOffset: 4,
     },
@@ -600,6 +603,7 @@ onBeforeUnmount(() => {
                 <option value="free">Gratuito</option>
                 <option value="basico">Essencial</option>
                 <option value="profissional">Profissional</option>
+                <option value="escritorio">Escritório</option>
                 <option value="business">Empresarial</option>
               </select>
               <select
@@ -697,6 +701,10 @@ onBeforeUnmount(() => {
                   <div class="flex flex-wrap gap-2">
                     <span :class="getPlanBadge(tenant.plano)">{{ getPlanLabel(tenant.plano) }}</span
                     ><span
+                      v-if="tenant.plano !== 'free'"
+                      class="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                      >{{ tenant.billing_cycle === 'annual' ? 'Anual' : 'Mensal' }}</span
+                    ><span
                       class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                       :class="getStatus(tenant.status_pagamento).class"
                       >{{ getStatus(tenant.status_pagamento).label }}</span
@@ -784,6 +792,10 @@ onBeforeUnmount(() => {
                   <span :class="getPlanBadge(selectedTenant.plano)">{{
                     getPlanLabel(selectedTenant.plano)
                   }}</span
+                  ><span
+                    v-if="selectedTenant.plano !== 'free'"
+                    class="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500"
+                    >{{ selectedTenant.billing_cycle === 'annual' ? 'Anual' : 'Mensal' }}</span
                   ><span
                     class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold"
                     :class="getStatus(selectedTenant.status_pagamento).class"

@@ -123,5 +123,6 @@ def get_me(
         "is_superadmin": current_user.get("is_superadmin"),
         "tenant_id": current_user.get("tenant_id"),
         "plan": tenant.plano if tenant else "free",
+        "billing_cycle": tenant.billing_cycle if tenant else "monthly",
         "payment_status": tenant.status_pagamento if tenant else "ativo",
     }

@@ -166,10 +166,17 @@ router.beforeEach(async (to) => {
     }
     const requestedPlan =
       typeof to.query.plano === 'string' &&
-      ['basico', 'profissional', 'business'].includes(to.query.plano)
+      ['basico', 'profissional', 'escritorio', 'business'].includes(to.query.plano)
         ? to.query.plano
         : null
-    if (requestedPlan) return { path: '/faturamento', query: { plano: requestedPlan } }
+    if (requestedPlan)
+      return {
+        path: '/faturamento',
+        query: {
+          plano: requestedPlan,
+          ...(to.query.ciclo === 'annual' ? { ciclo: 'annual' } : {}),
+        },
+      }
     return '/dashboard'
   }
 

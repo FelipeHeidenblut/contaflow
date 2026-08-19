@@ -7,7 +7,7 @@ import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
-import { getPlan } from '@/constants/plans'
+import { getPlan, getPlanPrice, isBillingCycle } from '@/constants/plans'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -24,6 +24,10 @@ const captchaToken = ref('')
 const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
 const showPassword = ref(false)
 const selectedPlan = getPlan(route.query.plano)
+const selectedCycle = isBillingCycle(route.query.ciclo) ? route.query.ciclo : 'monthly'
+const selectedQuery = selectedPlan
+  ? { plano: selectedPlan.id, ...(selectedCycle === 'annual' ? { ciclo: 'annual' } : {}) }
+  : {}
 
 const documentoFormatado = computed({
   get() {
@@ -96,14 +100,14 @@ const handleRegister = async () => {
           )
           router.push(
             selectedPlan && selectedPlan.id !== 'free'
-              ? { path: '/faturamento', query: { plano: selectedPlan.id } }
+              ? { path: '/faturamento', query: selectedQuery }
               : '/dashboard',
           )
         } else {
           toast.success('Conta criada! Verifique seu e-mail para confirmar antes de entrar.')
           router.push({
             path: '/login',
-            query: selectedPlan && selectedPlan.id !== 'free' ? { plano: selectedPlan.id } : {},
+            query: selectedPlan && selectedPlan.id !== 'free' ? selectedQuery : {},
           })
         }
       } catch {
@@ -129,7 +133,9 @@ const handleRegister = async () => {
     description="Configure a conta administradora. Você poderá adicionar clientes e membros depois."
   >
     <template #mobile-action
-      ><RouterLink to="/login" class="text-xs font-semibold text-[var(--ct-primary)]"
+      ><RouterLink
+        :to="{ path: '/login', query: selectedQuery }"
+        class="text-xs font-semibold text-[var(--ct-primary)]"
         >Entrar</RouterLink
       ></template
     >
@@ -138,7 +144,10 @@ const handleRegister = async () => {
       class="mb-5 rounded-xl border border-[var(--ct-primary)]/25 bg-[var(--ct-primary-soft)] px-4 py-3"
     >
       <p class="text-sm font-semibold text-[var(--ct-primary)]">
-        Você escolheu o plano {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês
+        Você escolheu o plano {{ selectedPlan.name }} — R$
+        {{ getPlanPrice(selectedPlan, selectedCycle) }}/{{
+          selectedCycle === 'annual' ? 'ano' : 'mês'
+        }}
       </p>
       <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
         Crie o escritório primeiro. O pagamento será apresentado depois do acesso.
@@ -273,7 +282,11 @@ const handleRegister = async () => {
       class="mt-7 border-t border-[var(--ct-border)] pt-6 text-center text-sm text-[var(--ct-text-muted)]"
     >
       Já possui uma conta?
-      <RouterLink to="/login" class="font-semibold text-[var(--ct-primary)]">Entrar</RouterLink>
+      <RouterLink
+        :to="{ path: '/login', query: selectedQuery }"
+        class="font-semibold text-[var(--ct-primary)]"
+        >Entrar</RouterLink
+      >
     </p>
   </AuthShell>
 </template>

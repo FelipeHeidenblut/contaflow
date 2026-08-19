@@ -110,5 +110,6 @@ class DashboardResponse(BaseModel):
     tarefas_abertas: int
     tarefas_atrasadas: int
     plano: str
+    billing_cycle: str
     status_pagamento: str
     model_config = ConfigDict(from_attributes=True)

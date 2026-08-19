@@ -10,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
     role?: string
     is_superadmin?: boolean
     plan?: string
+    billing_cycle?: string
     payment_status?: string
   }
   // Estados
@@ -20,6 +21,7 @@ export const useAuthStore = defineStore('auth', () => {
   const userName = ref('')
   const userEmail = ref('')
   const plan = ref('free')
+  const billingCycle = ref('monthly')
   const paymentStatus = ref('ativo')
   const isInitialized = ref(false)
   const hasValidProfile = ref(false)
@@ -40,6 +42,7 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = profile?.user_id || ''
     tenantId.value = profile?.tenant_id || ''
     plan.value = profile?.plan || 'free'
+    billingCycle.value = profile?.billing_cycle || 'monthly'
     paymentStatus.value = profile?.payment_status || 'ativo'
     hasValidProfile.value = true
   }
@@ -63,6 +66,7 @@ export const useAuthStore = defineStore('auth', () => {
     userName.value = ''
     userEmail.value = ''
     plan.value = 'free'
+    billingCycle.value = 'monthly'
     paymentStatus.value = 'ativo'
     hasValidProfile.value = false
   }
@@ -129,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
     userName,
     userEmail,
     plan,
+    billingCycle,
     paymentStatus,
     isInitialized,
     setSuperAdmin,

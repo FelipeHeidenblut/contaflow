@@ -70,6 +70,7 @@ const planLabel = computed(() => {
     free: 'Gratuito',
     basico: 'Essencial',
     profissional: 'Profissional',
+    escritorio: 'Escritório',
     business: 'Empresarial',
   }
   return labels[dashboard.value.plano] || 'Gratuito'

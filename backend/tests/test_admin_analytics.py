@@ -11,7 +11,12 @@ from admin import (
     _percentage_change,
     _shift_month,
 )
-from plan_config import get_plan_price, identify_plan_by_value
+from plan_config import (
+    get_monthly_equivalent,
+    get_plan_price,
+    identify_plan_by_value,
+    identify_subscription_by_value,
+)
 
 
 def test_shift_month_handles_year_boundaries():
@@ -41,6 +46,12 @@ def test_provider_identifier_is_masked():
 def test_plan_is_identified_from_exact_payment_value():
     assert identify_plan_by_value(Decimal("149.90")) == "profissional"
     assert identify_plan_by_value(Decimal("149.9")) == "profissional"
+    assert identify_subscription_by_value(Decimal("2499")) == ("escritorio", "annual")
+    assert get_plan_price("escritorio", "monthly") == Decimal("249.90")
+    assert get_plan_price("escritorio", "annual") == Decimal("2499.00")
+    assert get_monthly_equivalent("business", "annual").quantize(Decimal("0.01")) == Decimal(
+        "374.17"
+    )
     assert identify_plan_by_value(Decimal("150.00")) is None
     assert get_plan_price("unknown") == Decimal("0.00")
 

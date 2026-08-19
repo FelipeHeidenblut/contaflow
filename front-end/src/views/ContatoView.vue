@@ -13,6 +13,7 @@ const allowedSubjects = [
   'Dúvida sobre planos',
   'Quero conhecer a plataforma',
   'Suporte técnico',
+  'Alterar plano',
   'Plano Empresarial',
   'Outro assunto',
 ]

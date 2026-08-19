@@ -6,12 +6,16 @@ import { supabase } from '../services/supabase'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
-import { getPlan } from '@/constants/plans'
+import { getPlan, getPlanPrice, isBillingCycle } from '@/constants/plans'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const selectedPlan = getPlan(route.query.plano)
+const selectedCycle = isBillingCycle(route.query.ciclo) ? route.query.ciclo : 'monthly'
+const selectedQuery = selectedPlan
+  ? { plano: selectedPlan.id, ...(selectedCycle === 'annual' ? { ciclo: 'annual' } : {}) }
+  : {}
 const isLoading = ref(false)
 const erroMensagem = ref('')
 const email = ref('')
@@ -85,7 +89,7 @@ const handleLogin = async () => {
       authStore.initializeAuthenticatedSession(profile, data.user)
       router.push(
         selectedPlan && selectedPlan.id !== 'free'
-          ? { path: '/faturamento', query: { plano: selectedPlan.id } }
+          ? { path: '/faturamento', query: selectedQuery }
           : '/dashboard',
       )
     }
@@ -109,7 +113,7 @@ const handleLogin = async () => {
   >
     <template #mobile-action
       ><RouterLink
-        :to="{ path: '/cadastro', query: selectedPlan ? { plano: selectedPlan.id } : {} }"
+        :to="{ path: '/cadastro', query: selectedQuery }"
         class="text-xs font-semibold text-[var(--ct-primary)]"
         >Criar conta</RouterLink
       ></template
@@ -119,7 +123,10 @@ const handleLogin = async () => {
       class="mb-5 rounded-xl border border-[var(--ct-primary)]/25 bg-[var(--ct-primary-soft)] px-4 py-3"
     >
       <p class="text-sm font-semibold text-[var(--ct-primary)]">
-        Plano selecionado: {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês
+        Plano selecionado: {{ selectedPlan.name }} — R$
+        {{ getPlanPrice(selectedPlan, selectedCycle) }}/{{
+          selectedCycle === 'annual' ? 'ano' : 'mês'
+        }}
       </p>
       <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
         Entre para revisar o plano e continuar para o pagamento.
@@ -183,7 +190,7 @@ const handleLogin = async () => {
     >
       Ainda não tem conta?
       <RouterLink
-        :to="{ path: '/cadastro', query: selectedPlan ? { plano: selectedPlan.id } : {} }"
+        :to="{ path: '/cadastro', query: selectedQuery }"
         class="font-semibold text-[var(--ct-primary)]"
         >Comece gratuitamente</RouterLink
       >

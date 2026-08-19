@@ -31,6 +31,7 @@ class Tenant(Base):
     asaas_customer_id = Column(String, nullable=True)
     asaas_subscription_id = Column(String, nullable=True, unique=True)
     plano = Column(String, default="free")
+    billing_cycle = Column(String(20), default="monthly", nullable=False)
     status_pagamento = Column(String, default="ativo")
     calendar_token = Column(String(64), unique=True, nullable=True, index=True)
 

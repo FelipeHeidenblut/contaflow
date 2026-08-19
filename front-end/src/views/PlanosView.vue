@@ -3,9 +3,10 @@ import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PublicLayout from '@/components/PublicLayout.vue'
 import { useScrollReveal } from '@/composables/useScrollReveal'
-import { plans } from '@/constants/plans'
+import { getPlanMonthlyPrice, getPlanPrice, plans, type BillingCycle } from '@/constants/plans'
 
 const page = ref<HTMLElement | null>(null)
+const billingCycle = ref<BillingCycle>('monthly')
 useScrollReveal(page)
 
 const comparison = [
@@ -17,23 +18,33 @@ const comparison = [
   { label: 'Tamanho máximo por arquivo', values: plans.map(() => '5 MB') },
   {
     label: 'Relatórios operacionais',
-    values: ['Prévia', 'Resumo', 'Avançado', 'Avançado'],
+    values: plans.map((plan) =>
+      plan.id === 'free' ? 'Prévia' : plan.id === 'basico' ? 'Resumo' : 'Avançado',
+    ),
   },
   {
     label: 'Período de análise',
-    values: ['—', 'Até 3 meses', 'Até 12 meses', 'Até 12 meses'],
+    values: plans.map((plan) =>
+      plan.id === 'free' ? '—' : plan.id === 'basico' ? 'Até 3 meses' : 'Até 12 meses',
+    ),
   },
   {
     label: 'Desempenho por cliente e colaborador',
-    values: ['—', '—', 'Incluído', 'Incluído'],
+    values: plans.map((plan) =>
+      ['profissional', 'escritorio', 'business'].includes(plan.id) ? 'Incluído' : '—',
+    ),
   },
   {
     label: 'Filtros por cliente e responsável',
-    values: ['—', '—', 'Incluído', 'Incluído'],
+    values: plans.map((plan) =>
+      ['profissional', 'escritorio', 'business'].includes(plan.id) ? 'Incluído' : '—',
+    ),
   },
   {
     label: 'Exportação CSV',
-    values: ['—', '—', 'Incluído', 'Incluído'],
+    values: plans.map((plan) =>
+      ['profissional', 'escritorio', 'business'].includes(plan.id) ? 'Incluído' : '—',
+    ),
   },
 ]
 
@@ -45,11 +56,11 @@ const faq = [
   ],
   [
     'O que os planos pagos acrescentam?',
-    'O Essencial libera um resumo operacional de até 3 meses. Profissional e Empresarial acrescentam análises de até 12 meses, desempenho por cliente e equipe, filtros avançados e exportação CSV.',
+    'O Essencial libera um resumo operacional de até 3 meses. Profissional, Escritório e Empresarial acrescentam análises de até 12 meses, desempenho por cliente e equipe, filtros avançados e exportação CSV.',
   ],
   [
     'Existe fidelidade?',
-    'Não. As assinaturas são mensais e podem acompanhar a necessidade do escritório.',
+    'Não há renovação obrigatória. Você escolhe o ciclo mensal ou anual e pode cancelar a próxima renovação.',
   ],
   [
     'Como funciona o pagamento?',
@@ -79,8 +90,8 @@ const faq = [
             <div
               class="mt-7 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-wider text-slate-500"
             >
-              <span>✓ sem cartão no gratuito</span><span>✓ cobrança mensal</span
-              ><span>✓ sem fidelidade</span>
+              <span>✓ sem cartão no gratuito</span><span>✓ mensal ou anual</span
+              ><span>✓ checkout protegido</span>
             </div>
           </div>
 
@@ -115,21 +126,21 @@ const faq = [
                       :class="
                         plan.featured
                           ? 'bg-blue-600'
-                          : index === 3
+                          : index === plans.length - 1
                             ? 'bg-[var(--ct-navy)]'
                             : 'bg-blue-300'
                       "
-                      :style="{ width: `${24 + index * 24}%` }"
+                      :style="{ width: `${Math.min(100, 20 + index * 20)}%` }"
                     ></div>
                   </div>
                   <span class="font-mono text-[9px] text-slate-400">{{
-                    index === 3 ? '∞' : plan.clients.replace('Até ', '')
+                    index === plans.length - 1 ? '∞' : plan.clients.replace('Até ', '')
                   }}</span>
                 </div>
               </div>
               <div class="mt-8 grid grid-cols-3 gap-2 border-t border-slate-100 pt-5 text-center">
                 <div>
-                  <p class="font-mono text-lg font-semibold text-blue-600">4</p>
+                  <p class="font-mono text-lg font-semibold text-blue-600">{{ plans.length }}</p>
                   <p class="mt-1 text-[9px] text-slate-400">opções</p>
                 </div>
                 <div>
@@ -137,8 +148,8 @@ const faq = [
                   <p class="mt-1 text-[9px] text-slate-400">para começar</p>
                 </div>
                 <div>
-                  <p class="font-mono text-lg font-semibold text-blue-600">1 mês</p>
-                  <p class="mt-1 text-[9px] text-slate-400">por ciclo</p>
+                  <p class="font-mono text-lg font-semibold text-blue-600">2</p>
+                  <p class="mt-1 text-[9px] text-slate-400">ciclos de cobrança</p>
                 </div>
               </div>
             </div>
@@ -154,12 +165,33 @@ const faq = [
               <h2 class="ct-modern-section-title mt-5">Um plano para cada fase do escritório.</h2>
             </div>
             <p class="max-w-xl text-sm leading-7 text-slate-600">
-              Os valores e limites abaixo são mensais. Você pode começar no Gratuito e evoluir
-              quando o volume justificar.
+              Compare os limites e escolha entre pagamento mensal ou anual. No ciclo anual, o valor
+              total é cobrado uma vez por ano.
             </p>
           </div>
 
-          <div class="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div data-reveal class="mt-8 flex justify-center">
+            <div class="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                class="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+                :class="billingCycle === 'monthly' ? 'bg-blue-600 text-white' : 'text-slate-500'"
+                @click="billingCycle = 'monthly'"
+              >
+                Mensal
+              </button>
+              <button
+                type="button"
+                class="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+                :class="billingCycle === 'annual' ? 'bg-blue-600 text-white' : 'text-slate-500'"
+                @click="billingCycle = 'annual'"
+              >
+                Anual <span class="ml-1 text-[10px] opacity-80">economize 2 meses</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             <article
               v-for="(plan, index) in plans"
               :key="plan.id"
@@ -189,7 +221,7 @@ const faq = [
                   :class="plan.featured ? 'text-white/45' : 'text-slate-400'"
                   >R$</span
                 ><span class="text-[42px] font-semibold leading-none tracking-[-0.055em]">{{
-                  plan.price
+                  getPlanMonthlyPrice(plan, billingCycle)
                 }}</span>
               </div>
               <p
@@ -197,6 +229,13 @@ const faq = [
                 :class="plan.featured ? 'text-white/40' : 'text-slate-400'"
               >
                 por mês
+              </p>
+              <p
+                v-if="billingCycle === 'annual' && plan.id !== 'free'"
+                class="mt-1 text-xs"
+                :class="plan.featured ? 'text-white/50' : 'text-slate-500'"
+              >
+                R$ {{ getPlanPrice(plan, billingCycle) }} cobrados por ano
               </p>
               <p
                 class="mt-5 min-h-[66px] text-sm leading-6"
@@ -237,7 +276,10 @@ const faq = [
                 :to="
                   plan.sales
                     ? { path: '/contato', query: { assunto: 'Plano Empresarial' } }
-                    : { path: '/cadastro', query: plan.id === 'free' ? {} : { plano: plan.id } }
+                    : {
+                        path: '/cadastro',
+                        query: plan.id === 'free' ? {} : { plano: plan.id, ciclo: billingCycle },
+                      }
                 "
                 class="mt-7 inline-flex min-h-12 items-center justify-center rounded-xl px-4 text-sm font-semibold transition-colors"
                 :class="
@@ -269,10 +311,10 @@ const faq = [
           >
             <div data-reveal class="px-4">
               <p class="font-mono text-[10px] uppercase tracking-wider text-blue-300">
-                Sem fidelidade
+                Renovação transparente
               </p>
-              <p class="mt-3 text-xl font-semibold">Cancele quando quiser</p>
-              <p class="mt-2 text-sm text-white/50">A assinatura acompanha a fase do escritório.</p>
+              <p class="mt-3 text-xl font-semibold">Você controla a renovação</p>
+              <p class="mt-2 text-sm text-white/50">Escolha o ciclo que combina com a operação.</p>
             </div>
             <div data-reveal style="--reveal-delay: 70ms" class="px-4">
               <p class="font-mono text-[10px] uppercase tracking-wider text-blue-300">
@@ -301,7 +343,7 @@ const faq = [
             <h2 class="ct-modern-section-title mt-5">Veja exatamente o que muda.</h2>
           </div>
           <div data-reveal class="mt-10 overflow-x-auto rounded-2xl border border-slate-200">
-            <table class="min-w-[820px] w-full border-collapse text-left text-sm">
+            <table class="min-w-[1040px] w-full border-collapse text-left text-sm">
               <thead class="bg-slate-50">
                 <tr>
                   <th
@@ -334,7 +376,8 @@ const faq = [
             </table>
           </div>
           <p class="mt-4 font-mono text-[9px] uppercase tracking-wider text-slate-400">
-            Limites aplicados a clientes ativos e usuários cadastrados · preços mensais
+            Limites aplicados a clientes ativos e usuários cadastrados · ciclo selecionado:
+            {{ billingCycle === 'annual' ? 'anual' : 'mensal' }}
           </p>
         </div>
       </section>

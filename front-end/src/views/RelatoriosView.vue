@@ -63,7 +63,7 @@ interface ReportData {
   }
 }
 
-const paidPlans = new Set(['basico', 'profissional', 'business'])
+const paidPlans = new Set(['basico', 'profissional', 'escritorio', 'business'])
 const now = new Date()
 const startDefault = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 const endDefault = new Date(now.getFullYear(), now.getMonth() + 1, 0)
@@ -82,10 +82,14 @@ const hasPaidAccess = ref(false)
 const accessMessage = ref('Relatórios estão disponíveis nos planos pagos.')
 const report = ref<ReportData | null>(null)
 const hasAdvancedReports = computed(
-  () => report.value?.access.advanced ?? ['profissional', 'business'].includes(currentPlan.value),
+  () =>
+    report.value?.access.advanced ??
+    ['profissional', 'escritorio', 'business'].includes(currentPlan.value),
 )
 const canExportReports = computed(
-  () => report.value?.access.can_export ?? ['profissional', 'business'].includes(currentPlan.value),
+  () =>
+    report.value?.access.can_export ??
+    ['profissional', 'escritorio', 'business'].includes(currentPlan.value),
 )
 
 const applyDefaultPeriod = (plan: string) => {

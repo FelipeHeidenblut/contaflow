@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1/relatorios", tags=["Relatórios"])
 
-PAID_PLANS = {"basico", "profissional", "business"}
+PAID_PLANS = {"basico", "profissional", "escritorio", "business"}
 REPORT_CAPABILITIES = {
     "basico": {
         "advanced": False,
@@ -21,6 +21,11 @@ REPORT_CAPABILITIES = {
         "max_report_days": 92,
     },
     "profissional": {
+        "advanced": True,
+        "can_export": True,
+        "max_report_days": 366,
+    },
+    "escritorio": {
         "advanced": True,
         "can_export": True,
         "max_report_days": 366,

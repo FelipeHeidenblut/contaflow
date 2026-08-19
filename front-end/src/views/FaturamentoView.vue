@@ -5,22 +5,36 @@ import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { getApiErrorMessage } from '../utils/apiError'
-import { getPlan, plans, type PlanOption } from '../constants/plans'
+import {
+  getPlan,
+  getPlanMonthlyPrice,
+  getPlanPrice,
+  isBillingCycle,
+  plans,
+  type BillingCycle,
+  type PlanOption,
+} from '../constants/plans'
 
 const isLoadingPlano = ref<string | null>(null)
 const isLoadingCurrent = ref(true)
 const planoAtual = ref('free')
+const cicloAtual = ref<BillingCycle>('monthly')
 const statusPagamento = ref('ativo')
 const router = useRouter()
 const route = useRoute()
 const selectedPlan = computed(() => getPlan(route.query.plano))
+const billingCycle = ref<BillingCycle>(
+  isBillingCycle(route.query.ciclo) ? route.query.ciclo : 'monthly',
+)
 const currentPlan = computed(() => getPlan(planoAtual.value))
-const isCurrentPlan = (plan: PlanOption) => plan.id === planoAtual.value
+const isCurrentPlan = (plan: PlanOption) =>
+  plan.id === planoAtual.value && (plan.id === 'free' || billingCycle.value === cicloAtual.value)
 
 const getCta = (plan: PlanOption) => {
   if (isCurrentPlan(plan)) return 'Plano atual'
   if (plan.sales) return 'Falar com vendas'
   if (plan.id === 'free') return 'Plano gratuito'
+  if (planoAtual.value !== 'free') return 'Solicitar alteração'
   return `Assinar ${plan.name}`
 }
 
@@ -28,6 +42,7 @@ const loadCurrentPlan = async () => {
   try {
     const { data } = await api.get('/api/v1/dashboard/')
     planoAtual.value = data.plano || 'free'
+    cicloAtual.value = isBillingCycle(data.billing_cycle) ? data.billing_cycle : 'monthly'
     statusPagamento.value = data.status_pagamento || 'ativo'
   } catch {
     toast.error('Não foi possível identificar seu plano atual.')
@@ -45,6 +60,11 @@ const assinarPlano = async (plano: PlanOption) => {
     )
     return
   }
+  if (planoAtual.value !== 'free') {
+    toast.info('Para alterar um plano ou ciclo existente, entre em contato com o suporte.')
+    router.push({ path: '/contato', query: { assunto: 'Alterar plano' } })
+    return
+  }
   if (plano.sales) {
     router.push({ path: '/contato', query: { assunto: 'Plano Empresarial' } })
     return
@@ -53,7 +73,9 @@ const assinarPlano = async (plano: PlanOption) => {
   isLoadingPlano.value = plano.id
 
   try {
-    const response = await api.post(`/api/v1/asaas/criar-assinatura/${plano.id}`)
+    const response = await api.post(`/api/v1/asaas/criar-assinatura/${plano.id}`, {
+      billing_cycle: billingCycle.value,
+    })
 
     if (response.data.invoice_url) {
       toast.success('Estamos te redirecionando para o pagamento seguro...')
@@ -84,9 +106,42 @@ onMounted(loadCurrentPlan)
         <p
           class="ct-page-description mt-2 text-sm leading-relaxed text-[var(--ct-text-muted)] md:text-base"
         >
-          Sem fidelidade. Pague com PIX, boleto ou cartão e solicite alterações pelo suporte.
+          Escolha entre cobrança mensal ou anual. Pague com PIX, boleto ou cartão em checkout
+          protegido.
         </p>
       </header>
+
+      <div class="flex justify-center">
+        <div
+          class="inline-flex rounded-xl border border-[var(--ct-border)] bg-white p-1"
+          aria-label="Ciclo de cobrança"
+        >
+          <button
+            type="button"
+            class="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+            :class="
+              billingCycle === 'monthly'
+                ? 'bg-[var(--ct-primary)] text-white'
+                : 'text-[var(--ct-text-muted)] hover:text-[var(--ct-ink)]'
+            "
+            @click="billingCycle = 'monthly'"
+          >
+            Mensal
+          </button>
+          <button
+            type="button"
+            class="rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors"
+            :class="
+              billingCycle === 'annual'
+                ? 'bg-[var(--ct-primary)] text-white'
+                : 'text-[var(--ct-text-muted)] hover:text-[var(--ct-ink)]'
+            "
+            @click="billingCycle = 'annual'"
+          >
+            Anual <span class="ml-1 text-[10px] opacity-80">2 meses de economia</span>
+          </button>
+        </div>
+      </div>
 
       <section
         v-if="!isLoadingCurrent"
@@ -109,18 +164,21 @@ onMounted(loadCurrentPlan)
           </p>
         </div>
         <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--ct-primary)]"
-          >Assinatura mensal</span
+          >Assinatura {{ cicloAtual === 'annual' ? 'anual' : 'mensal' }}</span
         >
       </section>
 
       <section
-        v-if="selectedPlan && selectedPlan.id !== planoAtual"
+        v-if="selectedPlan && !isCurrentPlan(selectedPlan)"
         class="ct-information-panel flex flex-col justify-between gap-4 rounded-xl border border-[var(--ct-primary)] bg-[var(--ct-primary-soft)] px-5 py-4 sm:flex-row sm:items-center"
         aria-live="polite"
       >
         <div>
           <p class="text-sm font-semibold text-[var(--ct-primary)]">
-            Você escolheu o plano {{ selectedPlan.name }} — R$ {{ selectedPlan.price }}/mês.
+            Você escolheu o plano {{ selectedPlan.name }} — R$
+            {{ getPlanPrice(selectedPlan, billingCycle) }}/{{
+              billingCycle === 'annual' ? 'ano' : 'mês'
+            }}.
           </p>
           <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
             Confira os limites abaixo e prossiga quando estiver pronto.
@@ -140,8 +198,8 @@ onMounted(loadCurrentPlan)
         class="ct-information-panel grid border-y border-[var(--ct-border)] bg-white sm:grid-cols-3 sm:divide-x sm:divide-[var(--ct-border)]"
       >
         <div class="px-4 py-3 text-center">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Sem fidelidade</p>
-          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cancele quando quiser</p>
+          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Dois ciclos</p>
+          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Mensal ou anual</p>
         </div>
 
         <div class="border-t border-[var(--ct-border)] px-4 py-3 text-center sm:border-t-0">
@@ -156,7 +214,9 @@ onMounted(loadCurrentPlan)
       </section>
 
       <!-- cards -->
-      <section class="ct-plan-grid grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section
+        class="ct-plan-grid grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
+      >
         <article
           v-for="plano in plans"
           :key="plano.id"
@@ -186,11 +246,17 @@ onMounted(loadCurrentPlan)
             <div class="mt-4 flex items-end gap-1">
               <span class="mb-1 text-lg font-semibold text-slate-400">R$</span>
               <span class="text-4xl font-semibold tracking-tight text-[var(--ct-ink)]">
-                {{ plano.price }}
+                {{ getPlanMonthlyPrice(plano, billingCycle) }}
               </span>
             </div>
 
             <p class="mt-1 text-sm font-medium text-slate-400">/mês</p>
+            <p
+              v-if="billingCycle === 'annual' && plano.id !== 'free'"
+              class="mt-1 text-xs text-slate-400"
+            >
+              R$ {{ plano.annualPrice }} cobrados por ano
+            </p>
             <p class="mt-4 min-h-[42px] text-sm leading-relaxed text-[var(--ct-text-muted)]">
               {{ plano.description }}
             </p>

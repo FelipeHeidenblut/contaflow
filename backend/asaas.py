@@ -5,13 +5,14 @@ import os
 import re
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+from typing import Literal
 
 import httpx
 import models
 from database import get_db
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from plan_config import PLAN_CONFIG, identify_plan_by_value
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
+from plan_config import PLAN_CONFIG, get_plan_price, identify_subscription_by_value
 from security import get_current_user
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,101 @@ BASE_URL = (
 
 headers = {"access_token": ASAAS_API_KEY, "Content-Type": "application/json"}
 HTTP_TIMEOUT = 10.0
+
+
+def _normalize_billing_document(value: str | None) -> str:
+    """Normaliza CPF/CNPJ sem descartar letras do novo CNPJ alfanumérico."""
+    document = re.sub(r"[^A-Za-z0-9]", "", value or "").upper()
+    is_cpf = len(document) == 11 and document.isdigit()
+    is_cnpj = (
+        len(document) == 14
+        and document[:12].isalnum()
+        and document[-2:].isdigit()
+    )
+    if not (is_cpf or is_cnpj):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "O CPF/CNPJ do escritório está ausente ou possui formato inválido. "
+                "Atualize o cadastro antes de contratar um plano."
+            ),
+        )
+    return document
+
+
+def _gateway_error_description(response: httpx.Response) -> str | None:
+    try:
+        errors = response.json().get("errors", [])
+    except (ValueError, AttributeError):
+        return None
+    if not errors or not isinstance(errors[0], dict):
+        return None
+    description = errors[0].get("description")
+    return str(description)[:300] if description else None
+
+
+def _ensure_asaas_customer(db: Session, tenant: models.Tenant) -> str:
+    """Cria ou sincroniza o cliente do Asaas antes de emitir uma assinatura."""
+    document = _normalize_billing_document(tenant.cnpj)
+    payload = {
+        "name": tenant.razao_social,
+        "cpfCnpj": document,
+        "externalReference": str(tenant.id),
+    }
+
+    with httpx.Client(timeout=HTTP_TIMEOUT) as client:
+        if tenant.asaas_customer_id:
+            response = client.put(
+                f"{BASE_URL}/customers/{tenant.asaas_customer_id}",
+                json=payload,
+                headers=headers,
+            )
+            operation = "atualizar"
+        else:
+            response = client.post(
+                f"{BASE_URL}/customers", json=payload, headers=headers
+            )
+            operation = "criar"
+
+    if response.status_code not in (200, 201):
+        gateway_detail = _gateway_error_description(response)
+        logger.error(
+            "[ASAAS CLIENTE ERRO] Falha ao %s cliente do tenant %s. HTTP %s: %s",
+            operation,
+            tenant.id,
+            response.status_code,
+            gateway_detail or "resposta sem detalhe",
+        )
+        if response.status_code == 404 and tenant.asaas_customer_id:
+            detail = (
+                "O cadastro de cobrança não foi encontrado no ambiente atual do Asaas. "
+                "Entre em contato com o suporte."
+            )
+        elif response.status_code == 400:
+            detail = (
+                "O Asaas recusou o CPF/CNPJ cadastrado. Confira o documento do "
+                "responsável pelo escritório."
+            )
+        else:
+            detail = "Não foi possível sincronizar o cadastro com o gateway de pagamento."
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
+
+    if not tenant.asaas_customer_id:
+        customer_id = response.json().get("id")
+        if not customer_id:
+            logger.error(
+                "[ASAAS CLIENTE ERRO] Resposta sem ID ao criar cliente do tenant %s.",
+                tenant.id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="O gateway não retornou o identificador do cliente.",
+            )
+        tenant.asaas_customer_id = str(customer_id)
+        db.commit()
+        logger.info("Cliente criado no Asaas para o tenant %s.", tenant.id)
+
+    return str(tenant.asaas_customer_id)
 
 
 def _parse_date(value):
@@ -125,6 +221,7 @@ def _save_webhook_event(
 @router.post("/criar-assinatura/{plano}")
 def criar_assinatura(
     plano: str,
+    billing_cycle: Literal["monthly", "annual"] = Body("monthly", embed=True),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -135,58 +232,37 @@ def criar_assinatura(
         raise HTTPException(status_code=404, detail="Escritório não encontrado.")
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Apenas administradores podem contratar planos.")
-    if tenant.status_pagamento == "aguardando_pagamento" and tenant.asaas_subscription_id:
-        raise HTTPException(status_code=409, detail="Já existe uma assinatura aguardando pagamento.")
+    if tenant.asaas_subscription_id:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Já existe uma assinatura vinculada a este escritório. "
+                "Solicite ao suporte a alteração de plano ou ciclo."
+            ),
+        )
 
-    # 1. Criação ou recuperação do Cliente no Asaas
-    if not tenant.asaas_customer_id:
-        cliente_payload = {"name": tenant.razao_social}
-
-        # Em produção, o Asaas exige o CNPJ/CPF. No sandbox, ignoramos para não dar erro de dígito inválido.
-        if os.getenv("ASAAS_ENV") == "production" and tenant.cnpj:
-            cnpj_limpo = re.sub(r"\D", "", tenant.cnpj or "")
-            if len(cnpj_limpo) == 14:
-                cliente_payload["cpfCnpj"] = cnpj_limpo
-            else:
-                logger.warning(
-                    f"CNPJ inválido para o tenant {tenant_id} na criação do cliente."
-                )
-        elif os.getenv("ASAAS_ENV") == "production" and not tenant.cnpj:
-            # Proteção extra: se em produção e não tiver CNPJ, o Asaas pode barrar a cobrança.
-            logger.warning(f"Tenant {tenant_id} tentou assinar sem CNPJ em produção.")
-
-        with httpx.Client(timeout=HTTP_TIMEOUT) as client:
-            response = client.post(
-                f"{BASE_URL}/customers", json=cliente_payload, headers=headers
-            )
-
-        if response.status_code in [200, 201]:
-            tenant.asaas_customer_id = response.json().get("id")
-            db.commit()
-            logger.info(f"Cliente criado no Asaas: {tenant.asaas_customer_id}")
-        else:
-            erro_detalhe = response.text
-            logger.error(
-                f"[ASAAS CLIENTE ERRO] Payload: {cliente_payload} | Resposta: {erro_detalhe}"
-            )
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Falha ao registrar cliente no gateway.",
-            )
-
-    # 2. Definições do Plano (Removido o Starter, pois agora é Free)
+    # 1. Valida o plano antes de criar ou atualizar recursos externos.
     if plano not in PLAN_CONFIG or plano == "free":
         raise HTTPException(status_code=400, detail="Plano inválido ou gratuito.")
+    if billing_cycle not in {"monthly", "annual"}:
+        raise HTTPException(status_code=400, detail="Ciclo de cobrança inválido.")
+
+    # 2. Garante que o CPF/CNPJ esteja sincronizado inclusive para clientes existentes.
+    asaas_customer_id = _ensure_asaas_customer(db, tenant)
 
     # 3. Cria a Assinatura no Asaas
     vencimento_amanha = (date.today() + timedelta(days=1)).strftime("%Y-%m-%d")
     assinatura_payload = {
-        "customer": tenant.asaas_customer_id,
+        "customer": asaas_customer_id,
         "billingType": "UNDEFINED",
-        "value": float(PLAN_CONFIG[plano]["price"]),
-        "cycle": "MONTHLY",
-        "description": f"Plano {PLAN_CONFIG[plano]['name']} - ContablyTask",
+        "value": float(get_plan_price(plano, billing_cycle)),
+        "cycle": "YEARLY" if billing_cycle == "annual" else "MONTHLY",
+        "description": (
+            f"Plano {PLAN_CONFIG[plano]['name']} "
+            f"({'Anual' if billing_cycle == 'annual' else 'Mensal'}) - ContablyTask"
+        ),
         "nextDueDate": vencimento_amanha,
+        "externalReference": f"{tenant.id}:{plano}:{billing_cycle}",
     }
 
     with httpx.Client(timeout=HTTP_TIMEOUT) as client:
@@ -210,6 +286,7 @@ def criar_assinatura(
 
         tenant.status_pagamento = "aguardando_pagamento"
         tenant.asaas_subscription_id = subscription_id
+        tenant.billing_cycle = billing_cycle
         db.commit()
         logger.info(f"Assinatura gerada para o tenant {tenant_id}. Aguardando pagamento.")
 
@@ -283,15 +360,17 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                 payment_value = Decimal(str(payment_data.get("value") or "0"))
             except InvalidOperation:
                 payment_value = Decimal("0")
-            activated_plan = identify_plan_by_value(payment_value)
-            if not activated_plan:
+            subscription_match = identify_subscription_by_value(payment_value)
+            if not subscription_match:
                 raise HTTPException(
                     status_code=422,
                     detail="Valor recebido não corresponde a um plano ativo.",
                 )
+            activated_plan, activated_cycle = subscription_match
             old_status = tenant.status_pagamento
             tenant.status_pagamento = "ativo"
             tenant.plano = activated_plan
+            tenant.billing_cycle = activated_cycle
             _upsert_payment_record(db, tenant, payment_data, event)
             db.add(
                 models.AdminAuditLog(
@@ -299,7 +378,7 @@ async def asaas_webhook(request: Request, db: Session = Depends(get_db)):
                     action="payment_confirmed",
                     reason=f"Pagamento confirmado pelo Asaas ({event}).",
                     old_value=old_status,
-                    new_value="ativo",
+                    new_value=f"ativo:{activated_plan}:{activated_cycle}",
                 )
             )
             logger.info(

@@ -67,6 +67,16 @@ def test_plano_profissional_recebe_relatorio_avancado():
     }
 
 
+def test_plano_escritorio_recebe_relatorio_avancado():
+    capabilities = get_report_capabilities("escritorio")
+
+    assert capabilities == {
+        "advanced": True,
+        "can_export": True,
+        "max_report_days": 366,
+    }
+
+
 def test_agregacao_do_relatorio_usa_apenas_dados_recebidos():
     client_id = uuid4()
     member_id = uuid4()

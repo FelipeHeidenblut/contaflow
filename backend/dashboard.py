@@ -23,6 +23,7 @@ def obter_resumo_dashboard(
     # Busca o tenant para saber o plano
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     plano = tenant.plano if tenant else "free"
+    billing_cycle = tenant.billing_cycle if tenant else "monthly"
     status_pagamento = tenant.status_pagamento if tenant else "ativo"
 
     client_query = db.query(models.Client).filter(
@@ -53,5 +54,6 @@ def obter_resumo_dashboard(
         "tarefas_abertas": tarefas_abertas,
         "tarefas_atrasadas": tarefas_atrasadas,
         "plano": plano,
+        "billing_cycle": billing_cycle,
         "status_pagamento": status_pagamento,
     }

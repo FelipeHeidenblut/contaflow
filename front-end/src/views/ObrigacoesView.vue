@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -9,6 +9,8 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import CommentsPanel from '../components/CommentsPanel.vue'
+import PaginationControls from '../components/PaginationControls.vue'
+import { fetchAllPages, fetchPage } from '../services/pagination'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -52,6 +54,11 @@ const obrigacoes = ref<Obrigacao[]>([])
 const clientes = ref<Cliente[]>([])
 const membros = ref<Membro[]>([])
 const isLoading = ref(true)
+const currentPage = ref(1)
+const totalPages = ref(0)
+const totalResults = ref(0)
+const pageSize = 20
+const taskSummary = ref({ total: 0, concluidas: 0, pendentes: 0, aguardando: 0, atrasadas: 0 })
 
 const filtroClienteId = ref('')
 const filtroStatus = ref('')
@@ -133,53 +140,12 @@ const aplicarTemplate = (event: Event) => {
   }
 }
 
-const obrigacoesFiltradas = computed(() => {
-  let resultado = obrigacoes.value
+const obrigacoesFiltradas = computed(() => obrigacoes.value)
 
-  if (filtroClienteId.value) {
-    resultado = resultado.filter((o) => String(o.client_id) === String(filtroClienteId.value))
-  }
-
-  if (filtroStatus.value) {
-    resultado = resultado.filter((o) => o.status === filtroStatus.value)
-  }
-
-  if (filtroResponsavel.value) {
-    resultado = resultado.filter((o) => String(o.assigned_to) === String(filtroResponsavel.value))
-  }
-
-  if (searchQuery.value) {
-    const termoBusca = searchQuery.value.toLowerCase()
-    resultado = resultado.filter(
-      (o) =>
-        o.title.toLowerCase().includes(termoBusca) ||
-        (o.description && o.description.toLowerCase().includes(termoBusca)),
-    )
-  }
-
-  const prioridadePeso: Record<string, number> = { Urgente: 4, Alta: 3, Média: 2, Baixa: 1 }
-
-  return [...resultado].sort((a, b) => {
-    const pesoA = prioridadePeso[a.grau_importancia || 'Média'] || 0
-    const pesoB = prioridadePeso[b.grau_importancia || 'Média'] || 0
-
-    if (pesoB !== pesoA) return pesoB - pesoA
-    return a.due_date.localeCompare(b.due_date)
-  })
-})
-
-const totalConcluidas = computed(
-  () => obrigacoes.value.filter((o) => o.status === 'concluida').length,
-)
-const totalPendentes = computed(
-  () => obrigacoes.value.filter((o) => o.status === 'pendente').length,
-)
-const totalAguardando = computed(
-  () => obrigacoes.value.filter((o) => o.status === 'aguardando_cliente').length,
-)
-const totalAtrasadas = computed(
-  () => obrigacoes.value.filter((o) => isAtrasada(o.due_date, o.status)).length,
-)
+const totalConcluidas = computed(() => taskSummary.value.concluidas)
+const totalPendentes = computed(() => taskSummary.value.pendentes)
+const totalAguardando = computed(() => taskSummary.value.aguardando)
+const totalAtrasadas = computed(() => taskSummary.value.atrasadas)
 
 const abrirDetalhes = (obrigacao: Obrigacao) => {
   obrigacaoSelecionada.value = obrigacao
@@ -283,11 +249,11 @@ const concluirTarefa = async (obrigacao: Obrigacao) => {
     if (obrigacaoSelecionada.value?.id === obrigacao.id) obrigacaoSelecionada.value = response.data
 
     if (obrigacao.is_recurring) {
-      toast.success('Obrigação concluída! A tarefa do próximo mês já foi criada automaticamente.')
-      fetchData()
+      toast.success('Obrigação concluída! A próxima competência já está disponível.')
     } else {
       toast.success('Obrigação concluída!')
     }
+    await fetchData()
   } catch (error) {
     toast.error(getApiErrorMessage(error, 'Erro ao concluir tarefa.'))
   }
@@ -298,7 +264,8 @@ const excluirTarefa = async () => {
   if (id === null) return
   try {
     await api.delete(`/api/v1/obrigacoes/${id}`)
-    obrigacoes.value = obrigacoes.value.filter((o) => o.id !== id)
+    if (obrigacoes.value.length === 1 && currentPage.value > 1) currentPage.value -= 1
+    await fetchData()
     fecharDetalhes()
     toast.success('Tarefa excluída.')
     taskToDelete.value = null
@@ -310,15 +277,23 @@ const excluirTarefa = async () => {
 const fetchData = async () => {
   isLoading.value = true
   try {
-    const [obrigacoesRes, clientesRes, membrosRes] = await Promise.all([
-      api.get('/api/v1/obrigacoes'),
-      api.get('/api/v1/clientes'),
-      api.get('/api/v1/membros'),
-    ])
+    const taskPage = await fetchPage<Obrigacao>('/api/v1/obrigacoes', currentPage.value, pageSize, {
+      search: searchQuery.value.trim() || undefined,
+      client_id: filtroClienteId.value || undefined,
+      assigned_to: filtroResponsavel.value || undefined,
+      task_status: filtroStatus.value || undefined,
+    })
 
-    obrigacoes.value = obrigacoesRes.data
-    clientes.value = clientesRes.data
-    membros.value = membrosRes.data
+    obrigacoes.value = taskPage.items
+    totalPages.value = taskPage.pages
+    totalResults.value = taskPage.total
+    taskSummary.value = {
+      total: taskPage.summary?.total ?? taskPage.total,
+      concluidas: taskPage.summary?.concluidas ?? 0,
+      pendentes: taskPage.summary?.pendentes ?? 0,
+      aguardando: taskPage.summary?.aguardando ?? 0,
+      atrasadas: taskPage.summary?.atrasadas ?? 0,
+    }
   } catch (error) {
     toast.error(getApiErrorMessage(error, 'Erro ao carregar os dados.'))
     console.error(error)
@@ -326,6 +301,33 @@ const fetchData = async () => {
     isLoading.value = false
   }
 }
+
+const fetchLookups = async () => {
+  try {
+    const [clientItems, memberItems] = await Promise.all([
+      fetchAllPages<Cliente>('/api/v1/clientes'),
+      fetchAllPages<Membro>('/api/v1/membros'),
+    ])
+    clientes.value = clientItems
+    membros.value = memberItems
+  } catch {
+    toast.error('Erro ao carregar clientes e responsáveis.')
+  }
+}
+
+const changePage = (page: number) => {
+  currentPage.value = page
+  fetchData()
+}
+
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch([searchQuery, filtroClienteId, filtroStatus, filtroResponsavel], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchData()
+  }, 300)
+})
 
 const getNomeCliente = (clientId: string | number) => {
   const cliente = clientes.value.find((c) => String(c.id) === String(clientId))
@@ -404,7 +406,7 @@ const getImportanciaBadge = (grau?: string) => {
 }
 
 onMounted(async () => {
-  await fetchData()
+  await Promise.all([fetchData(), fetchLookups()])
   if (route.query.novo === '1') abrirCadastro()
 })
 </script>
@@ -542,9 +544,7 @@ onMounted(async () => {
             </select>
           </div>
 
-          <div class="text-xs text-[var(--ct-text-muted)]">
-            {{ obrigacoesFiltradas.length }} resultado(s)
-          </div>
+          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
         </div>
       </section>
 
@@ -787,6 +787,12 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          :page="currentPage"
+          :pages="totalPages"
+          :total="totalResults"
+          @change="changePage"
+        />
       </section>
 
       <!-- modal cadastro/edição -->
@@ -972,7 +978,8 @@ onMounted(async () => {
                     Tarefa recorrente mensal
                   </span>
                   <span class="block text-xs text-[var(--ct-text-muted)]">
-                    Ao concluir, o sistema poderá gerar automaticamente a próxima competência.
+                    Ao concluir, o sistema garante automaticamente a próxima competência, sem
+                    duplicar.
                   </span>
                 </div>
               </label>

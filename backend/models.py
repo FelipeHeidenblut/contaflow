@@ -9,7 +9,9 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
+    JSON,
     Numeric,
     String,
     Text,
@@ -33,6 +35,8 @@ class Tenant(Base):
     plano = Column(String, default="free")
     billing_cycle = Column(String(20), default="monthly", nullable=False)
     status_pagamento = Column(String, default="ativo")
+    subscription_status = Column(String(30), default="none", server_default="none", nullable=False)
+    billing_status_updated_at = Column(DateTime(timezone=True), nullable=True)
     calendar_token = Column(String(64), unique=True, nullable=True, index=True)
 
 
@@ -100,6 +104,32 @@ class Client(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        CheckConstraint(
+            "recurrence_day IS NULL OR recurrence_day BETWEEN 1 AND 31",
+            name="ck_tasks_recurrence_day",
+        ),
+        CheckConstraint(
+            "NOT is_recurring OR (recurrence_day IS NOT NULL "
+            "AND recurrence_series_id IS NOT NULL AND recurrence_period IS NOT NULL)",
+            name="ck_tasks_recurring_identity",
+        ),
+        CheckConstraint(
+            "recurrence_period IS NULL OR "
+            "recurrence_period = date_trunc('month', recurrence_period)::date",
+            name="ck_tasks_recurrence_period_month",
+        ),
+        UniqueConstraint(
+            "tenant_id",
+            "recurrence_series_id",
+            "recurrence_period",
+            name="uq_tasks_tenant_series_period",
+        ),
+        Index("ix_tasks_tenant_due_id", "tenant_id", "due_date", "id"),
+        Index("ix_tasks_tenant_client", "tenant_id", "client_id"),
+        Index("ix_tasks_tenant_assignee", "tenant_id", "assigned_to"),
+    )
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
@@ -119,15 +149,32 @@ class Task(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    is_recurring = Column(Boolean, default=False)
-
+    is_recurring = Column(Boolean, default=False, server_default="false", nullable=False)
     recurrence_day = Column(Integer, nullable=True)
+    recurrence_series_id = Column(UUID(as_uuid=True), nullable=True, index=True)
+    recurrence_period = Column(Date, nullable=True)
+    next_occurrence_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tasks.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    recurrence_processed_at = Column(DateTime(timezone=True), nullable=True)
     # Dentro da classe Tarefa
     grau_importancia = Column(String, default="Média")
 
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = (
+        Index(
+            "ix_documents_tenant_created_id",
+            "tenant_id",
+            "created_at",
+            "id",
+        ),
+        Index("ix_documents_tenant_client", "tenant_id", "client_id"),
+    )
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(
         UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
@@ -169,8 +216,15 @@ class AsaasWebhookEvent(Base):
         nullable=True,
         index=True,
     )
-    status = Column(String(20), default="success", nullable=False, index=True)
+    status = Column(
+        String(20), default="pending", server_default="pending", nullable=False, index=True
+    )
     error = Column(String(1000), nullable=True)
+    payload = Column(JSON, nullable=False, default=dict)
+    attempts = Column(Integer, default=0, server_default="0", nullable=False)
+    processing_started_at = Column(DateTime(timezone=True), nullable=True)
+    processed_at = Column(DateTime(timezone=True), nullable=True)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -261,6 +315,12 @@ class PaymentRecord(Base):
         index=True,
     )
     subscription_id = Column(String(100), nullable=True)
+    provider_customer_id = Column(String(100), nullable=True)
+    external_reference = Column(String(180), nullable=True)
+    plan_code = Column(String(30), nullable=True)
+    billing_cycle = Column(String(20), nullable=True)
+    last_event_id = Column(String(100), nullable=True)
+    provider_updated_at = Column(DateTime(timezone=True), nullable=True)
     value = Column(Numeric(12, 2), nullable=False)
     status = Column(String(30), nullable=False, index=True)
     due_date = Column(Date, nullable=True)
@@ -272,6 +332,59 @@ class PaymentRecord(Base):
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class BillingSubscription(Base):
+    __tablename__ = "billing_subscriptions"
+    __table_args__ = (
+        CheckConstraint(
+            "billing_cycle IN ('monthly', 'annual')",
+            name="ck_billing_subscriptions_cycle",
+        ),
+        UniqueConstraint(
+            "external_reference",
+            name="uq_billing_subscriptions_external_reference",
+        ),
+    )
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    provider_customer_id = Column(String(100), nullable=False, index=True)
+    provider_subscription_id = Column(String(100), nullable=True, unique=True, index=True)
+    external_reference = Column(String(180), nullable=False)
+    plan_code = Column(String(30), nullable=True, index=True)
+    billing_cycle = Column(String(20), nullable=False)
+    status = Column(String(30), nullable=False, default="creating", index=True)
+    value = Column(Numeric(12, 2), nullable=True)
+    next_due_date = Column(Date, nullable=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class BillingReconciliationRun(Base):
+    __tablename__ = "billing_reconciliation_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    status = Column(String(20), nullable=False, index=True)
+    started_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    processed_events = Column(Integer, default=0, server_default="0", nullable=False)
+    processed_subscriptions = Column(Integer, default=0, server_default="0", nullable=False)
+    processed_payments = Column(Integer, default=0, server_default="0", nullable=False)
+    failures = Column(Integer, default=0, server_default="0", nullable=False)
+    error = Column(String(1000), nullable=True)
 
 
 class AdminAuditLog(Base):
@@ -297,3 +410,17 @@ class AdminAuditLog(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+
+
+class RecurrenceRun(Base):
+    __tablename__ = "recurrence_runs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    status = Column(String(20), nullable=False, index=True)
+    started_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    finished_at = Column(DateTime(timezone=True), nullable=True)
+    processed_tasks = Column(Integer, default=0, server_default="0", nullable=False)
+    created_tasks = Column(Integer, default=0, server_default="0", nullable=False)
+    error = Column(String(1000), nullable=True)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -7,6 +7,8 @@ import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
 import { useAuthStore } from '../stores/auth'
+import PaginationControls from '../components/PaginationControls.vue'
+import { fetchAllPages, fetchPage } from '../services/pagination'
 
 const authStore = useAuthStore()
 const canManageDocuments = computed(() => ['admin', 'gerente'].includes(authStore.role))
@@ -28,6 +30,11 @@ interface ClientRecord {
 const documentos = ref<DocumentRecord[]>([])
 const clientes = ref<ClientRecord[]>([])
 const isLoading = ref(true)
+const currentPage = ref(1)
+const totalPages = ref(0)
+const totalResults = ref(0)
+const pageSize = 20
+const documentSummary = ref({ total: 0, fiscal: 0, contabil: 0, geral: 0 })
 
 const isModalOpen = ref(false)
 const isUploading = ref(false)
@@ -37,53 +44,64 @@ const filtroClienteId = ref('')
 const filtroCategoria = ref('')
 const searchQuery = ref('')
 
-const documentosFiltrados = computed(() => {
-  let resultado = documentos.value
-
-  if (filtroClienteId.value) {
-    resultado = resultado.filter((doc) => String(doc.client_id) === String(filtroClienteId.value))
-  }
-
-  if (filtroCategoria.value) {
-    resultado = resultado.filter((doc) => doc.categoria === filtroCategoria.value)
-  }
-
-  if (searchQuery.value) {
-    const termo = searchQuery.value.toLowerCase()
-    resultado = resultado.filter((doc) => doc.nome_arquivo.toLowerCase().includes(termo))
-  }
-
-  return resultado
-})
-
-const totalDocumentos = computed(() => documentos.value.length)
-const totalFiscal = computed(
-  () => documentos.value.filter((doc) => doc.categoria === 'Fiscal').length,
-)
-const totalContabil = computed(
-  () => documentos.value.filter((doc) => doc.categoria === 'Contábil').length,
-)
-const totalGeral = computed(
-  () => documentos.value.filter((doc) => !doc.categoria || doc.categoria === 'Geral').length,
-)
+const documentosFiltrados = computed(() => documentos.value)
+const totalDocumentos = computed(() => documentSummary.value.total)
+const totalFiscal = computed(() => documentSummary.value.fiscal)
+const totalContabil = computed(() => documentSummary.value.contabil)
+const totalGeral = computed(() => documentSummary.value.geral)
 
 const docForm = ref({ client_id: '', categoria: 'Geral' })
 const selectedFile = ref<File | null>(null)
 
 const fetchData = async () => {
   try {
-    const [docsResponse, clientesResponse] = await Promise.all([
-      api.get<DocumentRecord[]>('/api/v1/documentos'),
-      api.get<ClientRecord[]>('/api/v1/clientes'),
-    ])
-    documentos.value = docsResponse.data
-    clientes.value = clientesResponse.data
+    const documentPage = await fetchPage<DocumentRecord>(
+      '/api/v1/documentos',
+      currentPage.value,
+      pageSize,
+      {
+        search: searchQuery.value.trim() || undefined,
+        client_id: filtroClienteId.value || undefined,
+        categoria: filtroCategoria.value || undefined,
+      },
+    )
+    documentos.value = documentPage.items
+    totalPages.value = documentPage.pages
+    totalResults.value = documentPage.total
+    documentSummary.value = {
+      total: documentPage.summary?.total ?? documentPage.total,
+      fiscal: documentPage.summary?.fiscal ?? 0,
+      contabil: documentPage.summary?.contabil ?? 0,
+      geral: documentPage.summary?.geral ?? 0,
+    }
   } catch (error) {
     toast.error(getApiErrorMessage(error, 'Erro ao carregar dados.'))
   } finally {
     isLoading.value = false
   }
 }
+
+const fetchClients = async () => {
+  try {
+    clientes.value = await fetchAllPages<ClientRecord>('/api/v1/clientes')
+  } catch {
+    toast.error('Erro ao carregar os clientes disponíveis.')
+  }
+}
+
+const changePage = (page: number) => {
+  currentPage.value = page
+  fetchData()
+}
+
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch([searchQuery, filtroClienteId, filtroCategoria], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchData()
+  }, 300)
+})
 
 const handleFileChange = (event: Event) => {
   const file = (event.target as HTMLInputElement).files?.[0]
@@ -101,14 +119,15 @@ const handleUpload = async () => {
     formData.append('categoria', docForm.value.categoria)
     formData.append('file', selectedFile.value)
 
-    const response = await api.post('/api/v1/documentos', formData, {
+    await api.post('/api/v1/documentos', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
 
-    documentos.value.unshift(response.data)
     isModalOpen.value = false
     docForm.value = { client_id: '', categoria: 'Geral' }
     selectedFile.value = null
+    currentPage.value = 1
+    await fetchData()
 
     toast.success('Documento salvo com sucesso!')
   } catch (error: unknown) {
@@ -144,7 +163,8 @@ const handleExcluirDocumento = async () => {
   if (!docId) return
   try {
     await api.delete(`/api/v1/documentos/${docId}`)
-    documentos.value = documentos.value.filter((doc) => doc.id !== docId)
+    if (documentos.value.length === 1 && currentPage.value > 1) currentPage.value -= 1
+    await fetchData()
     toast.success('Documento excluído.')
     documentToDelete.value = null
   } catch (error) {
@@ -230,7 +250,10 @@ const getCategoriaBadge = (categoria: string) => {
   return `inline-flex rounded-md border px-2.5 py-1 text-[11px] font-semibold ${styles[categoria] || styles['Geral']}`
 }
 
-onMounted(() => fetchData())
+onMounted(() => {
+  fetchData()
+  fetchClients()
+})
 </script>
 
 <template>
@@ -359,9 +382,7 @@ onMounted(() => fetchData())
             </select>
           </div>
 
-          <div class="text-xs text-[var(--ct-text-muted)]">
-            {{ documentosFiltrados.length }} resultado(s)
-          </div>
+          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
         </div>
       </section>
 
@@ -514,6 +535,12 @@ onMounted(() => fetchData())
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          :page="currentPage"
+          :pages="totalPages"
+          :total="totalResults"
+          @change="changePage"
+        />
       </section>
 
       <!-- modal upload -->

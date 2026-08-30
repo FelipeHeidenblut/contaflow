@@ -9,41 +9,31 @@ from fastapi import HTTPException
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import models
 from relatorios import build_report, get_report_capabilities, require_paid_reports
 
 
-class TenantQuery:
-    def __init__(self, tenant):
-        self.tenant = tenant
-
-    def filter(self, *args):
-        return self
-
-    def first(self):
-        return self.tenant
-
-
-class TenantDb:
-    def __init__(self, tenant):
-        self.tenant = tenant
-
-    def query(self, entity):
-        assert entity is models.Tenant
-        return TenantQuery(self.tenant)
-
-
 def test_relatorios_bloqueiam_plano_gratuito():
-    tenant = SimpleNamespace(plano="free", status_pagamento="ativo")
+    user = {
+        "tenant_id": str(uuid4()),
+        "user_id": str(uuid4()),
+        "role": "admin",
+        "plan": "free",
+        "payment_status": "ativo",
+    }
     with pytest.raises(HTTPException) as error:
-        require_paid_reports(TenantDb(tenant), {"tenant_id": str(uuid4())})
+        require_paid_reports(user)
     assert error.value.status_code == 403
 
 
 def test_relatorios_liberam_plano_pago_ativo():
-    tenant = SimpleNamespace(plano="profissional", status_pagamento="ativo")
-    user = {"tenant_id": str(uuid4()), "role": "admin"}
-    result = require_paid_reports(TenantDb(tenant), user)
+    user = {
+        "tenant_id": str(uuid4()),
+        "user_id": str(uuid4()),
+        "role": "admin",
+        "plan": "profissional",
+        "payment_status": "ativo",
+    }
+    result = require_paid_reports(user)
     assert result["plan"] == "profissional"
 
 

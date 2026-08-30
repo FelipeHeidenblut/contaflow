@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import VueTurnstile from 'vue-turnstile'
 import PublicLayout from '@/components/PublicLayout.vue'
 import { useScrollReveal } from '@/composables/useScrollReveal'
+import { appConfig } from '@/config/env'
 
 const page = ref<HTMLElement | null>(null)
 useScrollReveal(page)
@@ -30,8 +31,8 @@ const captchaToken = ref('')
 const isSending = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
-const apiBaseUrl = import.meta.env.VITE_API_URL || 'https://api.contablytask.com.br'
+const turnstileSiteKey = appConfig.turnstileSiteKey
+const apiBaseUrl = appConfig.apiBaseUrl
 
 const getResponseError = (detail: unknown) => {
   if (typeof detail === 'string') return detail

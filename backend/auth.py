@@ -1,12 +1,11 @@
 import re
 from uuid import UUID
 
-import models
+from auth_service import RegistrationCommand, synchronize_registration
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from security import get_current_user, verify_token
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Autenticação e Sincronização"])
@@ -42,87 +41,27 @@ def sincronizar_cadastro(
     email = token_payload.get("email")
     if not email:
         raise HTTPException(status_code=401, detail="Token sem e-mail.")
-
-    usuario_existente = db.query(models.Profile).filter(models.Profile.id == user_id).first()
-    if usuario_existente:
-        return {
-            "status": "ja_existente",
-            "message": "Usuário já sincronizado no sistema local.",
-        }
-    if db.query(models.Profile).filter(models.Profile.email == email).first():
-        raise HTTPException(status_code=409, detail="E-mail associado a outra identidade.")
-
-    # 2. Fail-Fast: Verifica duplicidade de CNPJ/CPF no Tenant (Garante integridade fiscal)
-    tenant_existente = (
-        db.query(models.Tenant).filter(models.Tenant.cnpj == payload.documento).first()
-    )
-    if tenant_existente:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Este CPF/CNPJ já está atrelado a outro escritório no sistema.",
-        )
-
-    try:
-        # 3. Criação do Tenant (Inquilino SaaS)
-        # O campo 'documento' é salvo na coluna 'cnpj' para manter compatibilidade com a modelagem existente[cite: 3, 5]
-        novo_tenant = models.Tenant(
-            razao_social=payload.nome_escritorio, cnpj=payload.documento
-        )
-        db.add(novo_tenant)
-        db.flush()  # Gera o ID do Tenant para usarmos no Profile, mantendo a transação aberta
-
-        # 4. Criação do Profile vinculado ao Tenant (Isolamento Multi-tenant)[cite: 5]
-        novo_perfil = models.Profile(
-            id=user_id,
-            tenant_id=novo_tenant.id,
+    return synchronize_registration(
+        db,
+        RegistrationCommand(
+            user_id=user_id,
             email=email,
-            name=payload.nome_completo,
-            role="admin",  # Padrão RBAC: O criador do tenant é o admin[cite: 5]
-        )
-        db.add(novo_perfil)
-
-        # 5. Commit final da transação
-        db.commit()
-
-        return {
-            "status": "sucesso",
-            "message": "Escritório e usuário sincronizados com sucesso!",
-            "tenant_id": novo_tenant.id,
-        }
-
-    # Tratamento específico para erros de banco de dados[cite: 5]
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Conflito de dados: O registro já existe ou viola uma restrição do banco.",
-        )
-
-    # Fallback para erros genéricos[cite: 5]
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno ao persistir a estrutura do escritório.",
-        )
+            full_name=payload.nome_completo,
+            office_name=payload.nome_escritorio,
+            document=payload.documento,
+        ),
+    )
 
 
 @router.get("/me", tags=["Autenticação e Sincronização"])
-def get_me(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
-):
+def get_me(current_user: dict = Depends(get_current_user)):
     """Retorna os dados de permissão do usuário logado."""
-    tenant = (
-        db.query(models.Tenant)
-        .filter(models.Tenant.id == current_user.get("tenant_id"))
-        .first()
-    )
     return {
         "user_id": current_user.get("user_id"),
         "role": current_user.get("role"),
         "is_superadmin": current_user.get("is_superadmin"),
         "tenant_id": current_user.get("tenant_id"),
-        "plan": tenant.plano if tenant else "free",
-        "billing_cycle": tenant.billing_cycle if tenant else "monthly",
-        "payment_status": tenant.status_pagamento if tenant else "ativo",
+        "plan": current_user["plan"],
+        "billing_cycle": current_user["billing_cycle"],
+        "payment_status": current_user["payment_status"],
     }

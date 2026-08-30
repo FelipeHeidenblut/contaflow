@@ -1,9 +1,19 @@
-from database import engine
-import models
+"""Prepare the database by applying the complete Alembic history."""
 
-print("Iniciando a sincronização com o Supabase...")
+from pathlib import Path
 
-# Este comando olha para o seu models.py e força a criação de todas as tabelas na nuvem
-models.Base.metadata.create_all(bind=engine)
+from alembic import command
+from alembic.config import Config
 
-print("Tabelas criadas com sucesso! O banco está pronto.")
+
+def upgrade_database() -> None:
+    backend_dir = Path(__file__).resolve().parent
+    config = Config(backend_dir / "alembic.ini")
+    config.set_main_option("script_location", str(backend_dir / "alembic"))
+    command.upgrade(config, "head")
+
+
+if __name__ == "__main__":
+    print("Aplicando migrations do banco de dados...")
+    upgrade_database()
+    print("Banco atualizado com sucesso.")

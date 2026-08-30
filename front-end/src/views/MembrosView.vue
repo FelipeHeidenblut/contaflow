@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -7,6 +7,8 @@ import { useAuthStore } from '../stores/auth'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
+import PaginationControls from '../components/PaginationControls.vue'
+import { fetchPage } from '../services/pagination'
 
 interface Membro {
   id: string
@@ -17,6 +19,13 @@ interface Membro {
 
 const membros = ref<Membro[]>([])
 const isLoading = ref(true)
+const currentPage = ref(1)
+const totalPages = ref(0)
+const totalResults = ref(0)
+const pageSize = 20
+const searchQuery = ref('')
+const roleFilter = ref('')
+const memberSummary = ref({ total: 0, admins: 0, gerentes: 0, colaboradores: 0 })
 const isModalOpen = ref(false)
 const isSaving = ref(false)
 const memberToRemove = ref<Membro | null>(null)
@@ -29,29 +38,29 @@ const novoMembro = ref({
   name: '',
   email: '',
   role: 'colaborador',
-  password: '',
 })
 
-const totalMembros = computed(() => membros.value.length)
-const totalAdmins = computed(() => membros.value.filter((m) => m.role === 'admin').length)
-const totalGerentes = computed(() => membros.value.filter((m) => m.role === 'gerente').length)
-const totalColaboradores = computed(
-  () => membros.value.filter((m) => m.role === 'colaborador').length,
-)
-
-const gerarSenhaSugestao = () => {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#'
-  const random = new Uint32Array(14)
-  crypto.getRandomValues(random)
-  const senha = Array.from(random, (value) => chars[value % chars.length]).join('')
-  novoMembro.value.password = senha
-}
+const totalMembros = computed(() => memberSummary.value.total)
+const totalAdmins = computed(() => memberSummary.value.admins)
+const totalGerentes = computed(() => memberSummary.value.gerentes)
+const totalColaboradores = computed(() => memberSummary.value.colaboradores)
 
 const fetchData = async () => {
   isLoading.value = true
   try {
-    const response = await api.get('/api/v1/membros')
-    membros.value = response.data
+    const page = await fetchPage<Membro>('/api/v1/membros', currentPage.value, pageSize, {
+      search: searchQuery.value.trim() || undefined,
+      role: roleFilter.value || undefined,
+    })
+    membros.value = page.items
+    totalPages.value = page.pages
+    totalResults.value = page.total
+    memberSummary.value = {
+      total: page.summary?.total ?? page.total,
+      admins: page.summary?.admins ?? 0,
+      gerentes: page.summary?.gerentes ?? 0,
+      colaboradores: page.summary?.colaboradores ?? 0,
+    }
   } catch {
     toast.error('Erro ao carregar a equipe.')
   } finally {
@@ -59,26 +68,36 @@ const fetchData = async () => {
   }
 }
 
-const salvarMembro = async () => {
-  if (!novoMembro.value.name || !novoMembro.value.email || !novoMembro.value.password) {
-    toast.warn('Preencha nome, e-mail e senha.')
-    return
-  }
+const changePage = (page: number) => {
+  currentPage.value = page
+  fetchData()
+}
 
-  if (novoMembro.value.password.length < 8) {
-    toast.warn('A senha deve ter no mínimo 8 caracteres.')
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch([searchQuery, roleFilter], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchData()
+  }, 300)
+})
+
+const salvarMembro = async () => {
+  if (!novoMembro.value.name || !novoMembro.value.email) {
+    toast.warn('Preencha nome e e-mail.')
     return
   }
 
   try {
     isSaving.value = true
-    const response = await api.post('/api/v1/membros', novoMembro.value)
-    membros.value.push(response.data)
-    toast.success('Membro criado com sucesso! Ele já pode fazer login com a senha definida.')
+    await api.post('/api/v1/membros', novoMembro.value)
+    toast.success('Convite enviado! O funcionário definirá a própria senha pelo e-mail.')
     isModalOpen.value = false
-    novoMembro.value = { name: '', email: '', role: 'colaborador', password: '' }
+    novoMembro.value = { name: '', email: '', role: 'colaborador' }
+    currentPage.value = 1
+    await fetchData()
   } catch (error: unknown) {
-    toast.error(getApiErrorMessage(error, 'Erro ao adicionar membro.'))
+    toast.error(getApiErrorMessage(error, 'Erro ao enviar convite.'))
   } finally {
     isSaving.value = false
   }
@@ -89,7 +108,8 @@ const removerMembro = async () => {
   if (!membro) return
   try {
     await api.delete(`/api/v1/membros/${membro.id}`)
-    membros.value = membros.value.filter((m) => m.id !== membro.id)
+    if (membros.value.length === 1 && currentPage.value > 1) currentPage.value -= 1
+    await fetchData()
     toast.success('Membro removido com sucesso.')
     memberToRemove.value = null
   } catch (error: unknown) {
@@ -163,7 +183,7 @@ onMounted(() => fetchData())
               d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
             />
           </svg>
-          <span>Adicionar membro</span>
+          <span>Convidar membro</span>
         </button>
       </header>
 
@@ -200,6 +220,27 @@ onMounted(() => fetchData())
         </div>
       </section>
 
+      <section class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <input
+          v-model="searchQuery"
+          type="search"
+          aria-label="Buscar membros"
+          placeholder="Buscar por nome ou e-mail..."
+          class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none focus:border-[var(--ct-primary)] sm:max-w-md"
+        />
+        <select
+          v-model="roleFilter"
+          aria-label="Filtrar membros por nível de acesso"
+          class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none focus:border-[var(--ct-primary)] sm:w-56"
+        >
+          <option value="">Todos os níveis</option>
+          <option value="admin">Administradores</option>
+          <option value="gerente">Gerentes</option>
+          <option value="colaborador">Colaboradores</option>
+        </select>
+        <span class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</span>
+      </section>
+
       <!-- tabela -->
       <section
         class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
@@ -212,9 +253,17 @@ onMounted(() => fetchData())
 
         <EmptyState
           v-else-if="membros.length === 0"
-          title="Nenhum membro cadastrado"
-          description="Adicione usuários para distribuir acessos e responsabilidades."
-          :action-label="loggedUserRole === 'admin' ? 'Adicionar membro' : undefined"
+          :title="
+            memberSummary.total === 0 ? 'Nenhum membro cadastrado' : 'Nenhum membro encontrado'
+          "
+          :description="
+            memberSummary.total === 0
+              ? 'Adicione usuários para distribuir acessos e responsabilidades.'
+              : 'Ajuste a busca ou o filtro de nível de acesso.'
+          "
+          :action-label="
+            memberSummary.total === 0 && loggedUserRole === 'admin' ? 'Convidar membro' : undefined
+          "
           @action="isModalOpen = true"
         />
 
@@ -325,6 +374,12 @@ onMounted(() => fetchData())
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          :page="currentPage"
+          :pages="totalPages"
+          :total="totalResults"
+          @change="changePage"
+        />
       </section>
 
       <!-- modal -->
@@ -344,16 +399,16 @@ onMounted(() => fetchData())
           >
             <div>
               <h3 id="member-modal-title" class="text-lg font-semibold text-[var(--ct-ink)]">
-                Adicionar membro
+                Convidar membro
               </h3>
               <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
-                Crie um novo acesso para a equipe.
+                O funcionário receberá um link seguro para definir a própria senha.
               </p>
             </div>
 
             <button
               @click="isModalOpen = false"
-              aria-label="Fechar cadastro de membro"
+              aria-label="Fechar convite de membro"
               class="rounded-lg p-1 text-slate-400 transition-colors hover:bg-white hover:text-slate-700"
             >
               <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,40 +476,12 @@ onMounted(() => fetchData())
               </select>
             </div>
 
-            <div>
-              <label
-                for="member-password"
-                class="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500"
-              >
-                Senha temporária
-              </label>
-
-              <div class="flex gap-2">
-                <input
-                  v-model="novoMembro.password"
-                  id="member-password"
-                  autocomplete="new-password"
-                  required
-                  minlength="8"
-                  maxlength="72"
-                  type="text"
-                  placeholder="Mínimo 8 caracteres"
-                  class="flex-1 rounded-xl border border-[var(--ct-border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
-                />
-
-                <button
-                  type="button"
-                  @click="gerarSenhaSugestao"
-                  class="whitespace-nowrap rounded-xl bg-[var(--ct-primary-soft)] px-3 py-2 text-xs font-semibold text-[var(--ct-primary)] transition-colors hover:bg-[var(--ct-accent-soft)]"
-                >
-                  Gerar senha
-                </button>
-              </div>
-
-              <p class="mt-1.5 text-[11px] text-[var(--ct-text-muted)]">
-                Entregue esta senha ao funcionário. Ele poderá alterá-la após o primeiro login.
-              </p>
-            </div>
+            <p
+              class="rounded-xl border border-[var(--ct-border)] bg-[var(--ct-primary-soft)] px-4 py-3 text-xs leading-5 text-[var(--ct-text-muted)]"
+            >
+              O convite expira conforme a configuração de segurança do Supabase. Se o link expirar,
+              será necessário enviar um novo convite.
+            </p>
           </form>
 
           <div
@@ -473,7 +500,7 @@ onMounted(() => fetchData())
               :disabled="isSaving"
               class="rounded-xl bg-[var(--ct-primary)] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
             >
-              {{ isSaving ? 'Criando acesso...' : 'Criar acesso' }}
+              {{ isSaving ? 'Enviando convite...' : 'Enviar convite' }}
             </button>
           </div>
         </div>

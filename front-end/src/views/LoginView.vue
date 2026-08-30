@@ -7,6 +7,7 @@ import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
 import { getPlan, getPlanPrice, isBillingCycle } from '@/constants/plans'
+import { appConfig } from '@/config/env'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,7 +22,7 @@ const erroMensagem = ref('')
 const email = ref('')
 const senha = ref('')
 const captchaToken = ref('')
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileSiteKey = appConfig.turnstileSiteKey
 
 const getErrorMessage = (error: unknown): string => {
   const candidate = error as {

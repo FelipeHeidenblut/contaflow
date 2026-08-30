@@ -1,9 +1,10 @@
 import axios from 'axios'
 import { supabase } from '../services/supabase' // Ajuste o caminho se necessário (ex: ../services/supabase)
+import { appConfig } from '@/config/env'
 
 // Cria a instância base do Axios apontando para o FastAPI
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.contablytask.com.br',
+  baseURL: appConfig.apiBaseUrl,
   timeout: 10000,
 })
 

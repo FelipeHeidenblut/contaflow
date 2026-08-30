@@ -1,4 +1,3 @@
-import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import List
@@ -20,6 +19,7 @@ import relatorios
 import schemas
 import calendario
 import contact
+from app_config import get_settings
 from database import get_db
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,26 +28,21 @@ from security import get_current_user
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-is_production = os.getenv("ENVIRONMENT") == "production"
+settings = get_settings()
+
 app = FastAPI(
     title="ContaFlow API",
-    docs_url=None if is_production else "/docs",
-    redoc_url=None if is_production else "/redoc",
-    openapi_url=None if is_production else "/openapi.json",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
+    openapi_url=None if settings.is_production else "/openapi.json",
 )
 
 # ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA DO CORS
 # ==========================================
-# Pega a URL do frontend do .env. Se não achar, usa o localhost como padrão.
-frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173").rstrip("/")
-allowed_origins = [frontend_url]
-if not is_production:
-    allowed_origins.extend(["http://localhost:5173", "http://localhost:3000"])
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=list(dict.fromkeys(allowed_origins)),
+    allow_origins=list(settings.cors_allowed_origins),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
@@ -72,7 +67,10 @@ app.include_router(alertas.router)
 
 @app.get("/")
 def read_root():
-    return {"status": "A API do ContaFlow está no ar! 🚀"}
+    return {
+        "status": "A API do ContaFlow está no ar! 🚀",
+        "environment": settings.environment,
+    }
 
 
 @app.get("/db-check")
@@ -91,9 +89,9 @@ def test_db_connection(db: Session = Depends(get_db)):
 
 @app.post("/dev/login")
 def dev_fake_login(db: Session = Depends(get_db)):
-    # 🛡️ SEGURANÇA: Se a variável ENVIRONMENT não for "development", bloqueia o acesso!
+    # 🛡️ SEGURANÇA: disponível exclusivamente no ambiente de desenvolvimento.
     # Isso impede que hackers usem essa rota para gerar tokens quando o sistema estiver na nuvem.
-    if os.getenv("ENVIRONMENT") != "development":
+    if not settings.is_development:
         raise HTTPException(status_code=404, detail="Not Found")
 
     dev_tenant = (
@@ -115,7 +113,9 @@ def dev_fake_login(db: Session = Depends(get_db)):
         "exp": datetime.now(timezone.utc) + timedelta(days=1),
     }
 
-    SECRET = os.getenv("SUPABASE_JWT_SECRET")
+    SECRET = settings.supabase_jwt_secret
+    if not SECRET:
+        raise HTTPException(status_code=503, detail="Login de desenvolvimento não configurado.")
     token = jwt.encode(payload, SECRET, algorithm="HS256")
 
     return {

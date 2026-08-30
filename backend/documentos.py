@@ -1,58 +1,57 @@
-import os
-import tempfile
-import uuid
-from typing import Literal, Optional
+from typing import Literal
 from uuid import UUID
 
-import models
 import schemas
-from access_control import apply_client_scope, get_accessible_client, require_management_access
+from app_config import get_settings
 from database import get_db
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from document_service import (
+    DocumentListFilters,
+    create_download_url,
+    delete_document,
+    list_documents,
+    upload_document,
+)
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.responses import RedirectResponse
+from pagination import PaginatedResponse
 from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 
 # Configurações do Supabase Storage
 from supabase import Client, create_client
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY")
-BUCKET_NAME = "documentos-contaflow"
+settings = get_settings()
+SUPABASE_URL = settings.supabase_url
+SUPABASE_SERVICE_KEY = settings.supabase_service_key
+BUCKET_NAME = settings.supabase_storage_bucket
 
 # Inicializa o cliente admin do Supabase
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 router = APIRouter(prefix="/api/v1/documentos", tags=["Documentos e Repositório"])
 
-MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
-CHUNK_SIZE = 1024 * 1024
-ALLOWED_FILES = {
-    ".pdf": ("application/pdf", (b"%PDF-",)),
-    ".png": ("image/png", (b"\x89PNG\r\n\x1a\n",)),
-    ".jpg": ("image/jpeg", (b"\xff\xd8\xff",)),
-    ".jpeg": ("image/jpeg", (b"\xff\xd8\xff",)),
-    ".docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document", (b"PK\x03\x04",)),
-    ".xlsx": ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", (b"PK\x03\x04",)),
-}
 
-
-@router.get("", response_model=list[schemas.DocumentResponse])
+@router.get("", response_model=PaginatedResponse[schemas.DocumentResponse])
 def listar_documentos(
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
+    search: str | None = Query(None, max_length=120),
+    client_id: UUID | None = Query(None),
+    categoria: str | None = Query(None, max_length=40),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-    query = (
-        db.query(models.Document)
-        .join(
-            models.Client,
-            (models.Document.client_id == models.Client.id)
-            & (models.Document.tenant_id == models.Client.tenant_id),
-        )
-        .filter(models.Document.tenant_id == tenant_id)
+    return list_documents(
+        db,
+        current_user,
+        DocumentListFilters(
+            search=search,
+            client_id=client_id,
+            category=categoria,
+            page=page,
+            page_size=page_size,
+        ),
     )
-    documentos = apply_client_scope(query, current_user).all()
-    return documentos
 
 
 @router.post(
@@ -60,7 +59,7 @@ def listar_documentos(
 )
 async def registrar_documento(
     client_id: UUID = Form(...),
-    task_id: Optional[UUID] = Form(None),
+    task_id: UUID | None = Form(None),
     categoria: Literal[
         "Fiscal", "Contábil", "Departamento Pessoal", "Societário", "Geral"
     ] = Form("Geral"),
@@ -68,96 +67,16 @@ async def registrar_documento(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-    user_id = current_user.get("user_id")
-
-    # 1. Validação de Segurança (Tenant)
-    get_accessible_client(db, client_id, current_user, active_only=True)
-
-    if task_id:
-        tarefa = db.query(models.Task).filter(
-            models.Task.id == task_id,
-            models.Task.tenant_id == tenant_id,
-            models.Task.client_id == client_id,
-        ).first()
-        if not tarefa:
-            raise HTTPException(status_code=404, detail="Tarefa não encontrada para este cliente.")
-
-    # 2. Gerar nome seguro e caminho no Storage
-    nome_original = os.path.basename(file.filename or "documento")[:255]
-    extensao = os.path.splitext(nome_original)[1].lower()
-    if extensao not in ALLOWED_FILES:
-        raise HTTPException(status_code=415, detail="Tipo de arquivo não permitido.")
-
-    expected_content_type, signatures = ALLOWED_FILES[extensao]
-    nome_seguro = f"{uuid.uuid4()}{extensao}"
-    storage_path = f"{tenant_id}/{client_id}/{nome_seguro}"
-
-    # 3. Upload para o Supabase Storage via Arquivo Temporário
-    tmp_file_path = None  # Inicializa a variável para o bloco finally
-
-    try:
-        # Cria um arquivo temporário no disco
-        with tempfile.NamedTemporaryFile(delete=False, suffix=extensao) as tmp_file:
-            total_size = 0
-            first_chunk = True
-            while chunk := await file.read(CHUNK_SIZE):
-                total_size += len(chunk)
-                if total_size > MAX_FILE_SIZE:
-                    raise HTTPException(status_code=413, detail="Arquivo excede o limite máximo de 5MB.")
-                if first_chunk:
-                    if not any(chunk.startswith(signature) for signature in signatures):
-                        raise HTTPException(status_code=415, detail="Conteúdo do arquivo não corresponde à extensão.")
-                    first_chunk = False
-                tmp_file.write(chunk)
-            if first_chunk:
-                raise HTTPException(status_code=400, detail="Arquivo vazio.")
-            tmp_file_path = (
-                tmp_file.name
-            )  # Pega o caminho absoluto do arquivo temporário
-
-        # O arquivo temporário já foi fechado pelo bloco 'with' acima.
-        # Agora abrimos ele em modo de leitura binária ("rb") para o Supabase ler
-        with open(tmp_file_path, "rb") as f:
-            # 1º argumento: Caminho no bucket (destino)
-            # 2º argumento: Objeto de arquivo aberto (origem)
-            supabase_admin.storage.from_(BUCKET_NAME).upload(
-                storage_path,
-                f,
-                file_options={
-                    "content-type": expected_content_type,
-                    "content-disposition": f'attachment; filename="{nome_seguro}"',
-                },
-            )
-
-    except HTTPException:
-        raise  # Repassa o erro de tamanho (413)
-    except Exception as e:
-        print(f"Erro ao subir para o Supabase Storage: {e}")
-        raise HTTPException(
-            status_code=500, detail="Erro ao salvar o arquivo na nuvem."
-        )
-    finally:
-        # Segurança vital: Apaga o arquivo temporário do disco do servidor
-        if tmp_file_path and os.path.exists(tmp_file_path):
-            os.remove(tmp_file_path)
-
-    # 4. Salva os dados no banco PostgreSQL local (Apenas 1 vez!)
-    novo_doc = models.Document(
-        tenant_id=tenant_id,
+    return await upload_document(
+        db,
+        current_user,
+        supabase_admin,
+        BUCKET_NAME,
         client_id=client_id,
-        task_id=task_id if task_id else None,
-        nome_arquivo=nome_original,
-        categoria=categoria,
-        storage_path=storage_path,
-        uploaded_by=user_id,
+        task_id=task_id,
+        category=categoria,
+        upload=file,
     )
-
-    db.add(novo_doc)
-    db.commit()
-    db.refresh(novo_doc)
-
-    return novo_doc
 
 
 # ROTA 3: DOWNLOAD DE DOCUMENTO (AGORA VIA LINK ASSINADO DO SUPABASE)
@@ -167,37 +86,13 @@ def baixar_documento(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-
-    doc = (
-        db.query(models.Document)
-        .filter(models.Document.id == doc_id, models.Document.tenant_id == tenant_id)
-        .first()
+    download_url = create_download_url(
+        db,
+        current_user,
+        supabase_admin,
+        BUCKET_NAME,
+        doc_id,
     )
-
-    if not doc:
-        raise HTTPException(
-            status_code=404, detail="Registro do documento não encontrado."
-        )
-    get_accessible_client(db, doc.client_id, current_user)
-
-    # Gera uma URL assinada (válida por 1 hora) para o usuário baixar o arquivo
-    try:
-        signed_url = supabase_admin.storage.from_(BUCKET_NAME).create_signed_url(
-            doc.storage_path,
-            expires_in=3600,  # 3600 segundos = 1 hora
-        )
-        # O supabase-py retorna um dicionário, pegamos apenas a URL
-        download_url = signed_url.get("signedURL") or signed_url.get("signedUrl")
-
-        if not download_url:
-            raise Exception("URL vazia")
-
-    except Exception as e:
-        print(f"Erro ao gerar URL assinada: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao gerar link de download.")
-
-    # Redireciona o navegador do usuário direto para o link seguro do Supabase
     return RedirectResponse(url=download_url)
 
 
@@ -208,27 +103,10 @@ def excluir_documento(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-
-    doc = (
-        db.query(models.Document)
-        .filter(models.Document.id == doc_id, models.Document.tenant_id == tenant_id)
-        .first()
+    return delete_document(
+        db,
+        current_user,
+        supabase_admin,
+        BUCKET_NAME,
+        doc_id,
     )
-
-    if not doc:
-        raise HTTPException(status_code=404, detail="Documento não encontrado.")
-    get_accessible_client(db, doc.client_id, current_user)
-    require_management_access(current_user)
-
-    # Apaga o arquivo do Supabase Storage
-    try:
-        supabase_admin.storage.from_(BUCKET_NAME).remove([doc.storage_path])
-    except Exception as e:
-        print(f"Aviso: Não foi possível deletar o arquivo do Supabase Storage: {e}")
-
-    # Apaga o registro do banco de dados local
-    db.delete(doc)
-    db.commit()
-
-    return None

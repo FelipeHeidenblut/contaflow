@@ -1,0 +1,32 @@
+name: Reconciliar tarefas recorrentes
+
+on:
+  schedule:
+    - cron: "30 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: task-recurrences
+  cancel-in-progress: false
+
+jobs:
+  process-recurrences:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Acionar reconciliador protegido
+        env:
+          RECURRENCE_PROCESS_URL: ${{ secrets.RECURRENCE_PROCESS_URL }}
+          RECURRENCE_CRON_SECRET: ${{ secrets.RECURRENCE_CRON_SECRET }}
+        run: |
+          test -n "$RECURRENCE_PROCESS_URL"
+          test -n "$RECURRENCE_CRON_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --max-time 120 \
+            --request POST \
+            --header "X-Cron-Secret: $RECURRENCE_CRON_SECRET" \
+            "${RECURRENCE_PROCESS_URL%/}/api/v1/obrigacoes/recorrencias/processar"

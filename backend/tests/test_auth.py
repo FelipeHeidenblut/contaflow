@@ -58,6 +58,9 @@ class FakeQuery:
     def filter(self, *args):
         return self
 
+    def with_for_update(self):
+        return self
+
     def first(self):
         if self.entity is models.Tenant:
             return SimpleNamespace(plano="free")

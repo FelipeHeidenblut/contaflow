@@ -2,7 +2,12 @@ import secrets
 from datetime import datetime, timezone
 
 import models
-from access_control import apply_task_scope
+from access_control import (
+    Permission,
+    apply_task_scope,
+    require_permission,
+    tenant_repository,
+)
 from database import get_db
 from enums import TaskStatus
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -25,9 +30,10 @@ def ensure_calendar_token(profile: models.Profile, db: Session) -> str:
 def obter_feed_url(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    profile = db.query(models.Profile).filter(
-        models.Profile.id == current_user["user_id"],
-        models.Profile.tenant_id == current_user["tenant_id"],
+    require_permission(current_user, Permission.TASK_READ)
+    repository = tenant_repository(db, current_user)
+    profile = repository.query(models.Profile).filter(
+        models.Profile.id == repository.context.user_id
     ).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Perfil não encontrado.")
@@ -38,9 +44,10 @@ def obter_feed_url(
 def rotacionar_feed_token(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    profile = db.query(models.Profile).filter(
-        models.Profile.id == current_user["user_id"],
-        models.Profile.tenant_id == current_user["tenant_id"],
+    require_permission(current_user, Permission.TASK_READ)
+    repository = tenant_repository(db, current_user)
+    profile = repository.query(models.Profile).filter(
+        models.Profile.id == repository.context.user_id
     ).first()
     if not profile:
         raise HTTPException(status_code=404, detail="Perfil não encontrado.")
@@ -60,18 +67,15 @@ def gerar_ics_feed(calendar_token: str, db: Session = Depends(get_db)):
     cal = Calendar()
     cal.add("prodid", "-//ContablyTask//Contabil//BR")
     cal.add("version", "2.0")
-    task_query = db.query(models.Task).filter(
-        models.Task.tenant_id == profile.tenant_id,
+    feed_user = {
+        "user_id": str(profile.id),
+        "tenant_id": str(profile.tenant_id),
+        "role": profile.role,
+    }
+    task_query = tenant_repository(db, feed_user).query(models.Task).filter(
         models.Task.status != TaskStatus.CONCLUIDA.value,
     )
-    tarefas = apply_task_scope(
-        task_query,
-        {
-            "user_id": str(profile.id),
-            "tenant_id": str(profile.tenant_id),
-            "role": profile.role,
-        },
-    ).all()
+    tarefas = apply_task_scope(task_query, feed_user).all()
 
     for tarefa in tarefas:
         event = Event()

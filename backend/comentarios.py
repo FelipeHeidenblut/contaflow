@@ -3,11 +3,19 @@ from typing import Optional
 from uuid import UUID
 
 import models
-from access_control import get_accessible_client, has_management_access
+from access_control import (
+    Permission,
+    get_accessible_client,
+    get_accessible_task,
+    has_permission,
+    require_permission,
+    tenant_repository,
+)
 from database import get_db
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from security import get_active_user, get_current_user
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/v1/comentarios", tags=["Comentários internos"])
@@ -57,26 +65,26 @@ def list_comments(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    require_permission(current_user, Permission.COMMENT_READ)
     get_accessible_client(db, client_id, current_user)
+    repository = tenant_repository(db, current_user)
     query = (
-        db.query(models.Comment, models.Profile.name)
-        .outerjoin(models.Profile, models.Comment.author_id == models.Profile.id)
+        repository.query(models.Comment)
+        .add_columns(models.Profile.name)
+        .outerjoin(
+            models.Profile,
+            and_(
+                models.Comment.author_id == models.Profile.id,
+                models.Comment.tenant_id == models.Profile.tenant_id,
+            ),
+        )
         .filter(
-            models.Comment.tenant_id == current_user["tenant_id"],
             models.Comment.client_id == client_id,
         )
     )
     if task_id:
-        task = (
-            db.query(models.Task)
-            .filter(
-                models.Task.id == task_id,
-                models.Task.tenant_id == current_user["tenant_id"],
-                models.Task.client_id == client_id,
-            )
-            .first()
-        )
-        if not task:
+        task = get_accessible_task(db, task_id, current_user)
+        if task.client_id != client_id:
             raise HTTPException(status_code=404, detail="Tarefa não encontrada para este cliente.")
         query = query.filter(models.Comment.task_id == task_id)
     else:
@@ -93,31 +101,27 @@ def create_comment(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
+    require_permission(current_user, Permission.COMMENT_WRITE)
     get_accessible_client(db, payload.client_id, current_user, active_only=True)
     if payload.task_id:
-        task = (
-            db.query(models.Task)
-            .filter(
-                models.Task.id == payload.task_id,
-                models.Task.tenant_id == current_user["tenant_id"],
-                models.Task.client_id == payload.client_id,
-            )
-            .first()
-        )
-        if not task:
+        task = get_accessible_task(db, payload.task_id, current_user)
+        if task.client_id != payload.client_id:
             raise HTTPException(status_code=404, detail="Tarefa não encontrada para este cliente.")
 
+    repository = tenant_repository(db, current_user)
     comment = models.Comment(
-        tenant_id=current_user["tenant_id"],
+        tenant_id=repository.context.tenant_id,
         client_id=payload.client_id,
         task_id=payload.task_id,
-        author_id=current_user["user_id"],
+        author_id=repository.context.user_id,
         content=payload.content,
     )
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    author = db.query(models.Profile).filter(models.Profile.id == current_user["user_id"]).first()
+    author = repository.query(models.Profile).filter(
+        models.Profile.id == repository.context.user_id
+    ).first()
     return _serialize_comment(comment, author.name if author else "Usuário")
 
 
@@ -127,19 +131,13 @@ def delete_comment(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    comment = (
-        db.query(models.Comment)
-        .filter(
-            models.Comment.id == comment_id,
-            models.Comment.tenant_id == current_user["tenant_id"],
-        )
-        .first()
+    require_permission(current_user, Permission.COMMENT_WRITE)
+    comment = tenant_repository(db, current_user).get(
+        models.Comment, comment_id, detail="Comentário não encontrado."
     )
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comentário não encontrado.")
     get_accessible_client(db, comment.client_id, current_user)
-    if str(comment.author_id) != str(current_user["user_id"]) and not has_management_access(
-        current_user
+    if str(comment.author_id) != str(current_user["user_id"]) and not has_permission(
+        current_user, Permission.COMMENT_DELETE_ANY
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

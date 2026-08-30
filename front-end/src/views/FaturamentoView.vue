@@ -27,14 +27,23 @@ const billingCycle = ref<BillingCycle>(
   isBillingCycle(route.query.ciclo) ? route.query.ciclo : 'monthly',
 )
 const currentPlan = computed(() => getPlan(planoAtual.value))
-const isCurrentPlan = (plan: PlanOption) =>
-  plan.id === planoAtual.value && (plan.id === 'free' || billingCycle.value === cicloAtual.value)
+const canCreateSubscription = computed(
+  () => planoAtual.value === 'free' || statusPagamento.value === 'cancelado',
+)
+const isCurrentPlan = (plan: PlanOption) => {
+  if (plan.id === 'free') return planoAtual.value === 'free'
+  return (
+    statusPagamento.value !== 'cancelado' &&
+    plan.id === planoAtual.value &&
+    billingCycle.value === cicloAtual.value
+  )
+}
 
 const getCta = (plan: PlanOption) => {
   if (isCurrentPlan(plan)) return 'Plano atual'
   if (plan.sales) return 'Falar com vendas'
   if (plan.id === 'free') return 'Plano gratuito'
-  if (planoAtual.value !== 'free') return 'Solicitar alteração'
+  if (!canCreateSubscription.value) return 'Solicitar alteração'
   return `Assinar ${plan.name}`
 }
 
@@ -60,7 +69,7 @@ const assinarPlano = async (plano: PlanOption) => {
     )
     return
   }
-  if (planoAtual.value !== 'free') {
+  if (!canCreateSubscription.value) {
     toast.info('Para alterar um plano ou ciclo existente, entre em contato com o suporte.')
     router.push({ path: '/contato', query: { assunto: 'Alterar plano' } })
     return
@@ -89,6 +98,18 @@ const assinarPlano = async (plano: PlanOption) => {
     isLoadingPlano.value = null
   }
 }
+
+const paymentStatusLabel = computed(() => {
+  const labels: Record<string, string> = {
+    ativo: 'Ativo',
+    aguardando_pagamento: 'Pagamento pendente',
+    inadimplente: 'Vencido',
+    estornado: 'Estornado',
+    cancelado: 'Cancelado',
+    chargeback: 'Em contestação',
+  }
+  return labels[statusPagamento.value] || 'Requer atenção'
+})
 
 onMounted(loadCurrentPlan)
 </script>
@@ -154,13 +175,7 @@ onMounted(loadCurrentPlan)
           </p>
           <p class="mt-0.5 text-xs text-[var(--ct-text-muted)]">
             Status:
-            {{
-              statusPagamento === 'ativo'
-                ? 'Ativo'
-                : statusPagamento === 'aguardando_pagamento'
-                  ? 'Pagamento pendente'
-                  : 'Requer atenção'
-            }}
+            {{ paymentStatusLabel }}
           </p>
         </div>
         <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--ct-primary)]"

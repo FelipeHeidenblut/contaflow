@@ -1,23 +1,16 @@
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool, create_engine # Adicionado create_engine
+from sqlalchemy import pool, create_engine
 from alembic import context
 
-import os
-from dotenv import load_dotenv
-from database import Base 
-import models            
-
-load_dotenv()
+from app_config import get_database_url
+from database import Base
+import models
 
 # this is the Alembic Config object
 config = context.config
 
 # Puxa a URL do .env
-sqlalchemy_url = os.getenv("DATABASE_URL")
-
-# Ajusta o prefixo para o SQLAlchemy moderno
-if sqlalchemy_url and sqlalchemy_url.startswith("postgres://"):
-    sqlalchemy_url = sqlalchemy_url.replace("postgres://", "postgresql://", 1)
+sqlalchemy_url = get_database_url()
 
 # Interpret the config file for Python logging.
 if config.config_file_name is not None:

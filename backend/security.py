@@ -1,19 +1,16 @@
 import logging
 import os
 import time
-
-import models
 import requests
 import jwt
+from auth_service import resolve_user_context
 
 # Imports locais da sua arquitetura
+from app_config import get_settings
 from database import get_db
-from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-
-load_dotenv()
 
 # ==========================================
 # CONFIGURAÇÃO DE SEGURANÇA E LOGS
@@ -21,8 +18,9 @@ load_dotenv()
 logger = logging.getLogger("ContaFlow.Security")
 security_scheme = HTTPBearer()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+settings = get_settings()
+SUPABASE_URL = settings.supabase_url
+SUPABASE_ANON_KEY = settings.supabase_anon_key
 SUPABASE_JWT_AUDIENCE = os.getenv("SUPABASE_JWT_AUDIENCE", "authenticated")
 JWKS_CACHE_TTL_SECONDS = 3600
 _jwks_cache = None
@@ -129,49 +127,21 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security_sc
 def get_current_user(
     payload: dict = Depends(verify_token), db: Session = Depends(get_db)
 ):
-    """Valida a existência do usuário e do escritório no banco de dados local"""
-    user_id = payload.get("sub")
-
-    profile = db.query(models.Profile).filter(models.Profile.id == user_id).first()
-
-    # Validações de integridade
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Perfil de usuário não encontrado. Por favor, sincronize seu cadastro.",
-        )
-
-    if not profile.tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário não está associado a um escritório.",
-        )
-
-    # Retorna os dados com a flag is_superadmin embutida para a próxima camada
-    return {
-        "user_id": user_id,
-        "email": payload.get("email"),
-        "tenant_id": str(profile.tenant_id),
-        "role": profile.role,
-        "is_superadmin": profile.is_superadmin,
-    }
+    """Resolve, em uma única etapa, a identidade, o papel e o escritório do usuário."""
+    return resolve_user_context(db, payload)
 
 
-def get_active_user(
-    current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)
-):
-    """Bloqueia mutações quando o escritório está inadimplente."""
-    tenant = (
-        db.query(models.Tenant)
-        .filter(models.Tenant.id == current_user["tenant_id"])
-        .first()
-    )
-    if not tenant:
-        raise HTTPException(status_code=403, detail="Escritório não encontrado.")
-    if tenant.status_pagamento == "inadimplente":
+def get_active_user(current_user: dict = Depends(get_current_user)):
+    """Bloqueia mutações de assinaturas que não podem mais operar."""
+    if current_user["payment_status"] in {
+        "inadimplente",
+        "cancelado",
+        "estornado",
+        "chargeback",
+    }:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Conta bloqueada por inadimplência. Regularize o pagamento para continuar.",
+            detail="Conta bloqueada. Regularize a assinatura para continuar.",
         )
     return current_user
 

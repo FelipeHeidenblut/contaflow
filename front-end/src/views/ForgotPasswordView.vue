@@ -5,12 +5,13 @@ import { toast } from 'vue3-toastify'
 import VueTurnstile from 'vue-turnstile'
 import { supabase } from '../services/supabase'
 import AuthShell from '@/components/AuthShell.vue'
+import { appConfig } from '@/config/env'
 
 const email = ref('')
 const isLoading = ref(false)
 const emailEnviado = ref(false)
 const captchaToken = ref('')
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileSiteKey = appConfig.turnstileSiteKey
 const handleResetPassword = async () => {
   if (!captchaToken.value) {
     toast.error('Conclua a verificação de segurança.')

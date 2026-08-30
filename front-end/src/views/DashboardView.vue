@@ -5,6 +5,7 @@ import Layout from '../components/Layout.vue'
 import OperationalDashboard from '../components/OperationalDashboard.vue'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
+import { fetchAllPages } from '../services/pagination'
 
 interface TaskData {
   id: string | number
@@ -66,6 +67,9 @@ const teamLoad = computed(() => {
 const planLabel = computed(() => {
   if (dashboard.value.status_pagamento === 'aguardando_pagamento') return 'Pagamento pendente'
   if (dashboard.value.status_pagamento === 'inadimplente') return 'Conta bloqueada'
+  if (dashboard.value.status_pagamento === 'estornado') return 'Pagamento estornado'
+  if (dashboard.value.status_pagamento === 'cancelado') return 'Assinatura cancelada'
+  if (dashboard.value.status_pagamento === 'chargeback') return 'Pagamento em contestação'
   const labels: Record<string, string> = {
     free: 'Gratuito',
     basico: 'Essencial',
@@ -81,18 +85,18 @@ const fetchData = async () => {
   try {
     const [dashboardResult, tasksResult, membersResult, clientsResult] = await Promise.allSettled([
       api.get('/api/v1/dashboard/'),
-      api.get('/api/v1/obrigacoes'),
-      api.get('/api/v1/membros'),
-      api.get('/api/v1/clientes'),
+      fetchAllPages<TaskData>('/api/v1/obrigacoes'),
+      fetchAllPages<Member>('/api/v1/membros'),
+      fetchAllPages<Client>('/api/v1/clientes'),
     ])
 
     if (dashboardResult.status === 'rejected') throw dashboardResult.reason
     if (tasksResult.status === 'rejected') throw tasksResult.reason
 
     dashboard.value = dashboardResult.value.data
-    tasks.value = tasksResult.value.data
-    members.value = membersResult.status === 'fulfilled' ? membersResult.value.data : []
-    clients.value = clientsResult.status === 'fulfilled' ? clientsResult.value.data : []
+    tasks.value = tasksResult.value
+    members.value = membersResult.status === 'fulfilled' ? membersResult.value : []
+    clients.value = clientsResult.status === 'fulfilled' ? clientsResult.value : []
   } catch {
     toast.error('Erro ao carregar os dados do dashboard.')
   } finally {

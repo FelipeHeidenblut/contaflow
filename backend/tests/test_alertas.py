@@ -11,6 +11,7 @@ from pydantic import ValidationError
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import alertas
+import alert_service
 from alertas import AlertPreferences, is_due_for_alert, lead_time_label, verify_cron_secret
 
 
@@ -77,10 +78,13 @@ def test_processador_envia_para_funcionario_responsavel(monkeypatch):
     db.query.return_value = query
 
     sent_payloads = []
-    monkeypatch.setattr(alertas, "_claim_alert", lambda *_args: claimed_alert)
-    monkeypatch.setattr(alertas, "send_deadline_email", sent_payloads.append)
+    monkeypatch.setattr(alert_service, "claim_alert", lambda *_args: claimed_alert)
 
-    result = alertas.process_due_alerts(db, reference_date=reference)
+    result = alertas.process_due_alerts(
+        db,
+        reference_date=reference,
+        email_sender=sent_payloads.append,
+    )
 
     assert result == {"candidates": 1, "sent": 1, "failed": 0, "skipped": 0}
     assert sent_payloads[0].recipient == "funcionario@escritorio.test"

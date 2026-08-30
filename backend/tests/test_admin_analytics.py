@@ -1,6 +1,8 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from types import SimpleNamespace
 
+import admin
 import pytest
 from pydantic import ValidationError
 
@@ -14,8 +16,6 @@ from admin import (
 from plan_config import (
     get_monthly_equivalent,
     get_plan_price,
-    identify_plan_by_value,
-    identify_subscription_by_value,
 )
 
 
@@ -43,16 +43,12 @@ def test_provider_identifier_is_masked():
     assert _mask_provider_id(None) is None
 
 
-def test_plan_is_identified_from_exact_payment_value():
-    assert identify_plan_by_value(Decimal("149.90")) == "profissional"
-    assert identify_plan_by_value(Decimal("149.9")) == "profissional"
-    assert identify_subscription_by_value(Decimal("2499")) == ("escritorio", "annual")
+def test_configuracao_de_precos_mantem_valores_comerciais():
     assert get_plan_price("escritorio", "monthly") == Decimal("249.90")
     assert get_plan_price("escritorio", "annual") == Decimal("2499.00")
     assert get_monthly_equivalent("business", "annual").quantize(Decimal("0.01")) == Decimal(
         "374.17"
     )
-    assert identify_plan_by_value(Decimal("150.00")) is None
     assert get_plan_price("unknown") == Decimal("0.00")
 
 
@@ -65,3 +61,73 @@ def test_manual_status_change_requires_a_meaningful_reason():
 
     with pytest.raises(ValidationError):
         AdminStatusUpdate(status="cancelado", reason="Solicitado pelo financeiro")
+
+
+def test_csv_export_neutralizes_spreadsheet_formulas():
+    assert admin._safe_csv_cell("=HYPERLINK(\"https://example.com\")") == (
+        "'=HYPERLINK(\"https://example.com\")"
+    )
+    assert admin._safe_csv_cell("  +SUM(1;1)") == "'  +SUM(1;1)"
+    assert admin._safe_csv_cell("Escritório Contábil") == "Escritório Contábil"
+
+
+def test_tenant_export_streams_header_before_consuming_database_rows():
+    consumed = []
+    tenant = SimpleNamespace(
+        id="tenant-1",
+        razao_social="Escritório Contábil",
+        plano="profissional",
+        billing_cycle="monthly",
+        status_pagamento="ativo",
+        created_at=datetime(2026, 8, 1, tzinfo=timezone.utc),
+    )
+
+    def rows():
+        consumed.append("row")
+        yield (tenant, 3, "admin@example.com", None, 8, 12, None, None, None)
+
+    chunks = admin._stream_tenant_export(rows())
+
+    header = next(chunks)
+    assert consumed == []
+    assert header.startswith("\ufeff")
+    assert "Escritório;Administrador;Plano" in header
+
+    exported_row = next(chunks)
+    assert consumed == ["row"]
+    assert "Escritório Contábil" in exported_row
+
+
+def test_export_endpoint_uses_batched_query_and_disables_response_buffering(monkeypatch):
+    class ExportQuery:
+        batch_size = None
+
+        def order_by(self, *_values):
+            return self
+
+        def yield_per(self, value):
+            self.batch_size = value
+            return iter(())
+
+        def all(self):
+            raise AssertionError("A exportação não deve carregar todas as linhas em memória")
+
+    query = ExportQuery()
+    monkeypatch.setattr(admin, "_tenant_aggregate_query", lambda _db: (query, {}))
+    monkeypatch.setattr(
+        admin,
+        "_apply_filters",
+        lambda current_query, *_args: current_query,
+    )
+
+    response = admin.export_tenants(
+        search=None,
+        plan=None,
+        payment_status=None,
+        db=object(),
+        _admin_user={},
+    )
+
+    assert query.batch_size == 250
+    assert response.headers["x-accel-buffering"] == "no"
+    assert response.headers["cache-control"] == "private, no-store"

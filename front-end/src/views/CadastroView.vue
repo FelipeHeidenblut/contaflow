@@ -8,6 +8,7 @@ import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
 import { getPlan, getPlanPrice, isBillingCycle } from '@/constants/plans'
+import { appConfig } from '@/config/env'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -21,7 +22,7 @@ const nomeEscritorio = ref('')
 const documentoRaw = ref('')
 const acceptedTerms = ref(false)
 const captchaToken = ref('')
-const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || ''
+const turnstileSiteKey = appConfig.turnstileSiteKey
 const showPassword = ref(false)
 const selectedPlan = getPlan(route.query.plano)
 const selectedCycle = isBillingCycle(route.query.ciclo) ? route.query.ciclo : 'monthly'

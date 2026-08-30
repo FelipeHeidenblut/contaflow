@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Literal, Optional
+from typing import Iterable, Iterator, Literal, Optional
 from uuid import UUID
 
 import models
@@ -154,6 +154,59 @@ def _serialize_tenant(row) -> dict:
         "task_count": tasks or 0,
         "last_activity_at": _latest_activity(last_profile, last_task, last_doc, last_comment),
     }
+
+
+def _safe_csv_cell(value: object) -> str:
+    """Evita que planilhas interpretem conteúdo controlado pelo usuário como fórmula."""
+    text = "" if value is None else str(value)
+    if text.startswith(("\t", "\r")) or text.lstrip().startswith(
+        ("=", "+", "-", "@")
+    ):
+        return f"'{text}"
+    return text
+
+
+def _stream_tenant_export(rows: Iterable[object]) -> Iterator[str]:
+    """Gera o CSV linha a linha, sem manter toda a exportação em memória."""
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, delimiter=";")
+    writer.writerow(
+        [
+            "Escritório",
+            "Administrador",
+            "Plano",
+            "Ciclo",
+            "Status",
+            "Usuários",
+            "Clientes",
+            "Cadastro",
+            "Última atividade",
+        ]
+    )
+    yield "\ufeff" + output.getvalue()
+    output.seek(0)
+    output.truncate(0)
+
+    for row in rows:
+        item = _serialize_tenant(row)
+        writer.writerow(
+            [
+                _safe_csv_cell(item["razao_social"]),
+                _safe_csv_cell(item["admin_email"]),
+                item["plano"],
+                item["billing_cycle"],
+                item["status_pagamento"],
+                item["user_count"],
+                item["client_count"],
+                item["created_at"].isoformat(),
+                item["last_activity_at"].isoformat()
+                if item["last_activity_at"]
+                else "",
+            ]
+        )
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
 
 
 def _financial_metrics(db: Session, tenants: list[models.Tenant], month: date) -> dict:
@@ -316,7 +369,7 @@ def get_admin_overview(
     failed_webhooks = (
         db.query(func.count(models.AsaasWebhookEvent.id))
         .filter(
-            models.AsaasWebhookEvent.status == "failed",
+            models.AsaasWebhookEvent.status.in_({"failed", "dead"}),
             models.AsaasWebhookEvent.created_at >= now - timedelta(days=7),
         )
         .scalar()
@@ -393,7 +446,16 @@ def list_tenants(
     plan: Optional[
         Literal["free", "basico", "profissional", "escritorio", "business"]
     ] = None,
-    payment_status: Optional[Literal["ativo", "inadimplente", "aguardando_pagamento"]] = None,
+    payment_status: Optional[
+        Literal[
+            "ativo",
+            "inadimplente",
+            "aguardando_pagamento",
+            "estornado",
+            "cancelado",
+            "chargeback",
+        ]
+    ] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=5, le=100),
     sort_by: Literal["created_at", "name", "users", "clients", "last_activity"] = "created_at",
@@ -429,43 +491,34 @@ def export_tenants(
     plan: Optional[
         Literal["free", "basico", "profissional", "escritorio", "business"]
     ] = None,
-    payment_status: Optional[Literal["ativo", "inadimplente", "aguardando_pagamento"]] = None,
+    payment_status: Optional[
+        Literal[
+            "ativo",
+            "inadimplente",
+            "aguardando_pagamento",
+            "estornado",
+            "cancelado",
+            "chargeback",
+        ]
+    ] = None,
     db: Session = Depends(get_db),
     _admin_user: dict = Depends(get_super_admin),
 ):
     query, columns = _tenant_aggregate_query(db)
-    rows = _apply_filters(query, columns, search, plan, payment_status).order_by(
-        models.Tenant.created_at.desc()
-    ).all()
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")
-    writer.writerow(
-        [
-            "Escritório",
-            "Administrador",
-            "Plano",
-            "Ciclo",
-            "Status",
-            "Usuários",
-            "Clientes",
-            "Cadastro",
-            "Última atividade",
-        ]
+    rows = (
+        _apply_filters(query, columns, search, plan, payment_status)
+        .order_by(models.Tenant.created_at.desc())
+        .yield_per(250)
     )
-    for row in rows:
-        item = _serialize_tenant(row)
-        writer.writerow(
-            [
-                item["razao_social"], item["admin_email"], item["plano"],
-                item["billing_cycle"], item["status_pagamento"], item["user_count"], item["client_count"],
-                item["created_at"].isoformat(),
-                item["last_activity_at"].isoformat() if item["last_activity_at"] else "",
-            ]
-        )
     return StreamingResponse(
-        iter(["\ufeff" + output.getvalue()]),
+        _stream_tenant_export(rows),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename="escritorios-contablytask.csv"'},
+        headers={
+            "Content-Disposition": 'attachment; filename="escritorios-contablytask.csv"',
+            "Cache-Control": "private, no-store",
+            "X-Accel-Buffering": "no",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
@@ -522,6 +575,12 @@ def update_tenant_status(
         raise HTTPException(status_code=409, detail="O escritório já possui esse status.")
     old_status = tenant.status_pagamento
     tenant.status_pagamento = payload.status
+    tenant.subscription_status = {
+        "ativo": "active",
+        "inadimplente": "overdue",
+        "aguardando_pagamento": "pending",
+    }[payload.status]
+    tenant.billing_status_updated_at = datetime.now(timezone.utc)
     db.add(
         models.AdminAuditLog(
             tenant_id=tenant.id,

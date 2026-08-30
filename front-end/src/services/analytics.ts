@@ -1,4 +1,5 @@
-const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID || 'G-HK0N1KGHBC'
+import { appConfig } from '@/config/env'
+
 const scriptId = 'contablytask-google-analytics'
 
 type AnalyticsWindow = Window & {
@@ -10,10 +11,12 @@ let loadingPromise: Promise<void> | null = null
 
 export const loadGoogleAnalytics = (): Promise<void> => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve()
+  if (!appConfig.gaMeasurementId) return Promise.resolve()
   if (document.getElementById(scriptId)) return Promise.resolve()
   if (loadingPromise) return loadingPromise
 
   loadingPromise = new Promise((resolve, reject) => {
+    const measurementId = appConfig.gaMeasurementId
     const analyticsWindow = window as AnalyticsWindow
     analyticsWindow.dataLayer = analyticsWindow.dataLayer || []
     analyticsWindow.gtag = (...args: unknown[]) => analyticsWindow.dataLayer?.push(args)

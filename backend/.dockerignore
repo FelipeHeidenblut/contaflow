@@ -1,0 +1,36 @@
+# Segredos e configuracoes locais
+.env
+.env.*
+.envrc
+
+# Ambientes e artefatos Python
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Arquivos de desenvolvimento
+.git/
+.github/
+.gitignore
+.dockerignore
+Dockerfile
+tests/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+ngrok
+ngrok.exe
+

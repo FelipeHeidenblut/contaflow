@@ -3,7 +3,13 @@ from typing import List
 
 import models
 import schemas
-from access_control import apply_client_scope, apply_task_scope
+from access_control import (
+    Permission,
+    apply_client_scope,
+    apply_task_scope,
+    require_permission,
+    tenant_repository,
+)
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
 from fastapi import APIRouter, Depends
@@ -17,32 +23,29 @@ router = APIRouter(prefix="/api/v1/dashboard", tags=["Dashboard e Resumo"])
 def obter_resumo_dashboard(
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    tenant_id = current_user.get("tenant_id")
+    require_permission(current_user, Permission.TASK_READ)
+    require_permission(current_user, Permission.CLIENT_READ)
+    repository = tenant_repository(db, current_user)
     hoje = date.today()
 
-    # Busca o tenant para saber o plano
-    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
-    plano = tenant.plano if tenant else "free"
-    billing_cycle = tenant.billing_cycle if tenant else "monthly"
-    status_pagamento = tenant.status_pagamento if tenant else "ativo"
+    plano = current_user["plan"]
+    billing_cycle = current_user["billing_cycle"]
+    status_pagamento = current_user["payment_status"]
 
-    client_query = db.query(models.Client).filter(
-        models.Client.tenant_id == tenant_id,
+    client_query = repository.query(models.Client).filter(
         models.Client.ativo.is_(True),
     )
     total_clientes = apply_client_scope(client_query, current_user).count()
     open_query = (
-        db.query(models.Task)
+        repository.query(models.Task)
         .filter(
-            models.Task.tenant_id == tenant_id,
             models.Task.status != TaskStatus.CONCLUIDA.value,
         )
     )
     tarefas_abertas = apply_task_scope(open_query, current_user).count()
     overdue_query = (
-        db.query(models.Task)
+        repository.query(models.Task)
         .filter(
-            models.Task.tenant_id == tenant_id,
             models.Task.status != TaskStatus.CONCLUIDA.value,
             models.Task.due_date < hoje,
         )

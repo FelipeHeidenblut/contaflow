@@ -1,68 +1,51 @@
-import calendar
-from datetime import date, timedelta
-from typing import List, Optional
 from uuid import UUID
 
-import models
 import schemas
-from access_control import (
-    apply_task_scope,
-    get_accessible_client,
-    has_management_access,
-    require_management_access,
-    validate_responsible_profile,
-)
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from pagination import PaginatedResponse
+from recurrence import (
+    run_recurrence_reconciliation,
+    verify_recurrence_cron_secret,
+)
 from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
+from task_service import (
+    TaskListFilters,
+    complete_task,
+    create_task,
+    delete_task,
+    list_tasks,
+    update_task,
+)
 
 router = APIRouter(prefix="/api/v1/obrigacoes", tags=["Obrigações e Prazos"])
 
 
-def validar_relacionamentos(
-    db: Session, current_user: dict, tarefa: schemas.TaskCreate
-):
-    tenant_id = current_user["tenant_id"]
-    get_accessible_client(db, tarefa.client_id, current_user, active_only=True)
-    if tarefa.assigned_to:
-        validate_responsible_profile(db, tenant_id, tarefa.assigned_to)
-    if not has_management_access(current_user) and tarefa.assigned_to and str(
-        tarefa.assigned_to
-    ) != str(current_user["user_id"]):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Colaboradores só podem atribuir tarefas a si mesmos.",
-        )
-
-
-# ==========================================
-# REGRA DE NEGÓCIO: Prazo no Próximo Dia Útil
-# ==========================================
-def ajustar_para_dia_util(data_vencimento: date) -> date:
-    """
-    Realidade Brasileira: Se o prazo cai no sábado ou domingo,
-    empurramos para a segunda-feira.
-    """
-    dia_da_semana = data_vencimento.weekday()  # 0=Seg, 5=Sab, 6=Dom
-
-    if dia_da_semana == 5:  # Sábado -> Segunda
-        return data_vencimento + timedelta(days=2)
-    elif dia_da_semana == 6:  # Domingo -> Segunda
-        return data_vencimento + timedelta(days=1)
-
-    return data_vencimento  # Seg-Sex, mantém a data
-
-
-@router.get("", response_model=List[schemas.TaskResponse])
+@router.get("", response_model=PaginatedResponse[schemas.TaskResponse])
 def listar_obrigacoes(
-    db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
+    search: str | None = Query(None, max_length=120),
+    client_id: UUID | None = Query(None),
+    assigned_to: UUID | None = Query(None),
+    task_status: TaskStatus | None = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-    query = db.query(models.Task).filter(models.Task.tenant_id == tenant_id)
-    tarefas = apply_task_scope(query, current_user).all()
-    return tarefas
+    return list_tasks(
+        db,
+        current_user,
+        TaskListFilters(
+            search=search,
+            client_id=client_id,
+            assigned_to=assigned_to,
+            task_status=task_status,
+            page=page,
+            page_size=page_size,
+        ),
+    )
 
 
 @router.post(
@@ -73,36 +56,22 @@ def criar_obrigacao(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
+    return create_task(db, current_user, tarefa_in)
 
-    validar_relacionamentos(db, current_user, tarefa_in)
-    assigned_to = tarefa_in.assigned_to
-    if not has_management_access(current_user) and not assigned_to:
-        assigned_to = current_user["user_id"]
 
-    # 🇧🇷 REGRA DE NEGÓCIO: Ajusta a data para o próximo dia útil se cair no fim de semana
-    data_ajustada = ajustar_para_dia_util(tarefa_in.due_date)
-
-    nova_tarefa = models.Task(
-        tenant_id=tenant_id,
-        client_id=tarefa_in.client_id,
-        title=tarefa_in.title,
-        description=tarefa_in.description,
-        due_date=data_ajustada,
-        status=tarefa_in.status.value
-        if isinstance(tarefa_in.status, TaskStatus)
-        else tarefa_in.status,
-        assigned_to=assigned_to,
-        grau_importancia=tarefa_in.grau_importancia,
-        is_recurring=tarefa_in.is_recurring,  # <--- ADICIONADO
-        recurrence_day=tarefa_in.recurrence_day,  # <--- ADICIONADO
-    )
-
-    db.add(nova_tarefa)
-    db.commit()
-    db.refresh(nova_tarefa)
-
-    return nova_tarefa
+@router.post("/recorrencias/processar")
+def processar_recorrencias(
+    x_cron_secret: str | None = Header(default=None, alias="X-Cron-Secret"),
+    db: Session = Depends(get_db),
+):
+    verify_recurrence_cron_secret(x_cron_secret)
+    try:
+        return run_recurrence_reconciliation(db)
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Não foi possível processar as recorrências.",
+        ) from error
 
 
 @router.patch("/{tarefa_id}/concluir", response_model=schemas.TaskResponse)
@@ -111,65 +80,7 @@ def concluir_obrigacao(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-
-    tarefa = (
-        db.query(models.Task)
-        .filter(models.Task.id == tarefa_id, models.Task.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not tarefa:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
-    get_accessible_client(db, tarefa.client_id, current_user)
-
-    # Marca a tarefa atual como concluída
-    tarefa.status = TaskStatus.CONCLUIDA.value
-
-    # ==========================================
-    # MOTOR DE RECORRÊNCIA AUTOMÁTICA
-    # ==========================================
-    if tarefa.is_recurring and tarefa.recurrence_day:
-        today = date.today()
-
-        # Calcula o mês e ano do próximo vencimento
-        if today.month == 12:
-            next_month = 1
-            next_year = today.year + 1
-        else:
-            next_month = today.month + 1
-            next_year = today.year
-
-        # Descobre o último dia daquele mês (para não dar erro se o dia for 31 e o mês tiver 30 dias)
-        last_day_of_month = calendar.monthrange(next_year, next_month)[1]
-        day_to_use = min(tarefa.recurrence_day, last_day_of_month)
-
-        # Cria a data do próximo mês
-        next_due_date = date(next_year, next_month, day_to_use)
-
-        # Usa sua função existente para empurrar para o próximo dia útil se cair no fim de semana
-        next_due_date = ajustar_para_dia_util(next_due_date)
-
-        # Cria a nova tarefa do próximo mês
-        nova_tarefa = models.Task(
-            tenant_id=tenant_id,
-            client_id=tarefa.client_id,
-            title=tarefa.title,
-            description=tarefa.description,
-            due_date=next_due_date,
-            status=TaskStatus.PENDENTE.value,
-            assigned_to=tarefa.assigned_to,
-            grau_importancia=tarefa.grau_importancia,
-            is_recurring=True,  # Mantém a recorrência ativa
-            recurrence_day=tarefa.recurrence_day,
-        )
-        db.add(nova_tarefa)
-        # ==========================================
-
-    db.commit()
-    db.refresh(tarefa)
-
-    return tarefa
+    return complete_task(db, current_user, tarefa_id)
 
 
 @router.delete("/{tarefa_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -178,23 +89,7 @@ def excluir_obrigacao(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-
-    tarefa = (
-        db.query(models.Task)
-        .filter(models.Task.id == tarefa_id, models.Task.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not tarefa:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
-    get_accessible_client(db, tarefa.client_id, current_user)
-    require_management_access(current_user)
-
-    db.delete(tarefa)
-    db.commit()
-
-    return None
+    return delete_task(db, current_user, tarefa_id)
 
 
 @router.put("/{tarefa_id}", response_model=schemas.TaskResponse)
@@ -204,50 +99,4 @@ def atualizar_obrigacao(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_active_user),
 ):
-    tenant_id = current_user.get("tenant_id")
-
-    # 1. Busca a tarefa existente no banco
-    tarefa = (
-        db.query(models.Task)
-        .filter(models.Task.id == tarefa_id, models.Task.tenant_id == tenant_id)
-        .first()
-    )
-
-    if not tarefa:
-        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
-
-    get_accessible_client(db, tarefa.client_id, current_user)
-    validar_relacionamentos(db, current_user, tarefa_update)
-
-    # 🇧🇷 REGRA DE NEGÓCIO: Se a data foi alterada, ajustamos novamente para o próximo dia útil
-    data_ajustada = ajustar_para_dia_util(tarefa_update.due_date)
-
-    # 2. Atualiza os campos dinamicamente
-    tarefa.title = tarefa_update.title
-    tarefa.description = tarefa_update.description
-    tarefa.client_id = tarefa_update.client_id
-    tarefa.due_date = data_ajustada
-    tarefa.grau_importancia = tarefa_update.grau_importancia
-
-    # Tratamento seguro para o Enum do Status
-    tarefa.status = (
-        tarefa_update.status.value
-        if hasattr(tarefa_update.status, "value")
-        else tarefa_update.status
-    )
-
-    tarefa.assigned_to = (
-        tarefa_update.assigned_to
-        if has_management_access(current_user)
-        else current_user["user_id"]
-    )
-
-    # ADICIONE ESTAS DUAS LINHAS:
-    tarefa.is_recurring = tarefa_update.is_recurring
-    tarefa.recurrence_day = tarefa_update.recurrence_day
-
-    # 3. Salva no Supabase
-    db.commit()
-    db.refresh(tarefa)
-
-    return tarefa
+    return update_task(db, current_user, tarefa_id, tarefa_update)

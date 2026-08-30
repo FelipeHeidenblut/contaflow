@@ -1,22 +1,9 @@
-import os
-
-from dotenv import load_dotenv
+from app_config import get_database_url
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-# Carrega as variáveis do arquivo .env
-load_dotenv()
-
-# Substitua o bloco inteiro de SQLALCHEMY_DATABASE_URL por este:
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Ajuste de segurança: Se a URL do Supabase começar com postgres://, troque para postgresql://
-if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
-    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace(
-        "postgres://", "postgresql://", 1
-    )
-
 # Cria o "motor" de conexão com o banco
+SQLALCHEMY_DATABASE_URL = get_database_url()
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 
 # Cria a fábrica de sessões (cada requisição vai usar uma sessão)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -9,6 +9,8 @@ import { useRoute } from 'vue-router'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
+import PaginationControls from '../components/PaginationControls.vue'
+import { fetchAllPages, fetchPage } from '../services/pagination'
 
 interface Client {
   id: string
@@ -54,6 +56,11 @@ const clientToArchive = ref<{ id: string; name: string } | null>(null)
 const clients = ref<Client[]>([])
 const members = ref<Member[]>([])
 const isLoading = ref(true)
+const currentPage = ref(1)
+const totalPages = ref(0)
+const totalResults = ref(0)
+const pageSize = 20
+const clientSummary = ref({ total: 0, pj: 0, pf: 0 })
 const canManageClients = computed(() => ['admin', 'gerente'].includes(authStore.role))
 
 const isModalOpen = ref(false)
@@ -113,17 +120,17 @@ const abrirDossier = async (client: Client) => {
   isLoadingDossier.value = true
 
   try {
-    const [tasksRes, docsRes] = await Promise.all([
-      api.get<ClientTask[]>('/api/v1/obrigacoes'),
-      api.get<ClientDocument[]>('/api/v1/documentos'),
+    const [tasks, documents] = await Promise.all([
+      fetchAllPages<ClientTask>('/api/v1/obrigacoes'),
+      fetchAllPages<ClientDocument>('/api/v1/documentos'),
     ])
 
-    clientTasks.value = tasksRes.data
+    clientTasks.value = tasks
       .filter((task) => task.client_id === client.id)
       .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime())
       .slice(0, 5)
 
-    clientDocuments.value = docsRes.data
+    clientDocuments.value = documents
       .filter((document) => document.client_id === client.id)
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 5)
@@ -177,44 +184,9 @@ const baixarDocDossier = async (docId: string, nomeArquivo: string) => {
   }
 }
 
-const clientsFiltrados = computed(() => {
-  let listaFiltrada = clients.value
-
-  if (filtroNatureza.value !== 'Todos') {
-    listaFiltrada = listaFiltrada.filter(
-      (client) => client.natureza_operacao === filtroNatureza.value,
-    )
-  }
-
-  if (filtroResponsavel.value !== 'Todos') {
-    listaFiltrada = listaFiltrada.filter((client) =>
-      filtroResponsavel.value === 'Sem responsável'
-        ? !client.responsible_profile_id
-        : client.responsible_profile_id === filtroResponsavel.value,
-    )
-  }
-
-  const termo = searchQuery.value.trim().toLowerCase()
-  if (!termo) return listaFiltrada
-
-  return listaFiltrada.filter((client) => {
-    const nome = (client.nome || '').toLowerCase()
-    const razaoSocial = (client.razao_social || '').toLowerCase()
-    const cnpj = (client.cnpj || '').replace(/\D/g, '')
-    const cpf = (client.cpf || '').replace(/\D/g, '')
-    const termoLimpo = termo.replace(/\D/g, '')
-
-    return (
-      nome.includes(termo) ||
-      razaoSocial.includes(termo) ||
-      (termoLimpo && cnpj.includes(termoLimpo)) ||
-      (termoLimpo && cpf.includes(termoLimpo))
-    )
-  })
-})
-
-const totalPJ = computed(() => clients.value.filter((c) => !!c.razao_social).length)
-const totalPF = computed(() => clients.value.filter((c) => !c.razao_social).length)
+const clientsFiltrados = computed(() => clients.value)
+const totalPJ = computed(() => clientSummary.value.pj)
+const totalPF = computed(() => clientSummary.value.pf)
 const getResponsibleName = (profileId: string | null) =>
   members.value.find((member) => member.id === profileId)?.name || 'Sem responsável'
 const setTipoPessoa = (tipo: string) => {
@@ -232,18 +204,51 @@ const setTipoPessoa = (tipo: string) => {
 const fetchClients = async () => {
   isLoading.value = true
   try {
-    const [clientsResponse, membersResponse] = await Promise.all([
-      api.get<Client[]>('/api/v1/clientes'),
-      api.get<Member[]>('/api/v1/membros'),
-    ])
-    clients.value = clientsResponse.data
-    members.value = membersResponse.data
+    const clientPage = await fetchPage<Client>('/api/v1/clientes', currentPage.value, pageSize, {
+      search: searchQuery.value.trim() || undefined,
+      natureza: filtroNatureza.value === 'Todos' ? undefined : filtroNatureza.value,
+      responsible_profile_id:
+        filtroResponsavel.value === 'Todos' || filtroResponsavel.value === 'Sem responsável'
+          ? undefined
+          : filtroResponsavel.value,
+      unassigned: filtroResponsavel.value === 'Sem responsável' || undefined,
+    })
+    clients.value = clientPage.items
+    totalPages.value = clientPage.pages
+    totalResults.value = clientPage.total
+    clientSummary.value = {
+      total: clientPage.summary?.total ?? clientPage.total,
+      pj: clientPage.summary?.pj ?? 0,
+      pf: clientPage.summary?.pf ?? 0,
+    }
   } catch {
     toast.error('Erro ao carregar a lista de clientes.')
   } finally {
     isLoading.value = false
   }
 }
+
+const fetchMembers = async () => {
+  try {
+    members.value = await fetchAllPages<Member>('/api/v1/membros')
+  } catch {
+    toast.error('Erro ao carregar os responsáveis.')
+  }
+}
+
+const changePage = (page: number) => {
+  currentPage.value = page
+  fetchClients()
+}
+
+let filterTimer: ReturnType<typeof setTimeout> | undefined
+watch([searchQuery, filtroNatureza, filtroResponsavel], () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  filterTimer = setTimeout(() => {
+    currentPage.value = 1
+    fetchClients()
+  }, 300)
+})
 
 const validateForm = () => {
   let isValid = true
@@ -283,7 +288,6 @@ const handleCreateClient = async () => {
   isSubmitting.value = true
   try {
     const response = await api.post<Client>('/api/v1/clientes', newClient.value)
-    clients.value.unshift(response.data)
 
     newClient.value = {
       tipo_pessoa: 'PJ',
@@ -298,6 +302,8 @@ const handleCreateClient = async () => {
 
     isModalOpen.value = false
     toast.success('Cliente cadastrado com sucesso!')
+    currentPage.value = 1
+    await fetchClients()
     await abrirDossier(response.data)
   } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Erro ao cadastrar o cliente.'))
@@ -314,6 +320,7 @@ const updateResponsible = async (client: Client, profileId: string | null) => {
     const index = clients.value.findIndex((item) => item.id === client.id)
     if (index >= 0) clients.value[index] = data
     if (selectedClient.value?.id === client.id) selectedClient.value = data
+    await fetchClients()
     toast.success('Responsável pela carteira atualizado.')
   } catch (error: unknown) {
     toast.error(getApiErrorMessage(error, 'Não foi possível atualizar o responsável.'))
@@ -331,7 +338,8 @@ const handleDesativar = async () => {
   if (!clientId) return
   try {
     await api.patch(`/api/v1/clientes/${clientId}/desativar`)
-    clients.value = clients.value.filter((c) => c.id !== clientId)
+    if (clients.value.length === 1 && currentPage.value > 1) currentPage.value -= 1
+    await fetchClients()
     toast.success('Cliente arquivado com sucesso.')
     clientToArchive.value = null
   } catch {
@@ -342,7 +350,7 @@ const handleDesativar = async () => {
 const handleCsvChange = (event: Event) => {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (file && file.name.endsWith('.csv')) {
+  if (file && file.name.toLowerCase().endsWith('.csv')) {
     csvFile.value = file
   } else {
     toast.error('Por favor, selecione apenas arquivos .csv')
@@ -371,7 +379,7 @@ const handleUploadCsv = async () => {
     }
 
     if (erros > 0) {
-      toast.warning(`${erros} linhas ignoradas por dados incompletos.`)
+      toast.warning(`${erros} linhas ignoradas por dados inválidos ou duplicados.`)
     }
 
     isImportModalOpen.value = false
@@ -404,6 +412,7 @@ const baixarTemplate = () => {
 
 onMounted(() => {
   fetchClients()
+  fetchMembers()
   if (route.query.novo === '1' && canManageClients.value) isModalOpen.value = true
 })
 </script>
@@ -544,9 +553,7 @@ onMounted(() => {
             </select>
           </div>
 
-          <div class="text-xs text-[var(--ct-text-muted)]">
-            {{ clientsFiltrados.length }} resultado(s)
-          </div>
+          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
         </div>
       </div>
 
@@ -562,7 +569,7 @@ onMounted(() => {
         </div>
 
         <EmptyState
-          v-else-if="clients.length === 0"
+          v-else-if="clientSummary.total === 0"
           title="Nenhum cliente ativo cadastrado"
           :description="
             canManageClients
@@ -734,6 +741,12 @@ onMounted(() => {
             </tbody>
           </table>
         </div>
+        <PaginationControls
+          :page="currentPage"
+          :pages="totalPages"
+          :total="totalResults"
+          @change="changePage"
+        />
       </div>
 
       <!-- DOSSIÊ LATERAL (DRAWER) -->
@@ -1293,6 +1306,11 @@ onMounted(() => {
                 <li>Salve como CSV.</li>
                 <li>Envie o arquivo nesta tela.</li>
               </ol>
+
+              <p class="mt-3 text-xs leading-5 text-[var(--ct-primary)]/80">
+                Se os clientes válidos ultrapassarem o limite do plano, nenhuma linha será
+                importada.
+              </p>
 
               <button
                 @click="baixarTemplate"

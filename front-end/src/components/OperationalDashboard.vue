@@ -56,6 +56,22 @@ const greeting = computed(() => {
 
 const firstName = computed(() => props.userName.trim().split(/\s+/)[0] || 'Olá')
 
+const hasCriticalBillingStatus = computed(() =>
+  ['inadimplente', 'estornado', 'cancelado', 'chargeback'].includes(
+    props.dashboard.status_pagamento,
+  ),
+)
+
+const billingAlertTitle = computed(() => {
+  const labels: Record<string, string> = {
+    inadimplente: 'Assinatura requer atenção',
+    estornado: 'Pagamento estornado',
+    cancelado: 'Assinatura cancelada',
+    chargeback: 'Pagamento em contestação',
+  }
+  return labels[props.dashboard.status_pagamento] || 'Pagamento em processamento'
+})
+
 const monthLabel = new Intl.DateTimeFormat('pt-BR', {
   month: 'long',
   year: 'numeric',
@@ -349,21 +365,15 @@ const initials = (name: string) =>
       v-if="!loading && dashboard.status_pagamento !== 'ativo'"
       class="flex flex-col justify-between gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center"
       :class="
-        dashboard.status_pagamento === 'inadimplente'
-          ? 'border-red-200 bg-red-50'
-          : 'border-amber-200 bg-amber-50'
+        hasCriticalBillingStatus ? 'border-red-200 bg-red-50' : 'border-amber-200 bg-amber-50'
       "
     >
       <div>
         <p
           class="text-sm font-semibold"
-          :class="dashboard.status_pagamento === 'inadimplente' ? 'text-red-800' : 'text-amber-800'"
+          :class="hasCriticalBillingStatus ? 'text-red-800' : 'text-amber-800'"
         >
-          {{
-            dashboard.status_pagamento === 'inadimplente'
-              ? 'Assinatura requer atenção'
-              : 'Pagamento em processamento'
-          }}
+          {{ billingAlertTitle }}
         </p>
         <p class="mt-0.5 text-xs text-slate-600">
           Verifique a assinatura para manter o acesso aos recursos.

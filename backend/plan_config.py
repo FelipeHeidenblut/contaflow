@@ -1,4 +1,5 @@
 from decimal import Decimal
+from typing import Literal
 
 PLAN_CONFIG = {
     "free": {
@@ -35,10 +36,26 @@ PLAN_CONFIG = {
 
 PAID_PLAN_IDS = {"basico", "profissional", "escritorio", "business"}
 BILLING_CYCLES = {"monthly", "annual"}
+PlanLimitResource = Literal["clients", "members"]
+
+
+def get_plan_config(plan_id: str) -> dict:
+    return PLAN_CONFIG.get(plan_id, PLAN_CONFIG["free"])
+
+
+def get_plan_name(plan_id: str) -> str:
+    return get_plan_config(plan_id)["name"]
+
+
+def get_plan_limit(
+    plan_id: str,
+    resource: PlanLimitResource,
+) -> int | None:
+    return get_plan_config(plan_id)[resource]
 
 
 def get_plan_price(plan_id: str, billing_cycle: str = "monthly") -> Decimal:
-    plan = PLAN_CONFIG.get(plan_id, PLAN_CONFIG["free"])
+    plan = get_plan_config(plan_id)
     cycle = billing_cycle if billing_cycle in BILLING_CYCLES else "monthly"
     return plan["prices"][cycle]
 
@@ -46,22 +63,3 @@ def get_plan_price(plan_id: str, billing_cycle: str = "monthly") -> Decimal:
 def get_monthly_equivalent(plan_id: str, billing_cycle: str = "monthly") -> Decimal:
     price = get_plan_price(plan_id, billing_cycle)
     return price / 12 if billing_cycle == "annual" else price
-
-
-def identify_subscription_by_value(value: Decimal) -> tuple[str, str] | None:
-    normalized = value.quantize(Decimal("0.01"))
-    return next(
-        (
-            (plan_id, billing_cycle)
-            for plan_id, config in PLAN_CONFIG.items()
-            if plan_id != "free"
-            for billing_cycle, price in config["prices"].items()
-            if price == normalized
-        ),
-        None,
-    )
-
-
-def identify_plan_by_value(value: Decimal) -> str | None:
-    match = identify_subscription_by_value(value)
-    return match[0] if match else None

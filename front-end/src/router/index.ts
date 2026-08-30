@@ -29,7 +29,9 @@ const routes = [
   {
     path: '/redefinir-senha',
     component: () => import('@/views/ResetPasswordView.vue'),
-    meta: { guestOnly: true, title: 'Redefinir senha' },
+    // Links de recuperação e convite criam uma sessão temporária no Supabase.
+    // Esta rota não pode expulsar usuários autenticados antes da definição da senha.
+    meta: { title: 'Redefinir senha' },
   },
   {
     path: '/privacidade',

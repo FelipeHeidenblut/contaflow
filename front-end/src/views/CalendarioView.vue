@@ -4,6 +4,8 @@ import { RouterLink } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
+import { appConfig } from '@/config/env'
+import { fetchAllPages } from '../services/pagination'
 
 interface TaskData {
   id: string | number
@@ -53,7 +55,7 @@ const isDayModalOpen = ref(false)
 const selectedDayTasks = ref<TaskData[]>([])
 const selectedDayTitle = ref('')
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api.contablytask.com.br'
+const API_BASE_URL = appConfig.apiBaseUrl
 const icsUrl = ref('')
 const copied = ref(false)
 const isRotatingFeed = ref(false)
@@ -208,8 +210,8 @@ const openDayModal = (day: CalendarDay) => {
 const fetchData = async () => {
   isLoading.value = true
   try {
-    const tasksRes = await api.get<ApiTask[]>('/api/v1/obrigacoes')
-    const apiTasks: TaskData[] = tasksRes.data.map((task) => ({ ...task, type: 'task' }))
+    const taskItems = await fetchAllPages<ApiTask>('/api/v1/obrigacoes')
+    const apiTasks: TaskData[] = taskItems.map((task) => ({ ...task, type: 'task' }))
 
     let federalTasks: TaskData[] = []
     try {

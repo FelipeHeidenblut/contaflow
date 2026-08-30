@@ -9,12 +9,14 @@ from email.message import EmailMessage
 from typing import Literal
 
 import httpx
+from app_config import get_settings
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/contact", tags=["Contato"])
+settings = get_settings()
 
 CONTACT_SUBJECTS = Literal[
     "Dúvida sobre planos",
@@ -63,7 +65,7 @@ def enforce_rate_limit(client_ip: str):
 async def verify_turnstile(token: str, client_ip: str):
     secret = os.getenv("TURNSTILE_SECRET_KEY")
     if not secret:
-        if os.getenv("ENVIRONMENT") == "production":
+        if settings.is_production:
             logger.error("TURNSTILE_SECRET_KEY não configurada para o formulário de contato.")
             raise HTTPException(status_code=503, detail="Formulário temporariamente indisponível.")
         logger.warning("Validação Turnstile ignorada fora de produção por falta de configuração.")

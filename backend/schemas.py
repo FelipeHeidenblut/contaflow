@@ -81,6 +81,8 @@ class TaskResponse(TaskBase):
     id: UUID
     tenant_id: UUID
     created_at: datetime
+    recurrence_series_id: Optional[UUID] = None
+    recurrence_period: Optional[date] = None
 
 
 # ================== DOCUMENTOS ==================

@@ -174,8 +174,26 @@ const getStatus = (status: string) => {
       class: 'border-amber-200 bg-amber-50 text-amber-700',
     },
     inadimplente: { label: 'Bloqueado', class: 'border-red-200 bg-red-50 text-red-700' },
+    estornado: { label: 'Estornado', class: 'border-orange-200 bg-orange-50 text-orange-700' },
+    cancelado: { label: 'Cancelado', class: 'border-slate-300 bg-slate-100 text-slate-700' },
+    chargeback: { label: 'Chargeback', class: 'border-rose-300 bg-rose-50 text-rose-800' },
   }
   return values[status] || { label: status, class: 'border-slate-200 bg-slate-50 text-slate-600' }
+}
+
+const getPaymentStatus = (status: string) => {
+  const labels: Record<string, string> = {
+    pending: 'Pendente',
+    confirmed: 'Confirmado',
+    received: 'Recebido',
+    overdue: 'Vencido',
+    refund_pending: 'Estorno em andamento',
+    partially_refunded: 'Estorno parcial',
+    refunded: 'Estornado',
+    canceled: 'Cancelado',
+    chargeback: 'Chargeback',
+  }
+  return labels[status] || status
 }
 
 const getRoleLabel = (role: string) => {
@@ -614,6 +632,9 @@ onBeforeUnmount(() => {
                 <option value="ativo">Ativos</option>
                 <option value="aguardando_pagamento">Pendentes</option>
                 <option value="inadimplente">Bloqueados</option>
+                <option value="estornado">Estornados</option>
+                <option value="cancelado">Cancelados</option>
+                <option value="chargeback">Chargebacks</option>
               </select>
               <select
                 v-model="sortBy"
@@ -926,7 +947,7 @@ onBeforeUnmount(() => {
                   </div>
                   <span
                     class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase text-slate-600"
-                    >{{ payment.status }}</span
+                    >{{ getPaymentStatus(payment.status) }}</span
                   >
                 </div>
               </div>

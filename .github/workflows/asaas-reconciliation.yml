@@ -1,0 +1,32 @@
+name: Reconciliar cobrança Asaas
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: asaas-reconciliation
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Acionar reconciliador protegido
+        env:
+          ASAAS_RECONCILIATION_URL: ${{ secrets.ASAAS_RECONCILIATION_URL }}
+          ASAAS_RECONCILIATION_SECRET: ${{ secrets.ASAAS_RECONCILIATION_SECRET }}
+        run: |
+          test -n "$ASAAS_RECONCILIATION_URL"
+          test -n "$ASAAS_RECONCILIATION_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --max-time 300 \
+            --request POST \
+            --header "X-Cron-Secret: $ASAAS_RECONCILIATION_SECRET" \
+            "${ASAAS_RECONCILIATION_URL%/}/api/v1/asaas/reconciliar"

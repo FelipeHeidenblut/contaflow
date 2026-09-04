@@ -1,15 +1,20 @@
 User-agent: *
 Allow: /
 
-# Bloqueia as rotas internas do sistema (que exigem login)
-Disallow: /dashboard
-Disallow: /clientes
-Disallow: /obrigacoes
-Disallow: /documentos
-Disallow: /membros
-Disallow: /faturamento
-Disallow: /calendario
+# Áreas autenticadas e fluxos sem conteúdo público para indexação.
 Disallow: /admin
+Disallow: /calendario
+Disallow: /cadastro
+Disallow: /clientes
+Disallow: /dashboard
+Disallow: /documentos
+Disallow: /esqueceu-senha
+Disallow: /faturamento
+Disallow: /login
+Disallow: /membros
+Disallow: /obrigacoes
+Disallow: /ops-login
+Disallow: /redefinir-senha
+Disallow: /relatorios
 
-# Sitemap
 Sitemap: https://www.contablytask.com.br/sitemap.xml

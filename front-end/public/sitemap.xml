@@ -2,20 +2,30 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://www.contablytask.com.br/</loc>
-    <lastmod>2026-07-09</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.00</priority>
+    <lastmod>2026-09-03</lastmod>
   </url>
   <url>
-    <loc>https://www.contablytask.com.br/login</loc>
-    <lastmod>2026-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.80</priority>
+    <loc>https://www.contablytask.com.br/como-funciona</loc>
+    <lastmod>2026-09-03</lastmod>
   </url>
   <url>
-    <loc>https://www.contablytask.com.br/cadastro</loc>
-    <lastmod>2026-07-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.80</priority>
+    <loc>https://www.contablytask.com.br/planos</loc>
+    <lastmod>2026-09-03</lastmod>
+  </url>
+  <url>
+    <loc>https://www.contablytask.com.br/sobre</loc>
+    <lastmod>2026-09-03</lastmod>
+  </url>
+  <url>
+    <loc>https://www.contablytask.com.br/contato</loc>
+    <lastmod>2026-09-03</lastmod>
+  </url>
+  <url>
+    <loc>https://www.contablytask.com.br/privacidade</loc>
+    <lastmod>2026-09-03</lastmod>
+  </url>
+  <url>
+    <loc>https://www.contablytask.com.br/termos</loc>
+    <lastmod>2026-09-03</lastmod>
   </url>
 </urlset>

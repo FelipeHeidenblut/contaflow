@@ -1,34 +1,44 @@
 # ContablyTask
 
-> O ContablyTask é um SaaS de gestão de tarefas, prazos e documentos (Practice Management) desenvolvido exclusivamente para escritórios de contabilidade brasileiros. O objetivo é substituir o caos de planilhas e grupos de WhatsApp, centralizando clientes, obrigações fiscais e equipe em um único hub. O sistema posiciona-se como uma ferramenta complementar aos ERPs fiscais, focando em organização, fluxo de trabalho e visualização de prazos.
+> O ContablyTask é um software de gestão da rotina de escritórios contábeis brasileiros. A plataforma reúne clientes, obrigações, prazos, documentos, responsáveis, calendário e relatórios em um único ambiente.
 
-## Funcionalidades Principais
-- Calendário inteligente de vencimentos federais e estaduais.
-- Gestão de clientes (CRM leve) com dossiê 360º (dados, tarefas e documentos).
-- Controle de obrigações e tarefas com automação de recorrência mensal.
-- Gestão de documentos categorizados (Fiscal, Contábil, DP) com ícones dinâmicos.
-- Gestão de equipe e atribuição de responsabilidades.
-- Geração de link .ics para sincronização com Google Agenda e Outlook.
-- Relatórios de produtividade e capacidade da equipe (Premium).
+O ContablyTask é um SaaS de Practice Management complementar aos sistemas fiscais e contábeis. Seu foco é organizar o trabalho do escritório, distribuir responsabilidades e acompanhar entregas. O site e o produto são apresentados em português do Brasil, e os preços são cobrados em reais (BRL).
 
-## Modelo de Negócios e Preços
-O ContablyTask opera com um modelo Freemium e planos de assinatura mensal em Reais (BRL).
-- **Free (R$ 0,00):** Até 5 clientes e 1 usuário. Para testar a plataforma.
-- **Básico (R$ 79,90):** Até 40 clientes e 5 usuários. Para contadores autônomos.
-- **Profissional (R$ 149,90):** Até 100 clientes e 10 usuários. Inclui relatórios avançados.
-- **Business (R$ 449,00):** Clientes e usuários ilimitados. Para grandes operações.
-- Pagamentos processados via Asaas (PIX, Boleto, Cartão de Crédito).
+As assinaturas podem ser pagas por PIX, boleto ou cartão de crédito por meio do Asaas. Recursos, limites e preços vigentes devem ser confirmados na página de planos.
 
-## Links Importantes
-- [Landing Page / Site Oficial](https://www.contablytask.com.br/)
-- [Criar Conta Grátis](https://www.contablytask.com.br/cadastro)
-- [Login do Sistema](https://www.contablytask.com.br/login)
-- [Login do Backoffice Admin (SaaS Owner)](https://www.contablytask.com.br/ops-login)
-- [Política de Privacidade](https://www.contablytask.com.br/privacidade)
-- [Termos de Uso](https://www.contablytask.com.br/termos)
+As áreas internas exigem autenticação. Dados de escritórios diferentes são isolados, e as permissões dependem do papel do usuário.
 
-## Stack Tecnológica e Segurança
-- **Frontend:** Vue 3, TypeScript, Tailwind CSS (Hospedado na Vercel).
-- **Backend:** Python, FastAPI, SQLAlchemy (Hospedado em VPS com Easypanel/Docker).
-- **Banco de Dados/Auth:** Supabase (PostgreSQL) com isolamento Multi-tenant.
-- **Segurança:** RBAC (Role-Based Access Control), JWT, Criptografia em trânsito (HTTPS), conformidade com LGPD.
+Tecnologia atual: Vue 3, TypeScript e Vite no frontend; FastAPI e SQLAlchemy na API; PostgreSQL e Supabase para banco de dados, autenticação e armazenamento. Idioma: português do Brasil (`pt-BR`). Contato: contato@contablytask.com.br.
+
+## Páginas principais
+
+- [Página inicial](https://www.contablytask.com.br/): visão geral da plataforma e das principais funcionalidades.
+- [Como funciona](https://www.contablytask.com.br/como-funciona): fluxo de organização de clientes, tarefas, equipe e documentos.
+- [Planos e preços](https://www.contablytask.com.br/planos): limites, recursos e valores dos planos disponíveis.
+- [Sobre o ContablyTask](https://www.contablytask.com.br/sobre): propósito e princípios do produto.
+- [Contato](https://www.contablytask.com.br/contato): dúvidas comerciais, demonstrações e suporte.
+- [Política de Privacidade](https://www.contablytask.com.br/privacidade): tratamento de dados pessoais e direitos dos titulares.
+- [Termos de Uso](https://www.contablytask.com.br/termos): condições aplicáveis ao uso da plataforma.
+
+## Funcionalidades
+
+- [Gestão operacional](https://www.contablytask.com.br/como-funciona): clientes PF e PJ, responsáveis por carteira, obrigações, prioridades e status.
+- [Prazos e recorrências](https://www.contablytask.com.br/como-funciona): calendário de vencimentos e geração mensal de tarefas recorrentes.
+- [Documentos](https://www.contablytask.com.br/como-funciona): arquivos organizados por cliente e categoria, com acesso privado.
+- [Equipe](https://www.contablytask.com.br/como-funciona): administradores, gerentes e colaboradores com permissões distintas.
+- [Relatórios](https://www.contablytask.com.br/planos): indicadores operacionais nos planos pagos e análises avançadas a partir do Profissional.
+- [Integração de calendário](https://www.contablytask.com.br/como-funciona): feed ICS para aplicativos compatíveis, como Google Agenda e Outlook.
+
+## Planos
+
+- [Gratuito](https://www.contablytask.com.br/planos): R$ 0; até 5 clientes e 1 administrador.
+- [Essencial](https://www.contablytask.com.br/planos): R$ 79,90 por mês ou R$ 799 por ano; até 40 clientes e 5 usuários.
+- [Profissional](https://www.contablytask.com.br/planos): R$ 149,90 por mês ou R$ 1.499 por ano; até 100 clientes e 10 usuários.
+- [Escritório](https://www.contablytask.com.br/planos): R$ 249,90 por mês ou R$ 2.499 por ano; até 300 clientes e 25 usuários.
+- [Empresarial](https://www.contablytask.com.br/planos): R$ 449 por mês ou R$ 4.490 por ano; clientes e usuários ilimitados.
+
+## Acesso à plataforma
+
+- [Criar conta](https://www.contablytask.com.br/cadastro): abertura de uma conta gratuita para o escritório.
+- [Entrar](https://www.contablytask.com.br/login): acesso de usuários já cadastrados.
+- [Recuperar senha](https://www.contablytask.com.br/esqueceu-senha): início do fluxo de recuperação de acesso.

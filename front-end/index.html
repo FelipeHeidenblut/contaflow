@@ -2,82 +2,236 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-
-    <!-- Viewport -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Identidade / Navegador -->
-    <meta name="theme-color" content="#172554" />
-    <meta name="color-scheme" content="light" />
-    <link rel="icon" href="/favicon.png" sizes="32x32" />
-    <link rel="manifest" href="/site.webmanifest" />
-
-    <!-- Canonical global da home -->
-    <link rel="canonical" href="https://www.contablytask.com.br/" />
-
-    <!-- SEO global -->
-    <title>ContablyTask | Software de Gestão para Escritórios Contábeis</title>
+    <title>Software de Gestão para Escritórios Contábeis | ContablyTask</title>
     <meta
       name="description"
-      content="O ContablyTask é um software de gestão para escritórios contábeis. Organize tarefas, clientes, obrigações fiscais e documentos em um só lugar."
+      content="Organize clientes, obrigações, prazos, documentos e equipe do escritório contábil em uma única plataforma. Comece gratuitamente com o ContablyTask."
     />
     <meta name="author" content="ContablyTask" />
-    <meta name="robots" content="index, follow" />
+    <meta name="application-name" content="ContablyTask" />
+    <meta
+      name="robots"
+      content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+    />
 
-    <!-- Open Graph -->
+    <meta name="theme-color" content="#172554" />
+    <meta name="color-scheme" content="light" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.png" type="image/png" sizes="2000x2000" />
+
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="ContablyTask" />
     <meta property="og:url" content="https://www.contablytask.com.br/" />
     <meta
       property="og:title"
-      content="ContablyTask | Software de Gestão para Escritórios Contábeis"
+      content="Software de Gestão para Escritórios Contábeis | ContablyTask"
     />
     <meta
       property="og:description"
-      content="Organize tarefas, clientes, obrigações fiscais e documentos do seu escritório contábil com mais clareza e controle."
+      content="Centralize clientes, obrigações, prazos, documentos e equipe do seu escritório contábil."
     />
     <meta property="og:image" content="https://www.contablytask.com.br/banner.png" />
+    <meta property="og:image:secure_url" content="https://www.contablytask.com.br/banner.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="ContablyTask — gestão para escritórios contábeis"
+    />
 
-    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta
       name="twitter:title"
-      content="ContablyTask | Software de Gestão para Escritórios Contábeis"
+      content="Software de Gestão para Escritórios Contábeis | ContablyTask"
     />
     <meta
       name="twitter:description"
-      content="Organize tarefas, clientes, obrigações fiscais e documentos do seu escritório contábil com mais clareza e controle."
+      content="Centralize clientes, obrigações, prazos, documentos e equipe do seu escritório contábil."
     />
     <meta name="twitter:image" content="https://www.contablytask.com.br/banner.png" />
-    <meta name="twitter:url" content="https://www.contablytask.com.br/" />
+    <meta
+      name="twitter:image:alt"
+      content="ContablyTask — gestão para escritórios contábeis"
+    />
 
-    <!-- Dados estruturados -->
+    <script>
+      ;(() => {
+        const siteUrl = 'https://www.contablytask.com.br'
+        const pages = {
+          '/': {
+            title: 'Software de Gestão para Escritórios Contábeis | ContablyTask',
+            description:
+              'Organize clientes, obrigações, prazos, documentos e equipe do escritório contábil em uma única plataforma. Comece gratuitamente com o ContablyTask.',
+          },
+          '/como-funciona': {
+            title: 'Como Funciona o ContablyTask | Gestão Contábil Organizada',
+            description:
+              'Veja como o ContablyTask conecta clientes, responsáveis, obrigações, documentos e calendário na rotina do escritório contábil.',
+          },
+          '/planos': {
+            title: 'Planos e Preços para Escritórios Contábeis | ContablyTask',
+            description:
+              'Conheça os planos Gratuito, Essencial, Profissional, Escritório e Empresarial do ContablyTask, com opções de cobrança mensal e anual.',
+          },
+          '/sobre': {
+            title: 'Sobre o ContablyTask | Organização para Escritórios Contábeis',
+            description:
+              'Conheça o ContablyTask, plataforma criada para dar clareza, controle e continuidade à operação de escritórios contábeis.',
+          },
+          '/contato': {
+            title: 'Contato | ContablyTask',
+            description:
+              'Fale com a equipe do ContablyTask sobre planos, demonstrações, suporte técnico ou necessidades do seu escritório contábil.',
+          },
+          '/privacidade': {
+            title: 'Política de Privacidade | ContablyTask',
+            description:
+              'Entenda como o ContablyTask trata dados pessoais, segurança, armazenamento e direitos dos titulares conforme a LGPD.',
+          },
+          '/termos': {
+            title: 'Termos de Uso | ContablyTask',
+            description:
+              'Consulte os termos de uso aplicáveis à plataforma ContablyTask e às funcionalidades oferecidas aos escritórios contábeis.',
+          },
+        }
+
+        const rawPath = window.location.pathname.replace(/\/{2,}/g, '/')
+        const path = rawPath === '/' ? '/' : rawPath.replace(/\/$/, '')
+        const page = pages[path]
+        const robots = document.querySelector('meta[name="robots"]')
+
+        if (!page) {
+          robots?.setAttribute('content', 'noindex, nofollow')
+          return
+        }
+
+        const canonicalUrl = `${siteUrl}${path === '/' ? '/' : path}`
+        const canonical = document.createElement('link')
+        canonical.rel = 'canonical'
+        canonical.href = canonicalUrl
+        document.head.appendChild(canonical)
+
+        document.title = page.title
+        document.querySelector('meta[name="description"]')?.setAttribute('content', page.description)
+        document.querySelector('meta[property="og:url"]')?.setAttribute('content', canonicalUrl)
+        document.querySelector('meta[property="og:title"]')?.setAttribute('content', page.title)
+        document
+          .querySelector('meta[property="og:description"]')
+          ?.setAttribute('content', page.description)
+        document.querySelector('meta[name="twitter:title"]')?.setAttribute('content', page.title)
+        document
+          .querySelector('meta[name="twitter:description"]')
+          ?.setAttribute('content', page.description)
+      })()
+    </script>
+
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "ContablyTask",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "url": "https://www.contablytask.com.br/",
-        "description": "Software de gestão para escritórios contábeis, com organização de tarefas, clientes, documentos e obrigações.",
-        "offers": {
-          "@type": "Offer",
-          "price": "79.90",
-          "priceCurrency": "BRL"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "ContablyTask",
-          "url": "https://www.contablytask.com.br/"
-        }
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://www.contablytask.com.br/#organization",
+            "name": "ContablyTask",
+            "url": "https://www.contablytask.com.br/",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://www.contablytask.com.br/favicon.png",
+              "width": 2000,
+              "height": 2000
+            },
+            "email": "contato@contablytask.com.br"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.contablytask.com.br/#website",
+            "url": "https://www.contablytask.com.br/",
+            "name": "ContablyTask",
+            "description": "Software de gestão da rotina de escritórios contábeis.",
+            "inLanguage": "pt-BR",
+            "publisher": {
+              "@id": "https://www.contablytask.com.br/#organization"
+            }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://www.contablytask.com.br/#software",
+            "name": "ContablyTask",
+            "url": "https://www.contablytask.com.br/",
+            "applicationCategory": "BusinessApplication",
+            "applicationSubCategory": "Gestão para escritórios contábeis",
+            "operatingSystem": "Web",
+            "inLanguage": "pt-BR",
+            "description": "Plataforma para organizar clientes, obrigações, prazos, documentos, responsáveis e relatórios de escritórios contábeis brasileiros.",
+            "image": "https://www.contablytask.com.br/banner.png",
+            "isAccessibleForFree": true,
+            "audience": {
+              "@type": "BusinessAudience",
+              "audienceType": "Escritórios de contabilidade brasileiros"
+            },
+            "featureList": [
+              "Gestão de clientes",
+              "Obrigações e tarefas recorrentes",
+              "Calendário de vencimentos",
+              "Gestão de documentos",
+              "Responsáveis e equipe",
+              "Alertas de prazos",
+              "Relatórios operacionais"
+            ],
+            "offers": [
+              {
+                "@type": "Offer",
+                "name": "Plano Gratuito",
+                "price": "0.00",
+                "priceCurrency": "BRL",
+                "url": "https://www.contablytask.com.br/planos"
+              },
+              {
+                "@type": "Offer",
+                "name": "Plano Essencial mensal",
+                "price": "79.90",
+                "priceCurrency": "BRL",
+                "url": "https://www.contablytask.com.br/planos"
+              },
+              {
+                "@type": "Offer",
+                "name": "Plano Profissional mensal",
+                "price": "149.90",
+                "priceCurrency": "BRL",
+                "url": "https://www.contablytask.com.br/planos"
+              },
+              {
+                "@type": "Offer",
+                "name": "Plano Escritório mensal",
+                "price": "249.90",
+                "priceCurrency": "BRL",
+                "url": "https://www.contablytask.com.br/planos"
+              },
+              {
+                "@type": "Offer",
+                "name": "Plano Empresarial mensal",
+                "price": "449.00",
+                "priceCurrency": "BRL",
+                "url": "https://www.contablytask.com.br/planos"
+              }
+            ],
+            "publisher": {
+              "@id": "https://www.contablytask.com.br/#organization"
+            }
+          }
+        ]
       }
     </script>
   </head>
 
   <body>
     <div id="app"></div>
+    <noscript>O ContablyTask precisa de JavaScript habilitado para funcionar.</noscript>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -25,21 +25,42 @@ jobs:
             exit 1
           fi
 
-          curl --fail --silent --show-error \
-            --proto '=https' \
-            --connect-timeout 15 \
-            --max-time 90 \
-            --retry 1 \
-            --retry-delay 5 \
-            --output health.json \
-            "${BACKEND_BASE_URL%/}/health"
+          probe() {
+            curl --silent --show-error \
+              --proto '=https' \
+              --connect-timeout 15 \
+              --max-time 90 \
+              --retry 1 \
+              --retry-delay 5 \
+              --output health.json \
+              --write-out '%{http_code}' \
+              "${BACKEND_BASE_URL%/}$1"
+          }
 
-          python3 - <<'PY'
+          endpoint=/health
+          http_status=$(probe "$endpoint")
+          if [[ "$http_status" == "404" ]]; then
+            echo "::warning::/health não encontrado. Verificando a rota raiz da API para compatibilidade com deploys antigos."
+            endpoint=/
+            http_status=$(probe "$endpoint")
+          fi
+
+          if [[ "$http_status" != "200" ]]; then
+            echo "::error::A API respondeu HTTP $http_status em $endpoint. Confira BACKEND_BASE_URL (somente a origem HTTPS, sem /health ou /api/v1) e o deploy no Render."
+            exit 1
+          fi
+
+          python3 - "$endpoint" <<'PY'
           import json
+          import sys
           from pathlib import Path
 
           payload = json.loads(Path("health.json").read_text())
-          if payload != {"status": "ok"}:
-              raise SystemExit("Resposta inesperada do endpoint /health")
+          if sys.argv[1] == "/health":
+              valid = payload == {"status": "ok"}
+          else:
+              valid = isinstance(payload, dict) and payload.get("status") == "A API do ContaFlow está no ar! 🚀"
+          if not valid:
+              raise SystemExit("Resposta inesperada da API. Confira se BACKEND_BASE_URL aponta para o backend ContaFlow.")
           print("Backend ativo e respondendo.")
           PY

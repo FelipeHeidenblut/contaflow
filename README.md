@@ -79,8 +79,14 @@ Para ativar:
    resultado **Backend ativo e respondendo.** Depois, confira as execuções agendadas.
 
 O ping aceita até 90 segundos por tentativa para permitir a inicialização de uma instância
-adormecida e tenta novamente em falhas transitórias. Uma resposta diferente de
-`{"status":"ok"}` faz a execução falhar.
+adormecida e tenta novamente em falhas transitórias. Se `/health` responder 404, o workflow
+consulta `/` para compatibilidade com deploys antigos e valida a mensagem de status do ContaFlow.
+Nos demais casos, `/health` deve retornar HTTP 200 e `{"status":"ok"}`. Uma resposta HTTP
+inesperada ou um conteúdo que não corresponda à rota faz a execução falhar.
+
+Se ambas as rotas retornarem 404, confira se `BACKEND_BASE_URL` contém somente a origem HTTPS
+do backend, sem `/health`, `/api/v1` ou o domínio do frontend. Após publicar uma correção no
+workflow, use **Run workflow** para iniciar uma nova execução com a versão atualizada.
 
 Limitações:
 

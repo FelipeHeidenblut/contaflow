@@ -19,11 +19,21 @@ jobs:
     steps:
       - name: Acionar reconciliador protegido
         env:
-          ASAAS_RECONCILIATION_URL: ${{ secrets.ASAAS_RECONCILIATION_URL }}
+          ASAAS_RECONCILIATION_URL: ${{ secrets.ASAAS_RECONCILIATION_URL || vars.BACKEND_BASE_URL }}
           ASAAS_RECONCILIATION_SECRET: ${{ secrets.ASAAS_RECONCILIATION_SECRET }}
         run: |
-          test -n "$ASAAS_RECONCILIATION_URL"
-          test -n "$ASAAS_RECONCILIATION_SECRET"
+          missing=0
+          if [[ -z "$ASAAS_RECONCILIATION_URL" ]]; then
+            echo "::error::Configure a variável de repositório BACKEND_BASE_URL ou o secret ASAAS_RECONCILIATION_URL com a origem HTTPS do backend, sem caminho."
+            missing=1
+          fi
+          if [[ -z "$ASAAS_RECONCILIATION_SECRET" ]]; then
+            echo "::error::Configure o secret de repositório ASAAS_RECONCILIATION_SECRET no GitHub Actions e a variável de mesmo nome no Render, com valores iguais."
+            missing=1
+          fi
+          if [[ "$missing" == "1" ]]; then
+            exit 1
+          fi
           curl --fail-with-body --silent --show-error \
             --retry 2 \
             --max-time 300 \

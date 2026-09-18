@@ -128,6 +128,31 @@ cd front-end && npm run lint:check && npm run format:check && npm run type-check
 O workflow `.github/workflows/ci.yml` executa essas verificações, testa as migrations em um
 PostgreSQL descartável e audita as dependências em pushes e pull requests.
 
+## Configuração das tarefas agendadas
+
+Os workflows de cobrança, recorrências e alertas usam a variável de **repositório**
+`BACKEND_BASE_URL` como URL padrão. Os secrets opcionais `ASAAS_RECONCILIATION_URL`,
+`RECURRENCE_PROCESS_URL` e `ALERT_PROCESS_URL` têm prioridade, quando definidos, e devem
+conter somente a origem HTTPS da API, sem o caminho do endpoint.
+
+Cada tarefa exige também seu próprio segredo de autenticação:
+
+| Tarefa | Secret do repositório no GitHub e variável no Render |
+| --- | --- |
+| Cobrança Asaas | `ASAAS_RECONCILIATION_SECRET` |
+| Recorrências | `RECURRENCE_CRON_SECRET` |
+| Alertas de vencimento | `ALERT_CRON_SECRET` |
+
+Para cada linha, configure o mesmo valor no GitHub e no backend. No GitHub, use
+**Settings > Secrets and variables > Actions > Secrets > New repository secret**.
+Esses workflows não usam um GitHub Environment; configurações existentes apenas no ambiente
+`Production` não são disponibilizadas a eles. Não coloque os valores dos segredos no código.
+
+Uma configuração ausente agora é identificada pelo nome no log. Isso é diferente de falhas HTTP:
+404 indica rota não encontrada, 401/403 indica recusa de acesso e 5xx exige verificar a resposta
+da API e os logs do Render. Uma execução verde do keep-alive confirma apenas que a API responde;
+não valida autenticação, banco ou integrações dessas tarefas.
+
 ## Recorrências mensais
 
 - As competências e vencimentos são datas civis; a regra operacional adotada é o calendário de

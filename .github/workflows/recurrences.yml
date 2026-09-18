@@ -19,11 +19,21 @@ jobs:
     steps:
       - name: Acionar reconciliador protegido
         env:
-          RECURRENCE_PROCESS_URL: ${{ secrets.RECURRENCE_PROCESS_URL }}
+          RECURRENCE_PROCESS_URL: ${{ secrets.RECURRENCE_PROCESS_URL || vars.BACKEND_BASE_URL }}
           RECURRENCE_CRON_SECRET: ${{ secrets.RECURRENCE_CRON_SECRET }}
         run: |
-          test -n "$RECURRENCE_PROCESS_URL"
-          test -n "$RECURRENCE_CRON_SECRET"
+          missing=0
+          if [[ -z "$RECURRENCE_PROCESS_URL" ]]; then
+            echo "::error::Configure a variável de repositório BACKEND_BASE_URL ou o secret RECURRENCE_PROCESS_URL com a origem HTTPS do backend, sem caminho."
+            missing=1
+          fi
+          if [[ -z "$RECURRENCE_CRON_SECRET" ]]; then
+            echo "::error::Configure o secret de repositório RECURRENCE_CRON_SECRET no GitHub Actions e a variável de mesmo nome no Render, com valores iguais."
+            missing=1
+          fi
+          if [[ "$missing" == "1" ]]; then
+            exit 1
+          fi
           curl --fail-with-body --silent --show-error \
             --retry 2 \
             --max-time 120 \

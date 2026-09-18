@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -11,6 +11,8 @@ import { useAuthStore } from '../stores/auth'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import PaginationControls from '../components/PaginationControls.vue'
 import { fetchAllPages, fetchPage } from '../services/pagination'
+import ObrigacoesKanban from '../components/ObrigacoesKanban.vue'
+import type { Obrigacao, TaskStatus } from '../types/obrigacao'
 
 const route = useRoute()
 const authStore = useAuthStore()
@@ -27,19 +29,6 @@ interface Membro {
   name: string
 }
 
-interface Obrigacao {
-  id: string | number
-  title: string
-  description?: string
-  status: string
-  due_date: string
-  client_id: string | number
-  assigned_to?: string | number | null
-  type?: 'custom' | 'receita_federal'
-  grau_importancia?: string
-  is_recurring?: boolean
-  recurrence_day?: number | null
-}
 const taskToDelete = ref<string | number | null>(null)
 
 interface TemplateContabil {
@@ -64,6 +53,10 @@ const filtroClienteId = ref('')
 const filtroStatus = ref('')
 const filtroResponsavel = ref('')
 const searchQuery = ref('')
+const visualizacao = ref<'lista' | 'kanban'>('lista')
+const kanbanRefreshKey = ref(0)
+const isUpdatingStatus = ref(false)
+const filtrosAplicados = ref<Record<string, string | number | undefined>>({})
 
 const isDetalhesModalOpen = ref(false)
 const obrigacaoSelecionada = ref<Obrigacao | null>(null)
@@ -234,6 +227,8 @@ const salvarObrigacao = async () => {
     }
 
     fecharCadastro()
+    await fetchData()
+    kanbanRefreshKey.value += 1
   } catch (error) {
     toast.error(getApiErrorMessage(error, 'Erro ao salvar a obrigação.'))
     console.error(error)
@@ -241,21 +236,32 @@ const salvarObrigacao = async () => {
 }
 
 const concluirTarefa = async (obrigacao: Obrigacao) => {
+  await alterarStatus(obrigacao, 'concluida')
+}
+
+const alterarStatus = async (obrigacao: Obrigacao, status: TaskStatus) => {
+  if (isUpdatingStatus.value || obrigacao.status === status) return
+  isUpdatingStatus.value = true
   try {
-    const response = await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/concluir`)
+    const response = await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/status`, { status })
     const index = obrigacoes.value.findIndex((o) => o.id === obrigacao.id)
 
     if (index !== -1) obrigacoes.value[index] = response.data
     if (obrigacaoSelecionada.value?.id === obrigacao.id) obrigacaoSelecionada.value = response.data
 
-    if (obrigacao.is_recurring) {
+    if (status === 'concluida' && obrigacao.is_recurring) {
       toast.success('Obrigação concluída! A próxima competência já está disponível.')
-    } else {
+    } else if (status === 'concluida') {
       toast.success('Obrigação concluída!')
+    } else {
+      toast.success('Status atualizado!')
     }
+    kanbanRefreshKey.value += 1
     await fetchData()
   } catch (error) {
-    toast.error(getApiErrorMessage(error, 'Erro ao concluir tarefa.'))
+    toast.error(getApiErrorMessage(error, 'Erro ao atualizar o status da tarefa.'))
+  } finally {
+    isUpdatingStatus.value = false
   }
 }
 
@@ -266,6 +272,7 @@ const excluirTarefa = async () => {
     await api.delete(`/api/v1/obrigacoes/${id}`)
     if (obrigacoes.value.length === 1 && currentPage.value > 1) currentPage.value -= 1
     await fetchData()
+    kanbanRefreshKey.value += 1
     fecharDetalhes()
     toast.success('Tarefa excluída.')
     taskToDelete.value = null
@@ -274,15 +281,23 @@ const excluirTarefa = async () => {
   }
 }
 
+let fetchVersion = 0
 const fetchData = async () => {
+  const version = ++fetchVersion
   isLoading.value = true
   try {
-    const taskPage = await fetchPage<Obrigacao>('/api/v1/obrigacoes', currentPage.value, pageSize, {
-      search: searchQuery.value.trim() || undefined,
-      client_id: filtroClienteId.value || undefined,
-      assigned_to: filtroResponsavel.value || undefined,
-      task_status: filtroStatus.value || undefined,
-    })
+    const taskPage = await fetchPage<Obrigacao>(
+      '/api/v1/obrigacoes',
+      currentPage.value,
+      pageSize,
+      filtrosAplicados.value,
+    )
+    if (version !== fetchVersion) return
+    if (taskPage.pages > 0 && currentPage.value > taskPage.pages) {
+      currentPage.value = taskPage.pages
+      await fetchData()
+      return
+    }
 
     obrigacoes.value = taskPage.items
     totalPages.value = taskPage.pages
@@ -295,10 +310,11 @@ const fetchData = async () => {
       atrasadas: taskPage.summary?.atrasadas ?? 0,
     }
   } catch (error) {
+    if (version !== fetchVersion) return
     toast.error(getApiErrorMessage(error, 'Erro ao carregar os dados.'))
     console.error(error)
   } finally {
-    isLoading.value = false
+    if (version === fetchVersion) isLoading.value = false
   }
 }
 
@@ -324,9 +340,20 @@ let filterTimer: ReturnType<typeof setTimeout> | undefined
 watch([searchQuery, filtroClienteId, filtroStatus, filtroResponsavel], () => {
   if (filterTimer) clearTimeout(filterTimer)
   filterTimer = setTimeout(() => {
+    filtrosAplicados.value = {
+      search: searchQuery.value.trim() || undefined,
+      client_id: filtroClienteId.value || undefined,
+      assigned_to: filtroResponsavel.value || undefined,
+      task_status: filtroStatus.value || undefined,
+    }
     currentPage.value = 1
     fetchData()
   }, 300)
+})
+
+onUnmounted(() => {
+  if (filterTimer) clearTimeout(filterTimer)
+  fetchVersion += 1
 })
 
 const getNomeCliente = (clientId: string | number) => {
@@ -548,8 +575,57 @@ onMounted(async () => {
         </div>
       </section>
 
+      <div class="flex items-center justify-between gap-3">
+        <div
+          role="group"
+          aria-label="Visualização das obrigações"
+          class="inline-flex rounded-lg border border-[var(--ct-border)] bg-slate-50 p-1"
+        >
+          <button
+            type="button"
+            :aria-pressed="visualizacao === 'lista'"
+            class="rounded-md px-4 py-2 text-sm font-semibold"
+            :class="
+              visualizacao === 'lista'
+                ? 'bg-white text-[var(--ct-primary)] shadow-sm'
+                : 'text-slate-500'
+            "
+            @click="visualizacao = 'lista'"
+          >
+            Lista
+          </button>
+          <button
+            type="button"
+            :aria-pressed="visualizacao === 'kanban'"
+            class="rounded-md px-4 py-2 text-sm font-semibold"
+            :class="
+              visualizacao === 'kanban'
+                ? 'bg-white text-[var(--ct-primary)] shadow-sm'
+                : 'text-slate-500'
+            "
+            @click="visualizacao = 'kanban'"
+          >
+            Kanban
+          </button>
+        </div>
+      </div>
+
+      <ObrigacoesKanban
+        v-if="visualizacao === 'kanban'"
+        :filters="filtrosAplicados"
+        :refresh-key="kanbanRefreshKey"
+        :updating="isUpdatingStatus"
+        :client-name="getNomeCliente"
+        :member-name="getNomeMembro"
+        :overdue="isAtrasada"
+        :format-date="formatDate"
+        @details="abrirDetalhes"
+        @move="alterarStatus"
+      />
+
       <!-- tabela -->
       <section
+        v-else
         class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
       >
         <div v-if="isLoading" class="space-y-3 p-6">

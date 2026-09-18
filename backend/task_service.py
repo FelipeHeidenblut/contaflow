@@ -168,10 +168,20 @@ def complete_task(
     current_user: dict,
     task_id: UUID,
 ) -> models.Task:
+    return change_task_status(db, current_user, task_id, TaskStatus.CONCLUIDA)
+
+
+def change_task_status(
+    db: Session,
+    current_user: dict,
+    task_id: UUID,
+    task_status: TaskStatus,
+) -> models.Task:
     require_permission(current_user, Permission.TASK_WRITE)
     task = get_accessible_task(db, task_id, current_user, for_update=True)
-    task.status = TaskStatus.CONCLUIDA.value
-    ensure_next_occurrence(db, task)
+    task.status = task_status.value
+    if task_status == TaskStatus.CONCLUIDA:
+        ensure_next_occurrence(db, task)
     db.commit()
     db.refresh(task)
     return task

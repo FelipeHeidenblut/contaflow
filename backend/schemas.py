@@ -77,6 +77,10 @@ class TaskCreate(TaskBase):
     pass
 
 
+class TaskStatusUpdate(BaseModel):
+    status: TaskStatus
+
+
 class TaskResponse(TaskBase):
     id: UUID
     tenant_id: UUID

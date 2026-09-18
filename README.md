@@ -62,6 +62,41 @@ Pré-requisitos: Python 3.11, Node.js 22 e PostgreSQL.
 - Em produção, confirme o nome do bucket já utilizado antes do deploy para não perder acesso aos
   documentos existentes.
 
+### Manter o backend ativo no Render gratuito
+
+O workflow `.github/workflows/backend-keep-alive.yml` chama `GET /health` a cada 5 minutos,
+mesmo sem usuários com o site aberto. A rota é pública, retorna `{"status":"ok"}` e não
+consulta banco, Supabase ou Asaas. Ela verifica somente se a API está respondendo.
+
+Para ativar:
+
+1. Faça deploy do backend com a rota `/health` e publique o workflow na branch padrão do
+   repositório no GitHub.
+2. Em **Settings > Secrets and variables > Actions > Variables**, crie a variável de repositório
+   `BACKEND_BASE_URL` com a URL pública do backend, por exemplo
+   `https://seu-backend.onrender.com` (sem `/health` e sem credenciais).
+3. Em **Actions > Manter backend ativo > Run workflow**, execute manualmente e confirme o
+   resultado **Backend ativo e respondendo.** Depois, confira as execuções agendadas.
+
+O ping aceita até 90 segundos por tentativa para permitir a inicialização de uma instância
+adormecida e tenta novamente em falhas transitórias. Uma resposta diferente de
+`{"status":"ok"}` faz a execução falhar.
+
+Limitações:
+
+- O [Render gratuito](https://render.com/docs/free) suspende serviços após 15 minutos sem
+  tráfego e oferece 750 horas de instância por mês, compartilhadas pelo workspace. Um único
+  serviço ativo durante 31 dias consome 744 horas; outros serviços compartilham a mesma cota.
+- O [agendamento do GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule)
+  pode atrasar ou perder execuções. Em repositórios públicos, é desativado após 60 dias sem
+  atividade. Portanto, essa solução reduz a ocorrência de partidas a frio, mas não garante
+  disponibilidade contínua.
+- São aproximadamente 8.640 execuções em 30 dias. Em repositórios privados, acompanhe a cota
+  e o orçamento de minutos do Actions antes de ativar.
+- Para usar um monitor HTTP externo no lugar do Actions, configure `GET` para
+  `https://seu-backend.onrender.com/health` a cada 5 minutos, esperando HTTP 200 e
+  `{"status":"ok"}`. Para desativar o agendamento no GitHub, use **Disable workflow**.
+
 ### Convites de membros
 
 O administrador envia um convite por e-mail; a senha é definida pelo próprio funcionário. O backend

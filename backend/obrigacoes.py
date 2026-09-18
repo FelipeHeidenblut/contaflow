@@ -13,6 +13,7 @@ from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 from task_service import (
     TaskListFilters,
+    change_task_status,
     complete_task,
     create_task,
     delete_task,
@@ -81,6 +82,16 @@ def concluir_obrigacao(
     current_user: dict = Depends(get_active_user),
 ):
     return complete_task(db, current_user, tarefa_id)
+
+
+@router.patch("/{tarefa_id}/status", response_model=schemas.TaskResponse)
+def atualizar_status_obrigacao(
+    tarefa_id: UUID,
+    payload: schemas.TaskStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_active_user),
+):
+    return change_task_status(db, current_user, tarefa_id, payload.status)
 
 
 @router.delete("/{tarefa_id}", status_code=status.HTTP_204_NO_CONTENT)

@@ -1,0 +1,45 @@
+name: Manter backend ativo
+
+on:
+  schedule:
+    - cron: "2-57/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: backend-keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Verificar saúde da API
+        env:
+          BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+        run: |
+          if [[ -z "$BACKEND_BASE_URL" ]]; then
+            echo "::error::Configure a variável BACKEND_BASE_URL com a URL HTTPS do backend no Render."
+            exit 1
+          fi
+
+          curl --fail --silent --show-error \
+            --proto '=https' \
+            --connect-timeout 15 \
+            --max-time 90 \
+            --retry 1 \
+            --retry-delay 5 \
+            --output health.json \
+            "${BACKEND_BASE_URL%/}/health"
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("health.json").read_text())
+          if payload != {"status": "ok"}:
+              raise SystemExit("Resposta inesperada do endpoint /health")
+          print("Backend ativo e respondendo.")
+          PY

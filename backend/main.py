@@ -73,6 +73,12 @@ def read_root():
     }
 
 
+@app.get("/health", include_in_schema=False)
+async def health():
+    """Liveness público e leve, sem consultas ao banco ou serviços externos."""
+    return {"status": "ok"}
+
+
 @app.get("/db-check")
 def test_db_connection(db: Session = Depends(get_db)):
     try:

@@ -11,6 +11,9 @@ export const useAuthStore = defineStore('auth', () => {
     is_superadmin?: boolean
     plan?: string
     billing_cycle?: string
+    contracted_plan?: string
+    trial?: { status: string; ends_at: string | null; days_remaining: number }
+    trial_read_only?: boolean
     payment_status?: string
   }
   // Estados
@@ -21,6 +24,9 @@ export const useAuthStore = defineStore('auth', () => {
   const userName = ref('')
   const userEmail = ref('')
   const plan = ref('free')
+  const contractedPlan = ref('free')
+  const trial = ref<AuthProfile['trial']>()
+  const trialReadOnly = ref(false)
   const billingCycle = ref('monthly')
   const paymentStatus = ref('ativo')
   const isInitialized = ref(false)
@@ -42,6 +48,9 @@ export const useAuthStore = defineStore('auth', () => {
     userId.value = profile?.user_id || ''
     tenantId.value = profile?.tenant_id || ''
     plan.value = profile?.plan || 'free'
+    contractedPlan.value = profile?.contracted_plan || plan.value
+    trial.value = profile?.trial
+    trialReadOnly.value = profile?.trial_read_only === true
     billingCycle.value = profile?.billing_cycle || 'monthly'
     paymentStatus.value = profile?.payment_status || 'ativo'
     hasValidProfile.value = true
@@ -66,6 +75,9 @@ export const useAuthStore = defineStore('auth', () => {
     userName.value = ''
     userEmail.value = ''
     plan.value = 'free'
+    contractedPlan.value = 'free'
+    trial.value = undefined
+    trialReadOnly.value = false
     billingCycle.value = 'monthly'
     paymentStatus.value = 'ativo'
     hasValidProfile.value = false
@@ -133,6 +145,9 @@ export const useAuthStore = defineStore('auth', () => {
     userName,
     userEmail,
     plan,
+    contractedPlan,
+    trial,
+    trialReadOnly,
     billingCycle,
     paymentStatus,
     isInitialized,

@@ -84,13 +84,15 @@ const faq = [
               <span class="ct-gradient-text">Cresça sem refazer o processo.</span>
             </h1>
             <p class="mt-6 max-w-xl text-[17px] leading-7 text-slate-600">
-              O fluxo principal acompanha todos os planos. A capacidade aumenta com a carteira, a
-              equipe e a necessidade de análise do escritório.
+              Novos escritórios recebem 14 dias do Profissional, sem cartão e sem cobrança
+              automática. Depois, retornam ao Gratuito se não contratarem. O fluxo principal
+              acompanha todos os planos. A capacidade aumenta com a carteira, a equipe e a
+              necessidade de análise do escritório.
             </p>
             <div
               class="mt-7 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[10px] uppercase tracking-wider text-slate-500"
             >
-              <span>✓ sem cartão no gratuito</span><span>✓ mensal ou anual</span
+              <span>✓ 14 dias do Profissional grátis</span><span>✓ mensal ou anual</span
               ><span>✓ checkout protegido</span>
             </div>
           </div>

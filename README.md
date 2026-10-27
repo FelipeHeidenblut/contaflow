@@ -128,6 +128,34 @@ cd front-end && npm run lint:check && npm run format:check && npm run type-check
 O workflow `.github/workflows/ci.yml` executa essas verificações, testa as migrations em um
 PostgreSQL descartável e audita as dependências em pushes e pull requests.
 
+## Teste de 14 dias do Profissional
+
+Novos escritórios recebem 14 dias do Profissional (100 clientes e 10 membros) ao concluir
+`sincronizar-cadastro`, inclusive após confirmação de e-mail. Não há cartão ou cobrança automática.
+Escritórios anteriores à migration não recebem teste retroativo; convites e novos logins não
+reiniciam o prazo. O CPF/CNPJ continua único por escritório.
+
+- A migration `f2d8a1b6c903` acrescenta datas opcionais de início, término e conversão.
+  Execute `alembic upgrade head` **antes** de publicar o backend e, depois, publique o frontend.
+  Não use `create_all` como substituto da migration.
+- O plano contratado permanece separado do acesso temporário. O backend verifica a expiração
+  a cada requisição em UTC, independentemente de cron ou disponibilidade do Render.
+- O checkout pendente não encerra o teste. O primeiro pagamento confirmado encerra o benefício
+  e libera o plano pago; os dias gratuitos restantes não são adicionados à assinatura.
+- Ao expirar sem conversão, o acesso volta ao Gratuito. Acima de 5 clientes ativos ou 1 membro,
+  mutações são bloqueadas até adequação ou contratação. O administrador ainda pode desativar
+  clientes e remover membros; consultas e downloads continuam disponíveis. Dados não são apagados.
+- O administrador pode exportar clientes, obrigações, comentários e metadados de documentos em
+  JSON pelo aviso do teste. Arquivos anexados são baixados separadamente em Documentos.
+- O painel informa o término e reforça o lembrete nos últimos 3 dias, atualizando o estado a
+  cada minuto enquanto aberto. Nesta versão, os lembretes são no aplicativo, não por e-mail.
+- Datas de início e conversão permitem acompanhar testes e assinaturas convertidas. A primeira
+  atividade pode ser verificada pelos cadastros existentes; não há envio a analytics externo.
+
+Valide em homologação o cadastro, a expiração, os limites e o pagamento sandbox antes da oferta
+em produção. O teste de migration com PostgreSQL exige `MIGRATION_TEST_DATABASE_URL` apontando
+para um banco descartável vazio; nunca use o banco da aplicação para esse teste.
+
 ## Configuração das tarefas agendadas
 
 Os workflows de cobrança, recorrências e alertas usam a variável de **repositório**

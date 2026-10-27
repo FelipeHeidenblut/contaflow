@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
 
 interface Task {
@@ -22,12 +22,6 @@ interface Client {
   nome?: string
 }
 
-interface TeamLoad {
-  nome: string
-  count: number
-  percentual: number
-}
-
 const props = defineProps<{
   loading: boolean
   dashboard: {
@@ -41,14 +35,87 @@ const props = defineProps<{
   userName: string
   tasks: Task[]
   clients: Client[]
-  team: TeamLoad[]
+  members: { id: string | number; name: string }[]
+  lookupsReady: boolean
+  userId: string
+  role: string
+  readOnly: boolean
 }>()
 
-const today = new Date()
-const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+const clock = ref(new Date())
+let timer: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  timer = setInterval(() => {
+    clock.value = new Date()
+  }, 60000)
+})
+onUnmounted(() => clearInterval(timer))
+const todayIso = computed(() =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(clock.value),
+)
+const scope = ref<'all' | 'mine'>('all')
+const scopeLabel = computed(() =>
+  scope.value === 'mine'
+    ? 'Minhas tarefas'
+    : ['admin', 'gerente'].includes(props.role)
+      ? 'Todo o escritório'
+      : 'Minha carteira',
+)
+const scopedTasks = computed(() =>
+  scope.value === 'mine'
+    ? props.tasks.filter((task) => String(task.assigned_to) === props.userId)
+    : props.tasks,
+)
+const canManage = computed(() => ['admin', 'gerente'].includes(props.role))
+const canWrite = computed(() => !props.readOnly && !hasCriticalBillingStatus.value)
+const taskLink = (task: Task) => ({ path: '/obrigacoes', query: { tarefa: String(task.id) } })
+const assigneeName = (task: Task) =>
+  props.members.find((member) => String(member.id) === String(task.assigned_to))?.name ||
+  (task.assigned_to ? 'Responsável indisponível' : 'Sem responsável')
+const steps = computed(() => [
+  { label: 'Cadastre um cliente', done: props.clients.length > 0, to: '/clientes?novo=1' },
+  { label: 'Crie uma obrigação', done: props.tasks.length > 0, to: '/obrigacoes?novo=1' },
+  ...(props.dashboard.plano !== 'free'
+    ? [
+        {
+          label: 'Convide sua equipe',
+          done: props.members.some((member) => String(member.id) !== props.userId),
+          to: '/membros?novo=1',
+        },
+      ]
+    : []),
+])
+const completedSteps = computed(() => steps.value.filter((step) => step.done).length)
+const team = computed(() =>
+  props.members
+    .map((member) => {
+      const tasks = activeTasks.value.filter(
+        (task) => String(task.assigned_to) === String(member.id),
+      )
+      return {
+        id: member.id,
+        nome: member.name,
+        count: tasks.length,
+        overdue: tasks.filter((task) => task.due_date && task.due_date < todayIso.value).length,
+      }
+    })
+    .sort((a, b) => b.overdue - a.overdue || b.count - a.count),
+)
+const unassigned = computed(() => activeTasks.value.filter((task) => !task.assigned_to).length)
 
 const greeting = computed(() => {
-  const hour = new Date().getHours()
+  const hour = Number(
+    new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(clock.value),
+  )
   if (hour < 12) return 'Bom dia'
   if (hour < 18) return 'Boa tarde'
   return 'Boa noite'
@@ -72,10 +139,14 @@ const billingAlertTitle = computed(() => {
   return labels[props.dashboard.status_pagamento] || 'Pagamento em processamento'
 })
 
-const monthLabel = new Intl.DateTimeFormat('pt-BR', {
-  month: 'long',
-  year: 'numeric',
-}).format(today)
+const monthLabel = computed(() =>
+  new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(clock.value),
+)
 
 const clientNames = computed(() => {
   const names = new Map<string, string>()
@@ -88,13 +159,15 @@ const clientNames = computed(() => {
 const clientName = (id?: string | number) =>
   id === undefined ? 'Sem cliente' : clientNames.value.get(String(id)) || 'Cliente'
 
-const activeTasks = computed(() => props.tasks.filter((task) => task.status !== 'concluida'))
-const completedTasks = computed(() => props.tasks.filter((task) => task.status === 'concluida'))
+const activeTasks = computed(() => scopedTasks.value.filter((task) => task.status !== 'concluida'))
+const completedTasks = computed(() =>
+  scopedTasks.value.filter((task) => task.status === 'concluida'),
+)
 const dueToday = computed(
-  () => activeTasks.value.filter((task) => task.due_date === todayIso).length,
+  () => activeTasks.value.filter((task) => task.due_date === todayIso.value).length,
 )
 const overdueTasks = computed(() =>
-  activeTasks.value.filter((task) => task.due_date && task.due_date < todayIso),
+  activeTasks.value.filter((task) => task.due_date && task.due_date < todayIso.value),
 )
 const awaitingTasks = computed(() =>
   activeTasks.value.filter((task) => task.status === 'aguardando_cliente'),
@@ -111,52 +184,40 @@ const onTimePercent = computed(() =>
           ((activeTasks.value.length - overdueTasks.value.length) / activeTasks.value.length) * 100,
         ),
       )
-    : 100,
+    : null,
 )
 const completionPercent = computed(() =>
-  props.tasks.length ? Math.round((completedTasks.value.length / props.tasks.length) * 100) : 0,
+  scopedTasks.value.length
+    ? Math.round((completedTasks.value.length / scopedTasks.value.length) * 100)
+    : 0,
 )
 
 const metrics = computed(() => [
   {
-    label: 'Tarefas ativas',
-    value: activeTasks.value.length,
-    helper: `${inProgressTasks.value.length} em andamento`,
-    icon: 'clipboard',
-    tone: 'blue',
-  },
-  {
-    label: 'Vencendo hoje',
-    value: dueToday.value,
-    helper: dueToday.value ? 'Exigem atenção hoje' : 'Nenhum vencimento hoje',
-    icon: 'clock',
-    tone: 'amber',
-  },
-  {
     label: 'Atrasadas',
     value: overdueTasks.value.length,
-    helper: overdueTasks.value.length ? 'Fora do prazo' : 'Tudo dentro do prazo',
+    helper: 'Obrigações abertas com prazo vencido',
     icon: 'alert',
     tone: 'red',
   },
   {
-    label: 'Concluídas',
-    value: completedTasks.value.length,
-    helper: `${completionPercent.value}% do histórico`,
-    icon: 'check',
-    tone: 'green',
+    label: 'Vencendo hoje',
+    value: dueToday.value,
+    helper: 'Entregas abertas para hoje',
+    icon: 'clock',
+    tone: 'amber',
   },
   {
-    label: 'No prazo',
-    value: `${onTimePercent.value}%`,
-    helper: `${Math.max(0, activeTasks.value.length - overdueTasks.value.length)} tarefas em dia`,
-    icon: 'shield',
-    tone: 'cyan',
+    label: 'Em andamento',
+    value: inProgressTasks.value.length,
+    helper: 'Trabalho iniciado e ainda não concluído',
+    icon: 'clipboard',
+    tone: 'blue',
   },
 ])
 
 const flowItems = computed(() => {
-  const total = Math.max(props.tasks.length, 1)
+  const total = Math.max(scopedTasks.value.length, 1)
   return [
     { label: 'A fazer', value: pendingTasks.value.length, color: 'text-blue-600' },
     { label: 'Em andamento', value: inProgressTasks.value.length, color: 'text-cyan-600' },
@@ -190,9 +251,12 @@ const priorities = computed(() =>
   activeTasks.value
     .slice()
     .sort((a, b) => {
-      const overdueA = a.due_date && a.due_date < todayIso ? 1 : 0
-      const overdueB = b.due_date && b.due_date < todayIso ? 1 : 0
+      const overdueA = a.due_date && a.due_date < todayIso.value ? 1 : 0
+      const overdueB = b.due_date && b.due_date < todayIso.value ? 1 : 0
       if (overdueA !== overdueB) return overdueB - overdueA
+      const dueTodayA = a.due_date === todayIso.value ? 1 : 0
+      const dueTodayB = b.due_date === todayIso.value ? 1 : 0
+      if (dueTodayA !== dueTodayB) return dueTodayB - dueTodayA
       const priority =
         (priorityWeight[b.grau_importancia || 'Média'] || 0) -
         (priorityWeight[a.grau_importancia || 'Média'] || 0)
@@ -203,7 +267,7 @@ const priorities = computed(() =>
 )
 
 const recentTasks = computed(() =>
-  props.tasks
+  scopedTasks.value
     .slice()
     .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
     .slice(0, 4),
@@ -225,7 +289,7 @@ const clientsWithPending = computed(() => {
       lastActivity: task.created_at,
     }
     current.pending += 1
-    if (task.due_date && task.due_date < todayIso) current.overdue += 1
+    if (task.due_date && task.due_date < todayIso.value) current.overdue += 1
     if (
       task.created_at &&
       (!current.lastActivity || new Date(task.created_at) > new Date(current.lastActivity))
@@ -264,8 +328,9 @@ const formatCreatedAt = (date?: string) => {
 }
 
 const statusLabel = (task: Task) => {
-  if (task.due_date && task.due_date < todayIso && task.status !== 'concluida') return 'Atrasada'
-  if (task.due_date === todayIso && task.status !== 'concluida') return 'Vence hoje'
+  if (task.due_date && task.due_date < todayIso.value && task.status !== 'concluida')
+    return 'Atrasada'
+  if (task.due_date === todayIso.value && task.status !== 'concluida') return 'Vence hoje'
   if (task.status === 'aguardando_cliente') return 'Aguardando cliente'
   if (task.status === 'em_andamento') return 'Em andamento'
   if (task.status === 'concluida') return 'Concluída'
@@ -344,6 +409,7 @@ const initials = (name: string) =>
           </svg>
         </RouterLink>
         <RouterLink
+          v-if="canWrite"
           to="/obrigacoes?novo=1"
           class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--ct-primary)] px-5 text-sm font-semibold text-white shadow-sm hover:bg-[var(--ct-primary-hover)]"
         >
@@ -379,12 +445,77 @@ const initials = (name: string) =>
           Verifique a assinatura para manter o acesso aos recursos.
         </p>
       </div>
-      <RouterLink to="/faturamento" class="text-xs font-bold text-[var(--ct-primary)]"
+      <RouterLink
+        v-if="role === 'admin'"
+        to="/faturamento"
+        class="text-xs font-bold text-[var(--ct-primary)]"
         >Ver assinatura</RouterLink
       >
     </div>
 
-    <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <section
+      v-if="
+        !loading && lookupsReady && role === 'admin' && completedSteps < steps.length && canWrite
+      "
+      class="rounded-xl border border-blue-200 bg-blue-50 p-5"
+      aria-label="Primeiros passos"
+    >
+      <h2 class="font-semibold text-slate-900">
+        Configure seu escritório: {{ completedSteps }} de {{ steps.length }} etapas concluídas
+      </h2>
+      <p class="mt-1 text-sm text-slate-600">
+        Comece com um cliente real e organize a primeira entrega. Convidar a equipe é opcional.
+      </p>
+      <progress
+        class="my-3 h-2 w-full accent-blue-600"
+        :value="completedSteps"
+        :max="steps.length"
+        aria-label="Progresso da configuração"
+      />
+      <ol class="grid gap-3 sm:grid-cols-3">
+        <li
+          v-for="(step, index) in steps"
+          :key="step.label"
+          class="rounded-lg bg-white p-3 text-sm"
+        >
+          <span v-if="step.done" class="text-emerald-700">✓ {{ step.label }} — concluído</span>
+          <RouterLink v-else :to="step.to" class="font-semibold text-blue-700 underline"
+            >{{ index + 1 }}. {{ step.label }}</RouterLink
+          >
+        </li>
+      </ol>
+    </section>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <p class="text-sm text-slate-600">{{ scopeLabel }} · Prazos no horário de Brasília</p>
+      <div
+        class="flex rounded-lg border border-slate-200 bg-white p-1"
+        role="group"
+        aria-label="Escopo dos indicadores"
+      >
+        <button
+          v-for="option in ['all', 'mine'] as const"
+          :key="option"
+          type="button"
+          :aria-pressed="scope === option"
+          class="rounded-md px-3 py-2 text-sm"
+          :class="scope === option ? 'bg-blue-100 font-semibold text-blue-800' : 'text-slate-600'"
+          @click="scope = option"
+        >
+          {{
+            option === 'mine'
+              ? 'Minhas tarefas'
+              : canManage
+                ? 'Todo o escritório'
+                : 'Minha carteira'
+          }}
+        </button>
+      </div>
+    </div>
+    <p v-if="!loading && !lookupsReady" role="status" class="text-sm text-amber-800">
+      Alguns dados de clientes ou da equipe estão indisponíveis. Atualize a página para tentar
+      novamente.
+    </p>
+    <section class="grid gap-3 sm:grid-cols-3">
       <article
         v-for="metric in metrics"
         :key="metric.label"
@@ -465,7 +596,60 @@ const initials = (name: string) =>
       </article>
     </section>
 
+    <p v-if="!loading" class="text-sm text-slate-600">
+      Histórico completo: {{ completedTasks.length }} concluídas ({{
+        scopedTasks.length ? `${completionPercent}%` : 'sem dados'
+      }}). Obrigações abertas: {{ activeTasks.length }} · No prazo:
+      {{ onTimePercent === null ? 'sem dados' : `${onTimePercent}%` }}.
+    </p>
     <div class="grid gap-4 xl:grid-cols-12">
+      <section
+        class="overflow-hidden rounded-xl border border-[#e0e5ed] bg-white shadow-sm xl:col-span-12"
+      >
+        <div class="flex items-center justify-between border-b border-[#edf0f5] px-4 py-3.5">
+          <h2 class="text-sm font-semibold text-[#17213d]">O que fazer agora</h2>
+          <RouterLink to="/obrigacoes" class="text-[11px] font-semibold text-[var(--ct-primary)]"
+            >Ver todas</RouterLink
+          >
+        </div>
+        <div v-if="loading" class="space-y-2 p-4">
+          <div v-for="i in 5" :key="i" class="h-10 animate-pulse rounded bg-slate-100"></div>
+        </div>
+        <div v-else-if="priorities.length" class="divide-y divide-[#f0f2f6] px-4">
+          <RouterLink
+            v-for="task in priorities"
+            :key="task.id"
+            :to="taskLink(task)"
+            class="grid grid-cols-[1fr_auto] items-center gap-3 py-2.5"
+          >
+            <span class="min-w-0"
+              ><span class="block truncate text-sm font-semibold text-[#26344f]">{{
+                task.title
+              }}</span
+              ><span class="mt-0.5 block truncate text-xs text-[#6b7890]"
+                >{{ clientName(task.client_id) }} · {{ formatDate(task.due_date) }} ·
+                {{ assigneeName(task) }}</span
+              ></span
+            >
+            <span class="rounded-md px-2 py-1 text-[9px] font-medium" :class="statusClass(task)">{{
+              statusLabel(task)
+            }}</span>
+          </RouterLink>
+        </div>
+        <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
+          {{
+            scopedTasks.length
+              ? 'Tudo em dia: nenhuma obrigação aberta neste escopo.'
+              : 'Comece criando uma obrigação para acompanhar seus próximos prazos.'
+          }}
+          <RouterLink
+            v-if="canWrite"
+            to="/obrigacoes?novo=1"
+            class="mt-3 block font-semibold text-blue-700 underline"
+            >Criar obrigação</RouterLink
+          >
+        </p>
+      </section>
       <section
         class="overflow-hidden rounded-xl border border-[#e0e5ed] bg-white shadow-sm xl:col-span-8"
       >
@@ -474,12 +658,21 @@ const initials = (name: string) =>
           <RouterLink
             to="/obrigacoes"
             class="rounded-lg border border-[#e0e5ed] px-3 py-1.5 text-[11px] font-medium text-[#52617a] hover:bg-slate-50"
-            >Este mês</RouterLink
+            >Histórico completo</RouterLink
           >
         </div>
         <div v-if="loading" class="m-4 h-40 animate-pulse rounded-lg bg-slate-100"></div>
+        <div v-else-if="!scopedTasks.length" class="p-6 text-sm text-slate-600">
+          Sem tarefas neste escopo. Os indicadores aparecerão quando houver obrigações.
+          <RouterLink
+            v-if="canWrite"
+            to="/obrigacoes?novo=1"
+            class="mt-3 block font-semibold text-blue-700 underline"
+            >Criar primeira obrigação</RouterLink
+          >
+        </div>
         <div v-else class="overflow-x-auto px-4 pb-3 pt-2">
-          <div class="min-w-[620px]">
+          <div class="min-w-[480px]">
             <div class="grid grid-cols-4 divide-x divide-dashed divide-[#dce2eb] text-center">
               <div v-for="item in flowItems" :key="item.label" class="px-3 py-1">
                 <p class="text-[11px] font-medium text-[#52617a]">{{ item.label }}</p>
@@ -487,41 +680,22 @@ const initials = (name: string) =>
                 <p class="text-[10px] text-[#8190a8]">{{ item.percent }}%</p>
               </div>
             </div>
-            <svg
-              class="mt-[-5px] h-[78px] w-full"
-              viewBox="0 0 800 90"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <defs>
-                <linearGradient id="flow-stroke" x1="0" x2="1">
-                  <stop offset="0" stop-color="#2563eb" />
-                  <stop offset="0.42" stop-color="#0891b2" />
-                  <stop offset="0.72" stop-color="#f59e0b" />
-                  <stop offset="1" stop-color="#16a34a" />
-                </linearGradient>
-                <linearGradient id="flow-fill" x1="0" x2="1">
-                  <stop offset="0" stop-color="#dbeafe" stop-opacity=".9" />
-                  <stop offset=".45" stop-color="#cffafe" stop-opacity=".75" />
-                  <stop offset=".72" stop-color="#fef3c7" stop-opacity=".72" />
-                  <stop offset="1" stop-color="#dcfce7" stop-opacity=".85" />
-                </linearGradient>
-              </defs>
-              <path
-                d="M0 55 C120 30 180 38 255 54 S410 55 465 66 S610 65 670 44 S760 33 800 18 L800 90 L0 90Z"
-                fill="url(#flow-fill)"
-              />
-              <path
-                d="M0 55 C120 30 180 38 255 54 S410 55 465 66 S610 65 670 44 S760 33 800 18"
-                fill="none"
-                stroke="url(#flow-stroke)"
-                stroke-width="3"
-              />
-              <circle cx="100" cy="39" r="4" fill="#2563eb" />
-              <circle cx="300" cy="56" r="4" fill="#0891b2" />
-              <circle cx="500" cy="67" r="4" fill="#f59e0b" />
-              <circle cx="700" cy="37" r="4" fill="#16a34a" />
-            </svg>
+            <div class="mt-5 space-y-3">
+              <div
+                v-for="item in flowItems"
+                :key="item.label"
+                class="flex items-center gap-3 text-xs"
+              >
+                <span class="w-32 shrink-0">{{ item.label }}</span>
+                <div class="h-2 flex-1 rounded-full bg-slate-100">
+                  <div
+                    class="h-2 rounded-full bg-blue-500"
+                    :style="{ width: `${item.percent}%` }"
+                  />
+                </div>
+                <span class="w-12 text-right">{{ item.percent }}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -578,57 +752,19 @@ const initials = (name: string) =>
         class="overflow-hidden rounded-xl border border-[#e0e5ed] bg-white shadow-sm xl:col-span-4"
       >
         <div class="flex items-center justify-between border-b border-[#edf0f5] px-4 py-3.5">
-          <h2 class="text-sm font-semibold text-[#17213d]">Minhas prioridades</h2>
-          <RouterLink to="/obrigacoes" class="text-[11px] font-semibold text-[var(--ct-primary)]"
-            >Ver todas</RouterLink
-          >
-        </div>
-        <div v-if="loading" class="space-y-2 p-4">
-          <div v-for="i in 5" :key="i" class="h-10 animate-pulse rounded bg-slate-100"></div>
-        </div>
-        <div v-else-if="priorities.length" class="divide-y divide-[#f0f2f6] px-4">
+          <h2 class="text-sm font-semibold text-[#17213d]">Tarefas por responsável</h2>
           <RouterLink
-            v-for="task in priorities"
-            :key="task.id"
-            to="/obrigacoes"
-            class="grid grid-cols-[1fr_auto] items-center gap-3 py-2.5"
-          >
-            <span class="min-w-0"
-              ><span class="block truncate text-[11px] font-semibold text-[#26344f]">{{
-                task.title
-              }}</span
-              ><span class="mt-0.5 block truncate text-[10px] text-[#8190a8]">{{
-                clientName(task.client_id)
-              }}</span></span
-            >
-            <span class="rounded-md px-2 py-1 text-[9px] font-medium" :class="statusClass(task)">{{
-              statusLabel(task)
-            }}</span>
-          </RouterLink>
-        </div>
-        <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
-          Nenhuma prioridade em aberto.
-        </p>
-      </section>
-
-      <section
-        class="overflow-hidden rounded-xl border border-[#e0e5ed] bg-white shadow-sm xl:col-span-4"
-      >
-        <div class="flex items-center justify-between border-b border-[#edf0f5] px-4 py-3.5">
-          <h2 class="text-sm font-semibold text-[#17213d]">Carga por colaborador</h2>
-          <RouterLink to="/membros" class="text-[11px] font-semibold text-[var(--ct-primary)]"
+            v-if="canManage"
+            to="/membros"
+            class="text-[11px] font-semibold text-[var(--ct-primary)]"
             >Equipe</RouterLink
           >
         </div>
         <div v-if="loading" class="space-y-3 p-4">
           <div v-for="i in 5" :key="i" class="h-10 animate-pulse rounded bg-slate-100"></div>
         </div>
-        <div v-else-if="team.length" class="space-y-3.5 p-4">
-          <div
-            v-for="member in team.slice(0, 5)"
-            :key="member.nome"
-            class="flex items-center gap-3"
-          >
+        <div v-else-if="lookupsReady && team.length" class="space-y-3.5 p-4">
+          <div v-for="member in team.slice(0, 5)" :key="member.id" class="flex items-center gap-3">
             <span
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[9px] font-bold text-blue-700"
               >{{ initials(member.nome) }}</span
@@ -636,26 +772,22 @@ const initials = (name: string) =>
             <div class="min-w-0 flex-1">
               <div class="mb-1 flex items-center justify-between gap-2">
                 <p class="truncate text-[10px] font-medium text-[#26344f]">{{ member.nome }}</p>
-                <span class="text-[9px] text-[#6b7890]">{{ member.count }}</span>
               </div>
-              <div class="h-1.5 overflow-hidden rounded-full bg-[#edf0f5]">
-                <div
-                  class="h-full rounded-full"
-                  :class="
-                    member.percentual >= 85
-                      ? 'bg-blue-600'
-                      : member.percentual >= 50
-                        ? 'bg-cyan-500'
-                        : 'bg-emerald-500'
-                  "
-                  :style="{ width: `${Math.max(member.percentual, member.count ? 8 : 0)}%` }"
-                ></div>
-              </div>
+              <p class="text-xs text-slate-600">
+                {{ member.count }} abertas ·
+                <span :class="member.overdue ? 'font-semibold text-red-700' : ''"
+                  >{{ member.overdue }} atrasadas</span
+                >
+              </p>
             </div>
           </div>
         </div>
         <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
-          Nenhuma tarefa atribuída.
+          Nenhum responsável disponível neste escopo.
+        </p>
+        <p v-if="!loading" class="border-t border-slate-100 px-4 py-3 text-xs text-slate-600">
+          {{ unassigned }} obrigação(ões) sem responsável. Contagens do escopo selecionado, sem
+          estimativa de capacidade.
         </p>
       </section>
 
@@ -675,7 +807,7 @@ const initials = (name: string) =>
           <RouterLink
             v-for="task in recentTasks"
             :key="task.id"
-            to="/obrigacoes"
+            :to="taskLink(task)"
             class="flex items-center gap-3 py-3"
           >
             <span
@@ -705,7 +837,13 @@ const initials = (name: string) =>
           </RouterLink>
         </div>
         <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
-          Nenhuma tarefa cadastrada.
+          Nenhuma obrigação neste escopo.
+          <RouterLink
+            v-if="canWrite"
+            to="/obrigacoes?novo=1"
+            class="mt-3 block font-semibold text-blue-700 underline"
+            >Criar primeira obrigação</RouterLink
+          >
         </p>
       </section>
 
@@ -746,7 +884,17 @@ const initials = (name: string) =>
           </div>
         </div>
         <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
-          Nenhum cliente com pendências.
+          {{
+            clients.length
+              ? 'Nenhum cliente com pendências neste escopo.'
+              : 'Cadastre seu primeiro cliente para começar a organizar as entregas.'
+          }}
+          <RouterLink
+            v-if="canManage && canWrite && !clients.length"
+            to="/clientes?novo=1"
+            class="mt-3 block font-semibold text-blue-700 underline"
+            >Cadastrar cliente</RouterLink
+          >
         </p>
       </section>
 
@@ -771,7 +919,7 @@ const initials = (name: string) =>
             <RouterLink
               v-for="task in recurringTasks"
               :key="task.id"
-              to="/obrigacoes"
+              :to="taskLink(task)"
               class="grid grid-cols-[1.2fr_1fr_100px_80px] items-center border-b border-[#f0f2f6] px-4 py-2.5 last:border-0 hover:bg-slate-50"
             >
               <span class="truncate text-[10px] font-medium text-[#26344f]">{{ task.title }}</span
@@ -784,7 +932,14 @@ const initials = (name: string) =>
           </div>
         </div>
         <p v-else class="px-4 py-12 text-center text-xs text-[#8190a8]">
-          Nenhuma recorrência ativa.
+          Nenhuma recorrência ativa neste escopo. Ao criar uma obrigação, marque a opção de
+          recorrência para repetir a entrega mensalmente.
+          <RouterLink
+            v-if="canWrite"
+            to="/obrigacoes?novo=1"
+            class="mt-3 block font-semibold text-blue-700 underline"
+            >Criar obrigação recorrente</RouterLink
+          >
         </p>
       </section>
     </div>

@@ -85,20 +85,12 @@ const handleRegister = async () => {
     if (data.user) {
       try {
         if (data.session) {
-          const syncResponse = await api.post('/api/v1/auth/sincronizar-cadastro', {
+          await api.post('/api/v1/auth/sincronizar-cadastro', {
             nome_completo: nomeCompleto.value,
             nome_escritorio: nomeEscritorio.value,
             documento: documentoRaw.value,
           })
-          authStore.initializeAuthenticatedSession(
-            {
-              user_id: data.user.id,
-              tenant_id: syncResponse.data.tenant_id,
-              role: 'admin',
-              is_superadmin: false,
-            },
-            data.user,
-          )
+          await authStore.checkSession(true)
           router.push(
             selectedPlan && selectedPlan.id !== 'free'
               ? { path: '/faturamento', query: selectedQuery }
@@ -140,6 +132,15 @@ const handleRegister = async () => {
         >Entrar</RouterLink
       ></template
     >
+    <div class="mb-5 rounded-xl bg-blue-50 p-4 text-sm text-slate-700">
+      <strong>Experimente o Profissional grátis por 14 dias.</strong>
+      <p>Até 100 clientes e 10 membros. Sem cartão e sem cobrança automática.</p>
+      <p>Depois, escolha uma assinatura ou continue no Gratuito (5 clientes e 1 membro).</p>
+      <p>
+        Profissional: R$ {{ getPlanPrice(getPlan('profissional')!, 'monthly') }}/mês após
+        contratação.
+      </p>
+    </div>
     <div
       v-if="selectedPlan && selectedPlan.id !== 'free'"
       class="mb-5 rounded-xl border border-[var(--ct-primary)]/25 bg-[var(--ct-primary-soft)] px-4 py-3"
@@ -208,8 +209,9 @@ const handleRegister = async () => {
             placeholder="Documento do responsável"
           />
           <p class="ct-help">
-            Usado para identificar o responsável pelo escritório e preparar futuras contratações.
-            Nenhuma cobrança é feita no plano gratuito.
+            Usado para identificar o responsável pelo escritório e preparar futuras contratações. 14
+            dias do Profissional grátis, sem cartão e sem cobrança automática. Depois, sua conta
+            volta ao Gratuito.
           </p>
         </div>
       </div>
@@ -272,7 +274,7 @@ const handleRegister = async () => {
             ? 'Criando conta…'
             : selectedPlan && selectedPlan.id !== 'free'
               ? 'Criar escritório e continuar'
-              : 'Criar conta gratuita'
+              : 'Experimentar por 14 dias'
         }}
       </button>
       <p class="text-center text-xs text-[var(--ct-text-muted)]">

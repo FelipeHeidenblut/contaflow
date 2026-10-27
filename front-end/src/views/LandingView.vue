@@ -8,7 +8,7 @@ const page = ref<HTMLElement | null>(null)
 useScrollReveal(page)
 
 const proofPoints = [
-  { value: '5', label: 'clientes no plano gratuito', detail: 'Comece sem cartão' },
+  { value: '14', label: 'dias grátis do Profissional', detail: 'Comece sem cartão' },
   { value: '5 MB', label: 'por documento', detail: 'Arquivos ligados ao cliente' },
   { value: '12 meses', label: 'por relatório', detail: 'Visão consolidada nos planos pagos' },
 ]
@@ -121,7 +121,7 @@ const trustPoints = [
             </p>
             <div class="mt-8 flex flex-col gap-3 sm:flex-row">
               <RouterLink to="/cadastro" class="ct-button-primary ct-landing-primary">
-                Criar meu escritório grátis
+                Experimentar grátis por 14 dias
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-width="2" d="M5 12h14m-6-6 6 6-6 6" />
                 </svg>
@@ -131,8 +131,8 @@ const trustPoints = [
               </RouterLink>
             </div>
             <div class="mt-6 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] text-slate-500">
-              <span>✓ até 5 clientes</span><span>✓ sem cartão</span
-              ><span>✓ cancele quando quiser</span>
+              <span>✓ Profissional por 14 dias</span><span>✓ sem cartão</span
+              ><span>✓ sem cobrança automática</span>
             </div>
           </div>
 
@@ -694,8 +694,8 @@ const trustPoints = [
               Organize o próximo fechamento sem depender de mais uma planilha.
             </h2>
             <p class="mt-5 max-w-2xl text-[15px] leading-7 text-slate-600">
-              Cadastre até cinco clientes gratuitamente. Quando a carteira e a equipe crescerem, a
-              estrutura já estará pronta.
+              Experimente o Profissional por 14 dias, com até 100 clientes e 10 membros. Sem cartão.
+              Ao terminar, escolha uma assinatura ou continue no Gratuito.
             </p>
           </div>
           <div class="flex shrink-0 flex-col gap-3 sm:flex-row">

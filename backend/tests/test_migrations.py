@@ -31,6 +31,9 @@ EXPECTED_SECURED_TABLES = EXPECTED_TABLES
 EXPECTED_COLUMNS = {
     "tenants": {
         "asaas_customer_id",
+        "trial_started_at",
+        "trial_ends_at",
+        "trial_converted_at",
         "billing_cycle",
         "plano",
         "status_pagamento",
@@ -103,7 +106,7 @@ def test_migration_history_has_one_base_and_one_head():
     script = ScriptDirectory.from_config(_alembic_config())
 
     assert script.get_base() == "452ebc16bf35"
-    assert script.get_current_head() == "a6f2d8c4b190"
+    assert script.get_current_head() == "f2d8a1b6c903"
 
 
 def test_full_history_compiles_for_an_empty_postgresql_database():
@@ -133,6 +136,8 @@ def test_full_history_compiles_for_an_empty_postgresql_database():
     sql = result.stdout
     for table_name in EXPECTED_TABLES:
         assert f"CREATE TABLE {table_name}" in sql
+    for name in ("trial_started_at", "trial_ends_at", "trial_converted_at"):
+        assert f"ADD COLUMN {name} TIMESTAMP WITH TIME ZONE" in sql
     assert "ADD COLUMN asaas_customer_id" in sql
     assert "ADD COLUMN is_superadmin" in sql
     assert "ADD COLUMN natureza_operacao" in sql
@@ -220,4 +225,4 @@ def test_upgrade_head_on_disposable_empty_postgresql_database():
         current_revision = connection.execute(
             sa.text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-        assert current_revision == "a6f2d8c4b190"
+        assert current_revision == "f2d8a1b6c903"

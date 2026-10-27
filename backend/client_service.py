@@ -1,3 +1,4 @@
+from trial_service import effective_plan
 import csv
 import io
 import re
@@ -48,7 +49,7 @@ def _lock_tenant_and_get_client_capacity(
     if not tenant:
         raise HTTPException(status_code=404, detail="Escritório não encontrado.")
 
-    limit = get_plan_limit(tenant.plano, "clients")
+    limit = get_plan_limit(effective_plan(tenant), "clients")
     active_clients = (
         repository.query(models.Client)
         .filter(models.Client.ativo.is_(True))
@@ -116,7 +117,7 @@ def _plan_limit_error(tenant: models.Tenant, limit: int) -> HTTPException:
         status_code=status.HTTP_403_FORBIDDEN,
         detail=(
             f"Você atingiu o limite de {limit} clientes do plano "
-            f"{get_plan_name(tenant.plano)}. Faça upgrade para adicionar mais!"
+            f"{get_plan_name(effective_plan(tenant))}. Faça upgrade para adicionar mais!"
         ),
     )
 
@@ -391,7 +392,7 @@ def import_clients_from_csv(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
                     f"O arquivo possui {len(valid_clients)} cliente(s) válido(s), mas o plano "
-                    f"{get_plan_name(tenant.plano)} tem apenas "
+                    f"{get_plan_name(effective_plan(tenant))} tem apenas "
                     f"{available_slots} vaga(s) disponível(is). Nenhum cliente foi importado."
                 ),
             )

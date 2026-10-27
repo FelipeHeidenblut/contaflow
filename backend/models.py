@@ -36,6 +36,9 @@ class Tenant(Base):
     billing_cycle = Column(String(20), default="monthly", nullable=False)
     status_pagamento = Column(String, default="ativo")
     subscription_status = Column(String(30), default="none", server_default="none", nullable=False)
+    trial_started_at = Column(DateTime(timezone=True), nullable=True)
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    trial_converted_at = Column(DateTime(timezone=True), nullable=True)
     billing_status_updated_at = Column(DateTime(timezone=True), nullable=True)
     calendar_token = Column(String(64), unique=True, nullable=True, index=True)
 

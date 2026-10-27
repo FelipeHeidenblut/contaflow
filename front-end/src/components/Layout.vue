@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import AppNavIcon from './AppNavIcon.vue'
+import TrialNotice from './TrialNotice.vue'
 import BrandMark from './BrandMark.vue'
 import { useAuthStore } from '../stores/auth'
 
@@ -201,7 +202,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', closeOnEscape))
       </header>
 
       <main class="flex-1 overflow-y-auto px-4 py-5 sm:px-6 md:px-7 md:py-6 xl:px-9">
-        <div class="mx-auto w-full max-w-[1580px]"><slot /></div>
+        <div class="mx-auto w-full max-w-[1580px]"><TrialNotice /><slot /></div>
       </main>
     </div>
   </div>

@@ -8,7 +8,7 @@ from auth_service import resolve_user_context
 # Imports locais da sua arquitetura
 from app_config import get_settings
 from database import get_db
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -131,7 +131,7 @@ def get_current_user(
     return resolve_user_context(db, payload)
 
 
-def get_active_user(current_user: dict = Depends(get_current_user)):
+def get_active_user(current_user: dict = Depends(get_current_user), request: Request = None):
     """Bloqueia mutações de assinaturas que não podem mais operar."""
     if current_user["payment_status"] in {
         "inadimplente",
@@ -143,6 +143,15 @@ def get_active_user(current_user: dict = Depends(get_current_user)):
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Conta bloqueada. Regularize a assinatura para continuar.",
         )
+    if current_user.get("trial_read_only"):
+        # Only administrators may reduce usage after expiry; all reads remain available.
+        path = request.scope.get("route").path if request and request.scope.get("route") else ""
+        can_reduce = current_user.get("role") == "admin" and request and (
+            (request.method == "DELETE" and path == "/api/v1/membros/{membro_id}")
+            or (request.method == "PATCH" and path == "/api/v1/clientes/{cliente_id}/desativar")
+        )
+        if not can_reduce:
+            raise HTTPException(status_code=403, detail="Teste encerrado: adeque o escritório a 5 clientes ativos e 1 membro ou contrate um plano. Seus dados estão preservados para consulta.")
     return current_user
 
 

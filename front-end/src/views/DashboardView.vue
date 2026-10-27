@@ -34,6 +34,8 @@ interface Client {
 
 const authStore = useAuthStore()
 const isLoading = ref(true)
+const loadError = ref(false)
+const lookupsReady = ref(false)
 const tasks = ref<TaskData[]>([])
 const members = ref<Member[]>([])
 const clients = ref<Client[]>([])
@@ -43,25 +45,6 @@ const dashboard = ref({
   tarefas_atrasadas: 0,
   plano: '',
   status_pagamento: '',
-})
-
-const teamLoad = computed(() => {
-  const openAssigned = tasks.value.filter((task) => task.status !== 'concluida' && task.assigned_to)
-  const capacity = 8
-  const load = new Map<string, { nome: string; count: number; percentual: number }>()
-
-  members.value.forEach((member) => {
-    load.set(String(member.id), { nome: member.name, count: 0, percentual: 0 })
-  })
-  openAssigned.forEach((task) => {
-    const member = load.get(String(task.assigned_to))
-    if (member) member.count += 1
-  })
-  load.forEach((member) => {
-    member.percentual = Math.min(100, Math.round((member.count / capacity) * 100))
-  })
-
-  return Array.from(load.values()).sort((a, b) => b.count - a.count)
 })
 
 const planLabel = computed(() => {
@@ -82,6 +65,7 @@ const planLabel = computed(() => {
 
 const fetchData = async () => {
   isLoading.value = true
+  loadError.value = false
   try {
     const [dashboardResult, tasksResult, membersResult, clientsResult] = await Promise.allSettled([
       api.get('/api/v1/dashboard/'),
@@ -93,11 +77,14 @@ const fetchData = async () => {
     if (dashboardResult.status === 'rejected') throw dashboardResult.reason
     if (tasksResult.status === 'rejected') throw tasksResult.reason
 
+    lookupsReady.value =
+      membersResult.status === 'fulfilled' && clientsResult.status === 'fulfilled'
     dashboard.value = dashboardResult.value.data
     tasks.value = tasksResult.value
     members.value = membersResult.status === 'fulfilled' ? membersResult.value : []
     clients.value = clientsResult.status === 'fulfilled' ? clientsResult.value : []
   } catch {
+    loadError.value = true
     toast.error('Erro ao carregar os dados do dashboard.')
   } finally {
     isLoading.value = false
@@ -109,14 +96,23 @@ onMounted(fetchData)
 
 <template>
   <Layout title="Dashboard">
+    <div v-if="loadError" role="alert" class="rounded-xl border border-red-200 bg-red-50 p-5">
+      <p>Não foi possível carregar o dashboard. Seus indicadores não estão disponíveis.</p>
+      <button type="button" class="mt-3 underline" @click="fetchData">Tentar novamente</button>
+    </div>
     <OperationalDashboard
+      v-else
       :loading="isLoading"
       :dashboard="dashboard"
       :plan-label="planLabel"
       :user-name="authStore.userName || 'Usuário'"
       :tasks="tasks"
       :clients="clients"
-      :team="teamLoad"
+      :members="members"
+      :lookups-ready="lookupsReady"
+      :user-id="authStore.userId"
+      :role="authStore.role"
+      :read-only="authStore.trialReadOnly"
     />
   </Layout>
 </template>

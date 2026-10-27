@@ -367,6 +367,8 @@ def _apply_tenant_status(
     old_value = f"{tenant.status_pagamento}:{tenant.plano}:{tenant.billing_cycle}"
     tenant.status_pagamento, tenant.subscription_status = target
     if payment_status in {"confirmed", "received"}:
+        if getattr(tenant, "trial_started_at", None) and not getattr(tenant, "trial_converted_at", None):
+            tenant.trial_converted_at = event_time
         tenant.plano = subscription.plan_code
         tenant.billing_cycle = subscription.billing_cycle
     tenant.billing_status_updated_at = event_time

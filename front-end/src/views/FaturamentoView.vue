@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
+import { useAuthStore } from '../stores/auth'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -15,6 +16,7 @@ import {
   type PlanOption,
 } from '../constants/plans'
 
+const authStore = useAuthStore()
 const isLoadingPlano = ref<string | null>(null)
 const isLoadingCurrent = ref(true)
 const planoAtual = ref('free')
@@ -49,10 +51,11 @@ const getCta = (plan: PlanOption) => {
 
 const loadCurrentPlan = async () => {
   try {
-    const { data } = await api.get('/api/v1/dashboard/')
-    planoAtual.value = data.plano || 'free'
+    const { data } = await api.get('/api/v1/auth/me')
+    authStore.setProfile(data)
+    planoAtual.value = data.contracted_plan || data.plan || 'free'
     cicloAtual.value = isBillingCycle(data.billing_cycle) ? data.billing_cycle : 'monthly'
-    statusPagamento.value = data.status_pagamento || 'ativo'
+    statusPagamento.value = data.payment_status || 'ativo'
   } catch {
     toast.error('Não foi possível identificar seu plano atual.')
   } finally {
@@ -171,17 +174,29 @@ onMounted(loadCurrentPlan)
       >
         <div>
           <p class="text-sm font-semibold text-[var(--ct-primary)]">
-            Seu plano: {{ currentPlan?.name || planoAtual }}
+            {{ authStore.trial?.status === 'active' ? 'Plano após o teste:' : 'Seu plano:' }}
+            {{ currentPlan?.name || planoAtual }}
           </p>
           <p class="mt-0.5 text-xs text-[var(--ct-text-muted)]">
             Status:
             {{ paymentStatusLabel }}
           </p>
         </div>
-        <span class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--ct-primary)]"
-          >Assinatura {{ cicloAtual === 'annual' ? 'anual' : 'mensal' }}</span
+        <span
+          class="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[var(--ct-primary)]"
+        >
+          {{
+            planoAtual === 'free'
+              ? 'Sem assinatura paga'
+              : `Assinatura ${cicloAtual === 'annual' ? 'anual' : 'mensal'}`
+          }}</span
         >
       </section>
+
+      <p v-if="authStore.trial?.status === 'active'" class="mb-5 text-sm text-slate-600">
+        Seu teste não gera cobrança automática. Se contratar agora, a assinatura paga começa após a
+        confirmação do pagamento; os dias gratuitos restantes não serão acrescentados ao plano.
+      </p>
 
       <section
         v-if="selectedPlan && !isCurrentPlan(selectedPlan)"
@@ -196,7 +211,8 @@ onMounted(loadCurrentPlan)
             }}.
           </p>
           <p class="mt-1 text-xs text-[var(--ct-text-muted)]">
-            Confira os limites abaixo e prossiga quando estiver pronto.
+            Confira os limites abaixo e prossiga quando estiver pronto. Ao contratar durante o
+            teste, a assinatura paga começa após a confirmação do pagamento.
           </p>
         </div>
         <button

@@ -65,6 +65,8 @@ def test_sync_registration_creates_office_and_admin_in_one_transaction():
     tenant, profile = database.added
     assert isinstance(tenant, models.Tenant)
     assert isinstance(profile, models.Profile)
+    assert (tenant.trial_ends_at - tenant.trial_started_at).days == 14
+    assert tenant.trial_converted_at is None
     assert profile.id == user_id
     assert profile.tenant_id == tenant.id
     assert profile.role == "admin"
@@ -148,6 +150,9 @@ def test_resolve_user_context_returns_profile_and_office_billing_context():
         "role": "admin",
         "is_superadmin": False,
         "plan": "profissional",
+        "contracted_plan": "profissional",
+        "trial_read_only": False,
+        "trial": {"status": "none", "started_at": None, "ends_at": None, "days_remaining": 0},
         "billing_cycle": "annual",
         "payment_status": "ativo",
         "subscription_status": "active",

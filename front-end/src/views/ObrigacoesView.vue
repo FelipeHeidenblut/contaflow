@@ -6,7 +6,7 @@ import { toast } from 'vue3-toastify'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import PaginationControls from '../components/PaginationControls.vue'
@@ -15,6 +15,7 @@ import ObrigacoesKanban from '../components/ObrigacoesKanban.vue'
 import type { Obrigacao, TaskStatus } from '../types/obrigacao'
 
 const route = useRoute()
+const router = useRouter()
 const authStore = useAuthStore()
 const canManageTasks = computed(() => ['admin', 'gerente'].includes(authStore.role))
 
@@ -148,6 +149,11 @@ const abrirDetalhes = (obrigacao: Obrigacao) => {
 const fecharDetalhes = () => {
   isDetalhesModalOpen.value = false
   obrigacaoSelecionada.value = null
+  if (route.query.tarefa) {
+    const query = { ...route.query }
+    delete query.tarefa
+    void router.replace({ query })
+  }
 }
 
 const abrirCadastro = () => {
@@ -432,9 +438,27 @@ const getImportanciaBadge = (grau?: string) => {
   }
 }
 
+let detailVersion = 0
+const openLinkedTask = async () => {
+  const version = ++detailVersion
+  const id = route.query.tarefa
+  isDetalhesModalOpen.value = false
+  obrigacaoSelecionada.value = null
+  if (typeof id !== 'string' || !id) return
+  try {
+    const { data } = await api.get<Obrigacao>(`/api/v1/obrigacoes/${encodeURIComponent(id)}`)
+    if (version === detailVersion) abrirDetalhes(data)
+  } catch {
+    if (version === detailVersion) toast.error('Obrigação indisponível ou sem permissão de acesso.')
+  }
+}
+watch(() => route.query.tarefa, openLinkedTask)
+onUnmounted(() => {
+  detailVersion += 1
+})
 onMounted(async () => {
-  await Promise.all([fetchData(), fetchLookups()])
-  if (route.query.novo === '1') abrirCadastro()
+  await Promise.all([fetchData(), fetchLookups(), openLinkedTask()])
+  if (route.query.novo === '1' && !route.query.tarefa) abrirCadastro()
 })
 </script>
 

@@ -3,6 +3,8 @@ from uuid import UUID
 
 import models
 from access_control import TenantContext
+from trial_service import start_trial, trial_details, effective_plan
+from plan_config import get_plan_limit
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -53,6 +55,7 @@ def synchronize_registration(db: Session, command: RegistrationCommand) -> dict:
             razao_social=command.office_name,
             cnpj=command.document,
         )
+        start_trial(tenant)
         db.add(tenant)
         db.flush()
 
@@ -113,15 +116,30 @@ def resolve_user_context(db: Session, token_payload: dict) -> dict:
         )
 
     profile, tenant = resolved
+    trial = trial_details(tenant)
+    over_limit = False
+    if trial["status"] == "expired" and tenant.plano == "free":
+        clients = db.query(models.Client).filter(
+            models.Client.tenant_id == profile.tenant_id, models.Client.ativo.is_(True)
+        ).count()
+        members = db.query(models.Profile).filter(models.Profile.tenant_id == profile.tenant_id).count()
+        over_limit = clients > get_plan_limit("free", "clients") or members > get_plan_limit("free", "members")
     user = {
         "user_id": str(profile.id),
         "email": token_payload.get("email"),
         "tenant_id": str(profile.tenant_id),
         "role": str(profile.role or "").strip().lower(),
         "is_superadmin": profile.is_superadmin,
-        "plan": tenant.plano,
+        "plan": effective_plan(tenant),
+        "contracted_plan": tenant.plano,
+        "trial": trial,
+        "trial_read_only": over_limit,
         "billing_cycle": tenant.billing_cycle,
-        "payment_status": tenant.status_pagamento,
+        "payment_status": (
+            "ativo" if trial["status"] in {"active", "expired"}
+            and tenant.plano == "free" and tenant.status_pagamento != "chargeback"
+            else tenant.status_pagamento
+        ),
         "subscription_status": tenant.subscription_status,
     }
     TenantContext.from_user(user)

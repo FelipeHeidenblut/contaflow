@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -30,6 +31,7 @@ const isModalOpen = ref(false)
 const isSaving = ref(false)
 const memberToRemove = ref<Membro | null>(null)
 const authStore = useAuthStore()
+const route = useRoute()
 
 const loggedUserRole = computed(() => authStore.role)
 const loggedUserId = computed(() => authStore.userId)
@@ -151,7 +153,10 @@ const getIniciaisMembro = (nome: string) => {
   return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
 }
 
-onMounted(() => fetchData())
+onMounted(() => {
+  void fetchData()
+  if (route.query.novo === '1' && authStore.role === 'admin') isModalOpen.value = true
+})
 </script>
 
 <template>

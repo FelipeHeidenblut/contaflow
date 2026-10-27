@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from access_control import get_accessible_task
 import schemas
 from database import get_db
 from enums import TaskStatus  # Importando o Enum
@@ -111,3 +112,12 @@ def atualizar_obrigacao(
     current_user: dict = Depends(get_active_user),
 ):
     return update_task(db, current_user, tarefa_id, tarefa_update)
+
+
+@router.get("/{tarefa_id}", response_model=schemas.TaskResponse)
+def obter_obrigacao(
+    tarefa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return get_accessible_task(db, tarefa_id, current_user)

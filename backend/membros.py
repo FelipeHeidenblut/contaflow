@@ -1,3 +1,4 @@
+from trial_service import effective_plan
 import logging
 from typing import List
 from uuid import UUID
@@ -183,7 +184,7 @@ def adicionar_membro(
     )
     if not tenant:
         raise HTTPException(status_code=404, detail="Escritório não encontrado.")
-    limite = get_plan_limit(tenant.plano, "members")
+    limite = get_plan_limit(effective_plan(tenant), "members")
 
     total_membros = repository.query(models.Profile).count()
 
@@ -191,7 +192,7 @@ def adicionar_membro(
         raise HTTPException(
             status_code=403,
             detail=(
-                f"Seu plano {get_plan_name(tenant.plano)} permite "
+                f"Seu plano {get_plan_name(effective_plan(tenant))} permite "
                 f"apenas {limite} usuário(s). Faça upgrade para adicionar mais membros!"
             ),
         )
@@ -266,7 +267,7 @@ def adicionar_membro(
         )
         if not tenant:
             raise HTTPException(status_code=404, detail="Escritório não encontrado.")
-        limite = get_plan_limit(tenant.plano, "members")
+        limite = get_plan_limit(effective_plan(tenant), "members")
 
         # 4. Busca o perfil que a Trigger do banco pode ter criado automaticamente.
         perfil_criado = (
@@ -282,7 +283,7 @@ def adicionar_membro(
             raise HTTPException(
                 status_code=403,
                 detail=(
-                    f"Seu plano {get_plan_name(tenant.plano)} permite "
+                    f"Seu plano {get_plan_name(effective_plan(tenant))} permite "
                     f"apenas {limite} usuário(s). O usuário excedente não foi criado."
                 ),
             )

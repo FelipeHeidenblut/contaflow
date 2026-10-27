@@ -62,6 +62,41 @@ def get_me(current_user: dict = Depends(get_current_user)):
         "is_superadmin": current_user.get("is_superadmin"),
         "tenant_id": current_user.get("tenant_id"),
         "plan": current_user["plan"],
+        "contracted_plan": current_user["contracted_plan"],
+        "trial": current_user["trial"],
+        "trial_read_only": current_user["trial_read_only"],
         "billing_cycle": current_user["billing_cycle"],
         "payment_status": current_user["payment_status"],
     }
+
+
+@router.get("/exportar-escritorio")
+def export_office(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Administrative data portability stays available after trial expiry."""
+    import models
+    from access_control import Permission, require_permission, tenant_repository
+    from fastapi.encoders import jsonable_encoder
+    from fastapi.responses import JSONResponse
+
+    require_permission(current_user, Permission.BILLING_MANAGE)
+    repository = tenant_repository(db, current_user)
+    export = {}
+    for label, model in (
+        ("clientes", models.Client), ("obrigacoes", models.Task),
+        ("documentos", models.Document), ("comentarios", models.Comment),
+    ):
+        columns = [column.name for column in model.__table__.columns if column.name != "storage_path"]
+        export[label] = [
+            {name: getattr(row, name) for name in columns}
+            for row in repository.query(model).order_by(model.id).all()
+        ]
+    return JSONResponse(
+        content=jsonable_encoder(export),
+        headers={
+            "Content-Disposition": 'attachment; filename="contablytask-dados.json"',
+            "Cache-Control": "private, no-store",
+        },
+    )

@@ -6,8 +6,9 @@ import BrandMark from './BrandMark.vue'
 const route = useRoute()
 const open = ref(false)
 const links = [
-  { label: 'Produto', to: '/como-funciona' },
-  { label: 'Planos', to: '/planos' },
+  { label: 'Recursos', to: '/#recursos' },
+  { label: 'Como funciona', to: '/como-funciona' },
+  { label: 'Preços', to: '/planos' },
   { label: 'Sobre', to: '/sobre' },
   { label: 'Contato', to: '/contato' },
 ]
@@ -17,14 +18,14 @@ const links = [
   <header
     class="sticky top-0 z-50 border-b border-[var(--ct-border)] bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.02)] backdrop-blur-xl"
   >
-    <div class="ct-container flex h-[72px] items-center justify-between">
+    <div class="ct-container flex h-[76px] lg:h-[90px] items-center justify-between">
       <RouterLink to="/" aria-label="Página inicial"><BrandMark /></RouterLink>
-      <nav class="hidden items-center gap-1 md:flex" aria-label="Navegação principal">
+      <nav class="hidden items-center gap-1 lg:gap-3 lg:flex" aria-label="Navegação principal">
         <RouterLink
           v-for="link in links"
           :key="link.to"
           :to="link.to"
-          class="rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors"
+          class="rounded-lg px-2 py-2 text-sm font-medium transition-colors"
           :class="
             route.path === link.to
               ? 'bg-blue-50 text-[var(--ct-primary)]'
@@ -34,17 +35,17 @@ const links = [
           {{ link.label }}
         </RouterLink>
       </nav>
-      <div class="hidden items-center gap-2 md:flex">
-        <RouterLink to="/login" class="ct-button-secondary rounded-xl">Entrar</RouterLink>
+      <div class="hidden items-center gap-2 lg:flex">
+        <RouterLink to="/login" class="px-3 py-2 text-sm text-slate-600">Entrar</RouterLink>
         <RouterLink to="/cadastro" class="ct-button-primary rounded-xl">
-          Testar grátis
+          Começar agora
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-width="2" d="M5 12h14m-6-6 6 6-6 6" />
           </svg>
         </RouterLink>
       </div>
       <button
-        class="rounded-xl border border-[var(--ct-border)] p-2.5 text-[var(--ct-ink)] md:hidden"
+        class="rounded-xl border border-[var(--ct-border)] p-2.5 text-[var(--ct-ink)] lg:hidden"
         type="button"
         :aria-expanded="open"
         aria-label="Abrir menu"
@@ -59,7 +60,7 @@ const links = [
         </svg>
       </button>
     </div>
-    <div v-if="open" class="border-t border-[var(--ct-border)] bg-white px-4 py-4 md:hidden">
+    <div v-if="open" class="border-t border-[var(--ct-border)] bg-white px-4 py-4 lg:hidden">
       <nav class="mx-auto flex max-w-md flex-col" aria-label="Navegação móvel">
         <RouterLink
           v-for="link in links"
@@ -75,7 +76,7 @@ const links = [
             >Entrar</RouterLink
           >
           <RouterLink to="/cadastro" class="ct-button-primary rounded-xl" @click="open = false"
-            >Testar grátis</RouterLink
+            >Começar agora</RouterLink
           >
         </div>
       </nav>

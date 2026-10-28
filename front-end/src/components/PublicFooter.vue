@@ -1,60 +1,33 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import BrandMark from './BrandMark.vue'
+const links = [
+  { label: 'Como funciona', to: '/como-funciona' },
+  { label: 'Preços', to: '/planos' },
+  { label: 'Sobre', to: '/sobre' },
+  { label: 'Contato', to: '/contato' },
+  { label: 'Privacidade', to: '/privacidade' },
+  { label: 'Termos de uso', to: '/termos' },
+]
 </script>
-
 <template>
-  <footer class="overflow-hidden bg-[var(--ct-navy)] text-white">
-    <div class="ct-container grid gap-12 py-14 md:grid-cols-[1fr_auto_auto] lg:py-16">
-      <div>
-        <BrandMark inverse />
-        <p class="mt-5 max-w-sm text-sm leading-6 text-white/55">
-          Rotina contábil organizada, com clientes, obrigações e documentos no mesmo fluxo.
+  <footer class="border-t border-blue-100 bg-white py-7 text-slate-500">
+    <div class="ct-container">
+      <div class="flex flex-wrap items-center justify-between gap-5">
+        <RouterLink to="/" aria-label="ContablyTask, início"><BrandMark /></RouterLink>
+        <p class="text-xs leading-6">
+          Mais clareza para a rotina contábil. © {{ new Date().getFullYear() }}
         </p>
-        <RouterLink to="/cadastro" class="ct-link-arrow mt-6 text-blue-200">
-          Criar meu escritório <span>→</span>
-        </RouterLink>
       </div>
-      <div class="grid gap-2 text-sm">
-        <p
-          class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35"
+      <nav aria-label="Links do rodapé" class="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-xs">
+        <RouterLink
+          v-for="link in links"
+          :key="link.to"
+          :to="link.to"
+          class="hover:text-blue-600"
+          >{{ link.label }}</RouterLink
         >
-          Produto
-        </p>
-        <RouterLink to="/como-funciona" class="py-1 text-white/60 hover:text-white"
-          >Como funciona</RouterLink
-        >
-        <RouterLink to="/planos" class="py-1 text-white/60 hover:text-white">Planos</RouterLink>
-        <RouterLink to="/contato" class="py-1 text-white/60 hover:text-white">Contato</RouterLink>
-      </div>
-      <div class="grid gap-2 text-sm">
-        <p
-          class="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-white/35"
-        >
-          Legal
-        </p>
-        <RouterLink to="/privacidade" class="py-1 text-white/60 hover:text-white"
-          >Privacidade</RouterLink
-        >
-        <RouterLink to="/termos" class="py-1 text-white/60 hover:text-white"
-          >Termos de uso</RouterLink
-        >
-      </div>
-    </div>
-    <div class="ct-container pointer-events-none select-none overflow-hidden" aria-hidden="true">
-      <p
-        class="translate-y-[18%] bg-gradient-to-b from-white/[0.08] to-white/0 bg-clip-text text-[clamp(5rem,16vw,12rem)] font-bold leading-[0.75] tracking-[-0.065em] text-transparent"
-      >
-        ContablyTask
-      </p>
-    </div>
-    <div class="border-t border-white/10 py-5">
-      <div class="ct-container flex flex-wrap items-center justify-between gap-3">
-        <p class="text-xs text-white/35">© {{ new Date().getFullYear() }} ContablyTask.</p>
-        <RouterLink to="/" class="text-xs text-white/35 hover:text-white"
-          >Voltar ao topo ↑</RouterLink
-        >
-      </div>
+      </nav>
     </div>
   </footer>
 </template>

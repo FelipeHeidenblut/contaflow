@@ -1,12 +1,12 @@
 <template>
   <div class="ct-public-page min-h-screen bg-white">
     <PublicHeader />
-    <main class="py-8 selection:bg-[var(--ct-primary)] selection:text-white sm:py-12">
+    <main class="py-8 selection:bg-[var(--ct-primary)] selection:text-slate-800 sm:py-12">
       <div class="mx-auto max-w-3xl overflow-hidden border-x border-[var(--ct-border)] bg-white">
         <!-- Cabeçalho -->
-        <div class="bg-[var(--ct-navy)] px-8 py-10 sm:px-12">
-          <h1 class="mb-2 text-3xl font-extrabold tracking-tight text-white">Termos de Uso</h1>
-          <p class="text-sm text-white/65">
+        <div class="bg-[#edf5ff] px-8 py-10 sm:px-12">
+          <h1 class="mb-2 text-3xl font-extrabold tracking-tight text-slate-800">Termos de Uso</h1>
+          <p class="text-sm text-slate-800/65">
             Última atualização: Junho de 2026 · Ao usar a ContablyTask, você concorda com estes
             termos
           </p>

@@ -210,3 +210,14 @@ não valida autenticação, banco ou integrações dessas tarefas.
   `ASAAS_RECONCILIATION_SECRET` nos secrets do GitHub, além do mesmo segredo no backend.
 - As URLs utilizadas são `api-sandbox.asaas.com/v3` em desenvolvimento/homologação e
   `api.asaas.com/v3` em produção.
+
+## Arquivamento de tarefas concluídas
+
+- Tarefas concluídas podem ser arquivadas na lista, no Kanban ou no painel de detalhes.
+- A aba **Arquivadas** consulta o histórico e permite restaurar a tarefa como concluída.
+- O arquivamento preserva comentários, documentos, relatórios e a próxima competência das recorrências.
+- A API omite arquivadas nas listagens operacionais. `archived=true` consulta apenas arquivadas;
+  `include_archived=true` inclui todo o histórico (dashboard e dossiê do cliente).
+- Antes de iniciar a nova API, execute em `backend`: `.venv/bin/python -m alembic upgrade head`.
+  A revisão `b7c4e2a9d615` adiciona `tasks.archived_at`, valida que apenas concluídas estejam
+  arquivadas e cria o índice para as listagens. As tarefas existentes continuam visíveis.

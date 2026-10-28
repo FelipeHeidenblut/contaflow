@@ -1,3 +1,4 @@
+import { updatePageSeo } from '@/utils/seo'
 import { createRouter, createWebHistory } from 'vue-router'
 
 // As rotas privadas serão carregadas via Lazy Loading abaixo para otimizar performance.
@@ -127,6 +128,11 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes,
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.hash) return { el: to.hash, top: 100 }
+    return { top: 0 }
+  },
 })
 
 // ==========================================
@@ -187,7 +193,7 @@ router.beforeEach(async (to) => {
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${String(to.meta.title)} · ContablyTask` : 'ContablyTask'
+  updatePageSeo(to.path, to.meta.title ? String(to.meta.title) : undefined)
 })
 
 export default router

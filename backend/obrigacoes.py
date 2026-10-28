@@ -14,6 +14,8 @@ from security import get_active_user, get_current_user
 from sqlalchemy.orm import Session
 from task_service import (
     TaskListFilters,
+    archive_task,
+    restore_task,
     change_task_status,
     complete_task,
     create_task,
@@ -31,6 +33,9 @@ def listar_obrigacoes(
     client_id: UUID | None = Query(None),
     assigned_to: UUID | None = Query(None),
     task_status: TaskStatus | None = Query(None),
+    overdue: bool = Query(False),
+    archived: bool = Query(False),
+    include_archived: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -44,6 +49,9 @@ def listar_obrigacoes(
             client_id=client_id,
             assigned_to=assigned_to,
             task_status=task_status,
+            overdue=overdue,
+            archived=archived,
+            include_archived=include_archived,
             page=page,
             page_size=page_size,
         ),
@@ -93,6 +101,24 @@ def atualizar_status_obrigacao(
     current_user: dict = Depends(get_active_user),
 ):
     return change_task_status(db, current_user, tarefa_id, payload.status)
+
+
+@router.patch("/{tarefa_id}/arquivar", response_model=schemas.TaskResponse)
+def arquivar_obrigacao(
+    tarefa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_active_user),
+):
+    return archive_task(db, current_user, tarefa_id)
+
+
+@router.patch("/{tarefa_id}/restaurar", response_model=schemas.TaskResponse)
+def restaurar_obrigacao(
+    tarefa_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_active_user),
+):
+    return restore_task(db, current_user, tarefa_id)
 
 
 @router.delete("/{tarefa_id}", status_code=status.HTTP_204_NO_CONTENT)

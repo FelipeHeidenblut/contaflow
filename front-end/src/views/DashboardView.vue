@@ -69,7 +69,7 @@ const fetchData = async () => {
   try {
     const [dashboardResult, tasksResult, membersResult, clientsResult] = await Promise.allSettled([
       api.get('/api/v1/dashboard/'),
-      fetchAllPages<TaskData>('/api/v1/obrigacoes'),
+      fetchAllPages<TaskData>('/api/v1/obrigacoes', { include_archived: true }),
       fetchAllPages<Member>('/api/v1/membros'),
       fetchAllPages<Client>('/api/v1/clientes'),
     ])

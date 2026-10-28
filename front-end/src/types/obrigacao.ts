@@ -6,6 +6,7 @@ export interface Obrigacao {
   description?: string
   status: TaskStatus
   due_date: string
+  archived_at?: string | null
   client_id: string | number
   assigned_to?: string | number | null
   type?: 'custom' | 'receita_federal'

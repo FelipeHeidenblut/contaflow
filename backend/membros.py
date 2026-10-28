@@ -1,3 +1,4 @@
+from workload_service import attach_task_counts
 from trial_service import effective_plan
 import logging
 from typing import List
@@ -103,6 +104,8 @@ class ProfileResponse(BaseModel):
     name: str
     email: str
     role: str
+    open_tasks_count: int | None = Field(default=None, ge=0)
+    overdue_tasks_count: int | None = Field(default=None, ge=0)
 
 
 # ==========================================
@@ -128,6 +131,7 @@ def verificar_admin(current_user: dict = Depends(get_active_user)):
 def listar_membros(
     search: str | None = Query(None, max_length=120),
     role: Literal["admin", "gerente", "colaborador"] | None = Query(None),
+    include_workload: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -155,7 +159,7 @@ def listar_membros(
     query = query.order_by(
         models.Profile.name.asc(), models.Profile.id.asc()
     )
-    return paginate(
+    result = paginate(
         query,
         page=page,
         page_size=page_size,
@@ -166,6 +170,9 @@ def listar_membros(
             "colaboradores": colaboradores,
         },
     )
+    if include_workload is True:
+        attach_task_counts(db, current_user, result["items"], group_by="assigned_to")
+    return result
 
 
 @router.post("", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)

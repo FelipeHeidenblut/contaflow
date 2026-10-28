@@ -224,26 +224,6 @@ onMounted(loadCurrentPlan)
         </button>
       </section>
 
-      <!-- trust strip -->
-      <section
-        class="ct-information-panel grid border-y border-[var(--ct-border)] bg-white sm:grid-cols-3 sm:divide-x sm:divide-[var(--ct-border)]"
-      >
-        <div class="px-4 py-3 text-center">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Dois ciclos</p>
-          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Mensal ou anual</p>
-        </div>
-
-        <div class="border-t border-[var(--ct-border)] px-4 py-3 text-center sm:border-t-0">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pagamento seguro</p>
-          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Checkout protegido</p>
-        </div>
-
-        <div class="border-t border-[var(--ct-border)] px-4 py-3 text-center sm:border-t-0">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Escalável</p>
-          <p class="mt-1 text-sm font-semibold text-[var(--ct-ink)]">Cresça no seu ritmo</p>
-        </div>
-      </section>
-
       <!-- cards -->
       <section
         class="ct-plan-grid grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5"
@@ -338,32 +318,6 @@ onMounted(loadCurrentPlan)
             </button>
           </div>
         </article>
-      </section>
-
-      <!-- info box -->
-      <section class="ct-information-panel border-t border-[var(--ct-border)] bg-white pt-6">
-        <div class="grid gap-4 md:grid-cols-3">
-          <div>
-            <p class="text-sm font-semibold text-[var(--ct-ink)]">Upgrade simples</p>
-            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-              Escolha o plano e siga para o pagamento com redirecionamento seguro.
-            </p>
-          </div>
-
-          <div>
-            <p class="text-sm font-semibold text-[var(--ct-ink)]">Sem travas desnecessárias</p>
-            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-              Comece no Gratuito e evolua conforme o volume de clientes e equipe crescer.
-            </p>
-          </div>
-
-          <div>
-            <p class="text-sm font-semibold text-[var(--ct-ink)]">Para cada fase do escritório</p>
-            <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
-              Dos contadores autônomos até operações maiores com necessidade de escala.
-            </p>
-          </div>
-        </div>
       </section>
     </div>
   </Layout>

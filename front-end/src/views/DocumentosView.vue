@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -9,6 +9,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { useAuthStore } from '../stores/auth'
 import PaginationControls from '../components/PaginationControls.vue'
 import { fetchAllPages, fetchPage } from '../services/pagination'
+import CollectionViewToggle from '../components/CollectionViewToggle.vue'
 
 const authStore = useAuthStore()
 const canManageDocuments = computed(() => ['admin', 'gerente'].includes(authStore.role))
@@ -27,6 +28,22 @@ interface ClientRecord {
   razao_social?: string
 }
 
+interface DocumentFolder {
+  client_id: string
+  client_name: string
+  client_active: boolean
+  document_count: number
+  last_uploaded_at: string | null
+}
+
+const pastas = ref<DocumentFolder[]>([])
+const visualizacao = ref<'cards' | 'lista'>('cards')
+const pastaSelecionada = ref<DocumentFolder | null>(null)
+const isFolderView = computed(() => visualizacao.value === 'cards' && !pastaSelecionada.value)
+const loadError = ref(false)
+let folderReturnPage = 1
+let fetchVersion = 0
+
 const documentos = ref<DocumentRecord[]>([])
 const clientes = ref<ClientRecord[]>([])
 const isLoading = ref(true)
@@ -34,7 +51,6 @@ const currentPage = ref(1)
 const totalPages = ref(0)
 const totalResults = ref(0)
 const pageSize = 20
-const documentSummary = ref({ total: 0, fiscal: 0, contabil: 0, geral: 0 })
 
 const isModalOpen = ref(false)
 const isUploading = ref(false)
@@ -45,40 +61,68 @@ const filtroCategoria = ref('')
 const searchQuery = ref('')
 
 const documentosFiltrados = computed(() => documentos.value)
-const totalDocumentos = computed(() => documentSummary.value.total)
-const totalFiscal = computed(() => documentSummary.value.fiscal)
-const totalContabil = computed(() => documentSummary.value.contabil)
-const totalGeral = computed(() => documentSummary.value.geral)
 
 const docForm = ref({ client_id: '', categoria: 'Geral' })
 const selectedFile = ref<File | null>(null)
 
 const fetchData = async () => {
-  try {
-    const documentPage = await fetchPage<DocumentRecord>(
-      '/api/v1/documentos',
-      currentPage.value,
-      pageSize,
-      {
-        search: searchQuery.value.trim() || undefined,
-        client_id: filtroClienteId.value || undefined,
-        categoria: filtroCategoria.value || undefined,
-      },
-    )
-    documentos.value = documentPage.items
-    totalPages.value = documentPage.pages
-    totalResults.value = documentPage.total
-    documentSummary.value = {
-      total: documentPage.summary?.total ?? documentPage.total,
-      fiscal: documentPage.summary?.fiscal ?? 0,
-      contabil: documentPage.summary?.contabil ?? 0,
-      geral: documentPage.summary?.geral ?? 0,
-    }
-  } catch (error) {
-    toast.error(getApiErrorMessage(error, 'Erro ao carregar dados.'))
-  } finally {
-    isLoading.value = false
+  const version = ++fetchVersion
+  const folderMode = isFolderView.value
+  isLoading.value = true
+  loadError.value = false
+  const params = {
+    search: searchQuery.value.trim() || undefined,
+    client_id: pastaSelecionada.value?.client_id || filtroClienteId.value || undefined,
+    categoria: filtroCategoria.value || undefined,
   }
+  try {
+    const page = folderMode
+      ? await fetchPage<DocumentFolder>(
+          '/api/v1/documentos/pastas',
+          currentPage.value,
+          pageSize,
+          params,
+        )
+      : await fetchPage<DocumentRecord>('/api/v1/documentos', currentPage.value, pageSize, params)
+    if (version !== fetchVersion || folderMode !== isFolderView.value) return
+    const lastPage = Math.max(1, page.pages)
+    if (currentPage.value > lastPage) {
+      currentPage.value = lastPage
+      await fetchData()
+      return
+    }
+    if (folderMode) pastas.value = page.items as DocumentFolder[]
+    else documentos.value = page.items as DocumentRecord[]
+    totalPages.value = page.pages
+    totalResults.value = page.total
+  } catch (error) {
+    if (version !== fetchVersion) return
+    loadError.value = true
+    toast.error(getApiErrorMessage(error, 'Erro ao carregar documentos.'))
+  } finally {
+    if (version === fetchVersion) isLoading.value = false
+  }
+}
+
+const abrirPasta = (pasta: DocumentFolder) => {
+  folderReturnPage = currentPage.value
+  pastaSelecionada.value = pasta
+  currentPage.value = 1
+  void fetchData()
+}
+const voltarPastas = () => {
+  pastaSelecionada.value = null
+  currentPage.value = folderReturnPage
+  void fetchData()
+}
+const abrirEnvio = () => {
+  const clientId = pastaSelecionada.value?.client_id || filtroClienteId.value
+  docForm.value = {
+    client_id: clientes.value.some((client) => client.id === clientId) ? clientId : '',
+    categoria: filtroCategoria.value || 'Geral',
+  }
+  selectedFile.value = null
+  isModalOpen.value = true
 }
 
 const fetchClients = async () => {
@@ -95,12 +139,27 @@ const changePage = (page: number) => {
 }
 
 let filterTimer: ReturnType<typeof setTimeout> | undefined
-watch([searchQuery, filtroClienteId, filtroCategoria], () => {
+watch([searchQuery, filtroClienteId, filtroCategoria], (values, previous) => {
   if (filterTimer) clearTimeout(filterTimer)
+  fetchVersion += 1
+  isLoading.value = true
+  if (values[1] !== previous[1]) pastaSelecionada.value = null
   filterTimer = setTimeout(() => {
     currentPage.value = 1
-    fetchData()
+    folderReturnPage = 1
+    void fetchData()
   }, 300)
+})
+watch(visualizacao, () => {
+  if (filterTimer) clearTimeout(filterTimer)
+  pastaSelecionada.value = null
+  currentPage.value = 1
+  folderReturnPage = 1
+  void fetchData()
+})
+onUnmounted(() => {
+  if (filterTimer) clearTimeout(filterTimer)
+  fetchVersion += 1
 })
 
 const handleFileChange = (event: Event) => {
@@ -174,7 +233,11 @@ const handleExcluirDocumento = async () => {
 
 const getNomeCliente = (clientId: string) => {
   const cliente = clientes.value.find((c) => String(c.id) === String(clientId))
-  return cliente ? cliente.nome || cliente.razao_social : 'Desconhecido'
+  return cliente
+    ? cliente.nome || cliente.razao_social
+    : pastaSelecionada.value?.client_id === clientId
+      ? pastaSelecionada.value.client_name
+      : 'Cliente indisponível'
 }
 
 const formatDate = (dateString: string) => {
@@ -258,7 +321,7 @@ onMounted(() => {
 
 <template>
   <Layout title="Repositório de Documentos">
-    <div class="ct-workspace space-y-4">
+    <div class="ct-directory-workspace ct-workspace space-y-4">
       <!-- topo -->
       <header
         class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
@@ -268,12 +331,12 @@ onMounted(() => {
             Repositório de documentos
           </h1>
           <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
-            Centralize arquivos fiscais, contábeis e operacionais dos seus clientes.
+            Arquivos fiscais, contábeis e operacionais organizados por cliente.
           </p>
         </div>
 
         <button
-          @click="isModalOpen = true"
+          @click="abrirEnvio"
           class="ct-primary-action inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--ct-primary)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)] sm:w-auto"
         >
           <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -287,47 +350,6 @@ onMounted(() => {
           <span>Enviar documento</span>
         </button>
       </header>
-
-      <!-- cards -->
-      <section
-        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
-      >
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de arquivos</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalDocumentos }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Fiscal</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalFiscal }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Contábil</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalContabil }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Geral</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalGeral }}
-          </p>
-        </div>
-      </section>
 
       <!-- filtros -->
       <section class="ct-filter-panel border-b border-[var(--ct-border)] pb-5">
@@ -382,12 +404,140 @@ onMounted(() => {
             </select>
           </div>
 
-          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-xs text-slate-500" role="status"
+              >{{ totalResults }} {{ isFolderView ? 'pasta(s)' : 'arquivo(s)' }}</span
+            >
+            <CollectionViewToggle v-model="visualizacao" cards-label="Pastas" />
+          </div>
         </div>
+      </section>
+
+      <nav
+        v-if="pastaSelecionada"
+        aria-label="Navegação das pastas"
+        class="flex flex-wrap items-center gap-2 text-sm"
+      >
+        <button
+          type="button"
+          class="font-medium text-blue-500 hover:underline"
+          @click="voltarPastas"
+        >
+          ← Todas as pastas
+        </button>
+        <span aria-hidden="true" class="text-slate-300">/</span>
+        <span aria-current="page" class="font-semibold text-slate-800">{{
+          pastaSelecionada.client_name
+        }}</span>
+        <span
+          v-if="!pastaSelecionada.client_active"
+          class="rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-500"
+          >Cliente arquivado</span
+        >
+      </nav>
+      <div
+        v-if="loadError"
+        role="alert"
+        class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-5"
+      >
+        <p class="text-sm text-amber-900">
+          Não foi possível carregar {{ isFolderView ? 'as pastas' : 'os documentos' }}.
+        </p>
+        <button
+          type="button"
+          class="text-sm font-semibold text-blue-600 hover:underline"
+          @click="fetchData"
+        >
+          Tentar novamente
+        </button>
+      </div>
+      <section v-else-if="isFolderView" aria-label="Pastas de documentos por cliente">
+        <div
+          v-if="isLoading"
+          class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          aria-label="Carregando pastas"
+        >
+          <div
+            v-for="n in 6"
+            :key="n"
+            class="h-48 animate-pulse rounded-xl border border-[#e7edf5] bg-white"
+          />
+        </div>
+        <EmptyState
+          v-else-if="!pastas.length"
+          title="Nenhuma pasta encontrada"
+          :description="
+            searchQuery || filtroCategoria || filtroClienteId
+              ? 'Ajuste os filtros para encontrar os arquivos ou envie um novo documento.'
+              : 'As pastas são organizadas a partir dos clientes da sua carteira.'
+          "
+          :action-label="clientes.length ? 'Enviar documento' : undefined"
+          @action="abrirEnvio"
+        />
+        <div v-else class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <button
+            v-for="pasta in pastas"
+            :key="pasta.client_id"
+            type="button"
+            class="ct-document-folder flex min-w-0 flex-col rounded-xl border border-[#e7edf5] bg-white p-5 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/20"
+            :aria-label="`Abrir pasta de ${pasta.client_name}`"
+            @click="abrirPasta(pasta)"
+          >
+            <div class="mb-4 flex w-full items-start justify-between gap-3">
+              <svg viewBox="0 0 64 52" class="h-12 w-14 shrink-0" fill="none" aria-hidden="true">
+                <path
+                  d="M5 12a5 5 0 0 1 5-5h15l6 6h23a5 5 0 0 1 5 5v24a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5V12Z"
+                  fill="#e8f2ff"
+                  stroke="#8bbaff"
+                  stroke-width="1.5"
+                />
+                <path d="M5 21h54" stroke="#8bbaff" stroke-width="1.5" />
+              </svg>
+              <span
+                v-if="!pasta.client_active"
+                class="rounded-full bg-slate-100 px-2 py-1 text-[10px] text-slate-500"
+                >Arquivado</span
+              >
+            </div>
+            <h2 class="break-words text-sm font-semibold leading-6 text-slate-900">
+              {{ pasta.client_name }}
+            </h2>
+            <p class="mb-5 mt-2 text-xs leading-6 text-slate-500">
+              {{
+                pasta.last_uploaded_at
+                  ? `Último envio: ${formatDate(pasta.last_uploaded_at)}`
+                  : 'Nenhum arquivo enviado'
+              }}
+            </p>
+            <div
+              class="mt-auto flex w-full flex-wrap items-center justify-between gap-3 border-t border-[#edf1f7] pt-4 text-xs"
+            >
+              <span class="text-slate-500"
+                >{{ pasta.document_count }} {{ pasta.document_count === 1 ? 'arquivo' : 'arquivos'
+                }}{{
+                  searchQuery || filtroCategoria
+                    ? pasta.document_count === 1
+                      ? ' encontrado'
+                      : ' encontrados'
+                    : ''
+                }}</span
+              >
+              <span class="font-medium text-blue-500">Abrir pasta →</span>
+            </div>
+          </button>
+        </div>
+        <PaginationControls
+          :page="currentPage"
+          :pages="totalPages"
+          :total="totalResults"
+          class="mt-4 rounded-xl border border-[#e7edf5] bg-white"
+          @change="changePage"
+        />
       </section>
 
       <!-- tabela -->
       <section
+        v-else
         class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
       >
         <div v-if="isLoading" class="space-y-3 p-6">
@@ -399,10 +549,10 @@ onMounted(() => {
 
         <EmptyState
           v-else-if="documentosFiltrados.length === 0"
-          title="Nenhum documento encontrado"
+          :title="pastaSelecionada ? 'Nenhum documento nesta pasta' : 'Nenhum documento encontrado'"
           description="Ajuste os filtros ou envie um novo arquivo."
-          action-label="Enviar documento"
-          @action="isModalOpen = true"
+          :action-label="clientes.length ? 'Enviar documento' : undefined"
+          @action="abrirEnvio"
         />
 
         <div v-else class="overflow-x-auto">
@@ -579,11 +729,15 @@ onMounted(() => {
 
           <form @submit.prevent="handleUpload" class="space-y-5 p-6">
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">
+              <label
+                for="document-upload-client"
+                class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+              >
                 Vincular a qual cliente?
               </label>
               <select
                 v-model="docForm.client_id"
+                id="document-upload-client"
                 required
                 class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               >
@@ -595,11 +749,15 @@ onMounted(() => {
             </div>
 
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">
+              <label
+                for="document-upload-category"
+                class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+              >
                 Categoria do documento
               </label>
               <select
                 v-model="docForm.categoria"
+                id="document-upload-category"
                 required
                 class="w-full rounded-xl border border-[var(--ct-border)] bg-white px-4 py-3 text-sm outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               >
@@ -612,11 +770,15 @@ onMounted(() => {
             </div>
 
             <div>
-              <label class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80">
+              <label
+                for="document-upload-file"
+                class="mb-1.5 block text-sm font-medium text-[var(--ct-ink)]/80"
+              >
                 Selecionar arquivo
               </label>
               <input
                 type="file"
+                id="document-upload-file"
                 accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx"
                 @change="handleFileChange"
                 required

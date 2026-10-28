@@ -48,16 +48,50 @@ const currentPage = ref(1)
 const totalPages = ref(0)
 const totalResults = ref(0)
 const pageSize = 20
-const taskSummary = ref({ total: 0, concluidas: 0, pendentes: 0, aguardando: 0, atrasadas: 0 })
 
-const filtroClienteId = ref('')
+const filtroClienteId = ref(typeof route.query.cliente === 'string' ? route.query.cliente : '')
 const filtroStatus = ref('')
-const filtroResponsavel = ref('')
-const searchQuery = ref('')
+const statusFilters = [
+  { value: '', label: 'Todas' },
+  { value: 'atrasadas', label: 'Em atraso' },
+  { value: 'pendente', label: 'Pendentes' },
+  { value: 'em_andamento', label: 'Em andamento' },
+  { value: 'aguardando_cliente', label: 'Aguardando cliente' },
+  { value: 'concluida', label: 'Concluídas' },
+  { value: 'arquivadas', label: 'Arquivadas' },
+]
+
+const filtroResponsavel = ref(
+  typeof route.query.responsavel === 'string' ? route.query.responsavel : '',
+)
+const searchQuery = ref(typeof route.query.busca === 'string' ? route.query.busca : '')
+watch(
+  () => route.query.busca,
+  (value) => {
+    searchQuery.value = typeof value === 'string' ? value : ''
+  },
+)
+watch(
+  () => route.query.cliente,
+  (value) => {
+    filtroClienteId.value = typeof value === 'string' ? value : ''
+  },
+)
+watch(
+  () => route.query.responsavel,
+  (value) => {
+    filtroResponsavel.value = typeof value === 'string' ? value : ''
+  },
+)
 const visualizacao = ref<'lista' | 'kanban'>('lista')
 const kanbanRefreshKey = ref(0)
 const isUpdatingStatus = ref(false)
-const filtrosAplicados = ref<Record<string, string | number | undefined>>({})
+const archivingTaskId = ref<string | number | null>(null)
+const filtrosAplicados = ref<Record<string, string | number | boolean | undefined>>({
+  search: searchQuery.value.trim() || undefined,
+  client_id: filtroClienteId.value || undefined,
+  assigned_to: filtroResponsavel.value || undefined,
+})
 
 const isDetalhesModalOpen = ref(false)
 const obrigacaoSelecionada = ref<Obrigacao | null>(null)
@@ -135,11 +169,6 @@ const aplicarTemplate = (event: Event) => {
 }
 
 const obrigacoesFiltradas = computed(() => obrigacoes.value)
-
-const totalConcluidas = computed(() => taskSummary.value.concluidas)
-const totalPendentes = computed(() => taskSummary.value.pendentes)
-const totalAguardando = computed(() => taskSummary.value.aguardando)
-const totalAtrasadas = computed(() => taskSummary.value.atrasadas)
 
 const abrirDetalhes = (obrigacao: Obrigacao) => {
   obrigacaoSelecionada.value = obrigacao
@@ -246,7 +275,13 @@ const concluirTarefa = async (obrigacao: Obrigacao) => {
 }
 
 const alterarStatus = async (obrigacao: Obrigacao, status: TaskStatus) => {
-  if (isUpdatingStatus.value || obrigacao.status === status) return
+  if (
+    isUpdatingStatus.value ||
+    archivingTaskId.value !== null ||
+    obrigacao.archived_at ||
+    obrigacao.status === status
+  )
+    return
   isUpdatingStatus.value = true
   try {
     const response = await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/status`, { status })
@@ -268,6 +303,32 @@ const alterarStatus = async (obrigacao: Obrigacao, status: TaskStatus) => {
     toast.error(getApiErrorMessage(error, 'Erro ao atualizar o status da tarefa.'))
   } finally {
     isUpdatingStatus.value = false
+  }
+}
+
+const arquivarOuRestaurar = async (obrigacao: Obrigacao) => {
+  if (archivingTaskId.value !== null || isUpdatingStatus.value || authStore.trialReadOnly) return
+  archivingTaskId.value = obrigacao.id
+  const restoring = Boolean(obrigacao.archived_at)
+  try {
+    await api.patch(`/api/v1/obrigacoes/${obrigacao.id}/${restoring ? 'restaurar' : 'arquivar'}`)
+    if (obrigacaoSelecionada.value?.id === obrigacao.id) fecharDetalhes()
+    kanbanRefreshKey.value += 1
+    await fetchData()
+    toast.success(
+      restoring
+        ? 'Tarefa restaurada para a lista de concluídas.'
+        : 'Tarefa arquivada. Consulte na aba Arquivadas.',
+    )
+  } catch (error) {
+    toast.error(
+      getApiErrorMessage(
+        error,
+        restoring ? 'Não foi possível restaurar a tarefa.' : 'Não foi possível arquivar a tarefa.',
+      ),
+    )
+  } finally {
+    archivingTaskId.value = null
   }
 }
 
@@ -299,8 +360,8 @@ const fetchData = async () => {
       filtrosAplicados.value,
     )
     if (version !== fetchVersion) return
-    if (taskPage.pages > 0 && currentPage.value > taskPage.pages) {
-      currentPage.value = taskPage.pages
+    if (currentPage.value > Math.max(1, taskPage.pages)) {
+      currentPage.value = Math.max(1, taskPage.pages)
       await fetchData()
       return
     }
@@ -308,13 +369,6 @@ const fetchData = async () => {
     obrigacoes.value = taskPage.items
     totalPages.value = taskPage.pages
     totalResults.value = taskPage.total
-    taskSummary.value = {
-      total: taskPage.summary?.total ?? taskPage.total,
-      concluidas: taskPage.summary?.concluidas ?? 0,
-      pendentes: taskPage.summary?.pendentes ?? 0,
-      aguardando: taskPage.summary?.aguardando ?? 0,
-      atrasadas: taskPage.summary?.atrasadas ?? 0,
-    }
   } catch (error) {
     if (version !== fetchVersion) return
     toast.error(getApiErrorMessage(error, 'Erro ao carregar os dados.'))
@@ -350,7 +404,12 @@ watch([searchQuery, filtroClienteId, filtroStatus, filtroResponsavel], () => {
       search: searchQuery.value.trim() || undefined,
       client_id: filtroClienteId.value || undefined,
       assigned_to: filtroResponsavel.value || undefined,
-      task_status: filtroStatus.value || undefined,
+      task_status:
+        filtroStatus.value && !['atrasadas', 'arquivadas'].includes(filtroStatus.value)
+          ? filtroStatus.value
+          : undefined,
+      overdue: filtroStatus.value === 'atrasadas' || undefined,
+      archived: filtroStatus.value === 'arquivadas',
     }
     currentPage.value = 1
     fetchData()
@@ -373,22 +432,6 @@ const getNomeMembro = (membroId?: string | number | null) => {
   return membro ? membro.name : 'Desconhecido'
 }
 
-const getIniciaisMembro = (nome: string) => {
-  if (!nome || nome === 'Não atribuído') return '?'
-
-  const partes = nome
-    .trim()
-    .split(' ')
-    .filter((p) => p)
-
-  if (partes.length === 0) return '?'
-  if (partes.length === 1) return (partes[0]?.charAt(0) || '?').toUpperCase()
-
-  const primeiraLetra = partes[0]?.charAt(0) || ''
-  const ultimaLetra = partes[partes.length - 1]?.charAt(0) || ''
-  return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
-}
-
 const formatDate = (dateString: string) => {
   if (!dateString) return '-'
   const [year, month, day] = dateString.split('-')
@@ -397,9 +440,10 @@ const formatDate = (dateString: string) => {
 
 const isAtrasada = (dateString: string, status: string) => {
   if (status === 'concluida' || !dateString) return false
-  const today = new Date()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-  return dateString < todayStr
+  return (
+    dateString <
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+  )
 }
 
 const getStatusBadge = (status: string) => {
@@ -407,7 +451,7 @@ const getStatusBadge = (status: string) => {
     concluida: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     em_andamento: 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)] border-[var(--ct-border)]',
     aguardando_cliente: 'bg-amber-100 text-amber-700 border-amber-200',
-    pendente: 'bg-slate-100 text-slate-700 border-slate-200',
+    pendente: 'bg-amber-50 text-amber-600 border-amber-100',
   }
 
   const labels: Record<string, string> = {
@@ -421,6 +465,31 @@ const getStatusBadge = (status: string) => {
     class: `inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${styles[status] || styles['pendente']}`,
     label: labels[status] || 'Pendente',
   }
+}
+
+const getTaskBadge = (task: Obrigacao) =>
+  task.archived_at
+    ? {
+        label: 'Arquivada',
+        class:
+          'inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-500',
+      }
+    : isAtrasada(task.due_date, task.status)
+      ? {
+          label: 'Em atraso',
+          class:
+            'inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-xs font-medium text-rose-500',
+        }
+      : getStatusBadge(task.status)
+
+const dateToday = () =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+const getListDate = (date: string) => (date === dateToday() ? 'Hoje' : formatDate(date))
+const toggleCompleted = (task: Obrigacao, event: Event) => {
+  const checkbox = event.target as HTMLInputElement
+  const nextStatus = checkbox.checked ? 'concluida' : 'pendente'
+  checkbox.checked = task.status === 'concluida'
+  void alterarStatus(task, nextStatus)
 }
 
 const getImportanciaBadge = (grau?: string) => {
@@ -464,7 +533,7 @@ onMounted(async () => {
 
 <template>
   <Layout title="Controle de Obrigações">
-    <div class="ct-workspace space-y-4">
+    <div class="ct-obligations-workspace ct-workspace space-y-5">
       <!-- topo -->
       <header
         class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
@@ -474,7 +543,7 @@ onMounted(async () => {
             Obrigações e tarefas
           </h1>
           <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
-            Gerencie prazos, responsáveis e pendências operacionais do escritório.
+            Organize as entregas e acompanhe cada etapa.
           </p>
         </div>
 
@@ -494,52 +563,61 @@ onMounted(async () => {
         </button>
       </header>
 
-      <!-- kpis -->
-      <section
-        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
-      >
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
+      <section class="ct-obligations-panel rounded-xl border border-[#e7edf5] bg-white p-4">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div role="group" aria-label="Filtrar obrigações por status" class="flex flex-wrap gap-2">
+            <button
+              v-for="filter in statusFilters"
+              :key="filter.value"
+              type="button"
+              :aria-pressed="filtroStatus === filter.value"
+              class="ct-obligations-tab rounded-md border px-3 py-2 text-xs transition-colors"
+              :class="
+                filtroStatus === filter.value
+                  ? 'border-blue-200 bg-blue-50 text-blue-600'
+                  : 'border-[#e1e9f5] bg-white text-slate-500 hover:bg-slate-50'
+              "
+              @click="filtroStatus = filter.value"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+          <div
+            role="group"
+            aria-label="Visualização das obrigações"
+            class="inline-flex rounded-lg border border-[var(--ct-border)] bg-slate-50 p-1"
           >
-            {{ totalPendentes }}
-          </p>
+            <button
+              type="button"
+              :aria-pressed="visualizacao === 'lista'"
+              class="rounded-md px-3 py-1.5 text-xs font-semibold"
+              :class="
+                visualizacao === 'lista'
+                  ? 'bg-white text-[var(--ct-primary)] shadow-sm'
+                  : 'text-slate-500'
+              "
+              @click="visualizacao = 'lista'"
+            >
+              Lista
+            </button>
+            <button
+              type="button"
+              :aria-pressed="visualizacao === 'kanban'"
+              class="rounded-md px-3 py-1.5 text-xs font-semibold"
+              :class="
+                visualizacao === 'kanban'
+                  ? 'bg-white text-[var(--ct-primary)] shadow-sm'
+                  : 'text-slate-500'
+              "
+              @click="visualizacao = 'kanban'"
+            >
+              Kanban
+            </button>
+          </div>
         </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Em espera do cliente</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalAguardando }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Concluídas</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalConcluidas }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Atrasadas</p>
-          <p
-            class="text-xl font-semibold tracking-tight text-red-600 [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalAtrasadas }}
-          </p>
-        </div>
-      </section>
-
-      <!-- filtros -->
-      <section class="ct-filter-panel border-b border-[var(--ct-border)] pb-5">
-        <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div class="relative">
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+          <div class="grid min-w-0 flex-1 gap-3 md:grid-cols-3">
+            <div class="relative min-w-0">
               <svg
                 class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
                 fill="none"
@@ -558,14 +636,14 @@ onMounted(async () => {
                 aria-label="Buscar obrigações"
                 type="text"
                 placeholder="Buscar tarefa..."
-                class="w-full rounded-lg border border-[var(--ct-border)] bg-white py-2.5 pl-10 pr-4 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+                class="w-full rounded-lg border border-[var(--ct-border)] bg-white py-2 pl-10 pr-4 text-xs text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
               />
             </div>
 
             <select
               v-model="filtroClienteId"
               aria-label="Filtrar obrigações por cliente"
-              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-3 py-2 text-xs text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os clientes</option>
               <option v-for="c in clientes" :key="c.id" :value="c.id">
@@ -576,323 +654,212 @@ onMounted(async () => {
             <select
               v-model="filtroResponsavel"
               aria-label="Filtrar obrigações por responsável"
-              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
+              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-3 py-2 text-xs text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
             >
               <option value="">Todos os responsáveis</option>
               <option v-for="m in membros" :key="m.id" :value="m.id">{{ m.name }}</option>
             </select>
-
-            <select
-              v-model="filtroStatus"
-              aria-label="Filtrar obrigações por status"
-              class="w-full rounded-lg border border-[var(--ct-border)] bg-white px-4 py-2.5 text-sm text-[var(--ct-ink)] outline-none transition focus:border-[var(--ct-primary)] focus:ring-4 focus:ring-[var(--ct-primary)]/10"
-            >
-              <option value="">Todos os status</option>
-              <option value="pendente">Pendentes</option>
-              <option value="em_andamento">Em andamento</option>
-              <option value="aguardando_cliente">Aguard. cliente</option>
-              <option value="concluida">Concluídas</option>
-            </select>
           </div>
-
-          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
+          <p class="shrink-0 text-xs text-slate-500" role="status">
+            {{ totalResults }} resultado(s)
+          </p>
         </div>
-      </section>
-
-      <div class="flex items-center justify-between gap-3">
-        <div
-          role="group"
-          aria-label="Visualização das obrigações"
-          class="inline-flex rounded-lg border border-[var(--ct-border)] bg-slate-50 p-1"
-        >
-          <button
-            type="button"
-            :aria-pressed="visualizacao === 'lista'"
-            class="rounded-md px-4 py-2 text-sm font-semibold"
-            :class="
-              visualizacao === 'lista'
-                ? 'bg-white text-[var(--ct-primary)] shadow-sm'
-                : 'text-slate-500'
-            "
-            @click="visualizacao = 'lista'"
-          >
-            Lista
-          </button>
-          <button
-            type="button"
-            :aria-pressed="visualizacao === 'kanban'"
-            class="rounded-md px-4 py-2 text-sm font-semibold"
-            :class="
-              visualizacao === 'kanban'
-                ? 'bg-white text-[var(--ct-primary)] shadow-sm'
-                : 'text-slate-500'
-            "
-            @click="visualizacao = 'kanban'"
-          >
-            Kanban
-          </button>
-        </div>
-      </div>
-
-      <ObrigacoesKanban
-        v-if="visualizacao === 'kanban'"
-        :filters="filtrosAplicados"
-        :refresh-key="kanbanRefreshKey"
-        :updating="isUpdatingStatus"
-        :client-name="getNomeCliente"
-        :member-name="getNomeMembro"
-        :overdue="isAtrasada"
-        :format-date="formatDate"
-        @details="abrirDetalhes"
-        @move="alterarStatus"
-      />
-
-      <!-- tabela -->
-      <section
-        v-else
-        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
-      >
-        <div v-if="isLoading" class="space-y-3 p-6">
-          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
-          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
-          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
-          <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
-        </div>
-
-        <EmptyState
-          v-else-if="obrigacoesFiltradas.length === 0"
-          title="Nenhuma obrigação encontrada"
-          description="Ajuste os filtros ou crie uma nova obrigação para começar."
-          action-label="Criar obrigação"
-          @action="abrirCadastro"
+        <ObrigacoesKanban
+          v-if="visualizacao === 'kanban'"
+          :filters="filtrosAplicados"
+          :refresh-key="kanbanRefreshKey"
+          :updating="isUpdatingStatus || archivingTaskId !== null"
+          :read-only="authStore.trialReadOnly"
+          :client-name="getNomeCliente"
+          :member-name="getNomeMembro"
+          :overdue="isAtrasada"
+          :format-date="formatDate"
+          @details="abrirDetalhes"
+          @move="alterarStatus"
+          @archive="arquivarOuRestaurar"
         />
 
-        <div v-else class="overflow-x-auto">
-          <div class="divide-y divide-[var(--ct-border)] md:hidden">
-            <article
-              v-for="obrigacao in obrigacoesFiltradas"
-              :key="`mobile-${obrigacao.id}`"
-              class="p-4"
-            >
-              <button class="w-full text-left" @click="abrirDetalhes(obrigacao)">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
-                      {{ obrigacao.title }}
-                    </p>
-                    <p class="mt-1 truncate text-xs text-[var(--ct-text-muted)]">
-                      {{ getNomeCliente(obrigacao.client_id) }}
-                    </p>
-                  </div>
-                  <span :class="getStatusBadge(obrigacao.status).class">{{
-                    getStatusBadge(obrigacao.status).label
-                  }}</span>
-                </div>
-                <div class="mt-3 flex items-center justify-between">
-                  <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">{{
-                    getImportanciaBadge(obrigacao.grau_importancia).label
-                  }}</span
-                  ><span
-                    class="text-xs"
-                    :class="
-                      isAtrasada(obrigacao.due_date, obrigacao.status)
-                        ? 'font-semibold text-red-600'
-                        : 'text-slate-500'
-                    "
-                    >{{ formatDate(obrigacao.due_date) }}</span
-                  >
-                </div>
-              </button>
-              <button
-                v-if="obrigacao.status !== 'concluida'"
-                class="mt-3 text-xs font-semibold text-emerald-700"
-                @click="concluirTarefa(obrigacao)"
-              >
-                Marcar como concluída
-              </button>
-            </article>
+        <!-- tabela -->
+        <section v-else class="ct-obligations-list min-w-0">
+          <div v-if="isLoading" class="space-y-3 p-6">
+            <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+            <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+            <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
+            <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
           </div>
-          <table class="hidden min-w-full md:table">
-            <thead class="border-b border-[var(--ct-border)] bg-slate-50/80">
-              <tr>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Tarefa
-                </th>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Cliente
-                </th>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Responsável
-                </th>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Prazo
-                </th>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Prioridade
-                </th>
-                <th
-                  class="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Status
-                </th>
-                <th
-                  class="px-6 py-4 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"
-                >
-                  Ações
-                </th>
-              </tr>
-            </thead>
 
-            <tbody class="divide-y divide-[var(--ct-border)] bg-white">
-              <tr
+          <EmptyState
+            v-else-if="obrigacoesFiltradas.length === 0"
+            title="Nenhuma obrigação encontrada"
+            description="Ajuste os filtros ou crie uma nova obrigação para começar."
+            action-label="Criar obrigação"
+            @action="abrirCadastro"
+          />
+
+          <div v-else class="overflow-x-auto">
+            <div class="divide-y divide-[var(--ct-border)] md:hidden">
+              <article
                 v-for="obrigacao in obrigacoesFiltradas"
-                :key="obrigacao.id"
-                class="transition-colors hover:bg-slate-50/70"
+                :key="`mobile-${obrigacao.id}`"
+                class="p-4"
               >
-                <td class="px-6 py-4">
-                  <button
-                    @click="abrirDetalhes(obrigacao)"
-                    class="flex max-w-sm items-start gap-3 text-left transition-colors hover:text-[var(--ct-primary)]"
-                  >
-                    <div
-                      class="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl"
-                      :class="
-                        obrigacao.is_recurring
-                          ? 'bg-[var(--ct-primary-soft)] text-[var(--ct-primary)]'
-                          : 'bg-slate-100 text-slate-500'
-                      "
-                    >
-                      <svg
-                        v-if="obrigacao.is_recurring"
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                        />
-                      </svg>
-                      <svg
-                        v-else
-                        class="h-4 w-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9m-7-4h6m0 0v6m0-6L10 14"
-                        />
-                      </svg>
-                    </div>
-
+                <button class="w-full text-left" @click="abrirDetalhes(obrigacao)">
+                  <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
-                          {{ obrigacao.title }}
-                        </p>
-                        <span
-                          v-if="obrigacao.is_recurring"
-                          class="inline-flex rounded-full bg-[var(--ct-primary-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--ct-primary)]"
-                        >
-                          Recorrente
-                        </span>
-                      </div>
-
+                      <p class="truncate text-sm font-semibold text-[var(--ct-ink)]">
+                        {{ obrigacao.title }}
+                      </p>
                       <p class="mt-1 truncate text-xs text-[var(--ct-text-muted)]">
-                        {{ obrigacao.description || 'Sem descrição adicional.' }}
+                        {{ getNomeCliente(obrigacao.client_id) }}
                       </p>
                     </div>
-                  </button>
-                </td>
-
-                <td class="px-6 py-4 text-sm text-[var(--ct-ink)]">
-                  {{ getNomeCliente(obrigacao.client_id) }}
-                </td>
-
-                <td class="px-6 py-4">
-                  <div
-                    class="flex items-center gap-2"
-                    :title="getNomeMembro(obrigacao.assigned_to)"
-                  >
-                    <div
-                      class="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--ct-primary-soft)] text-[10px] font-semibold text-[var(--ct-primary)]"
-                    >
-                      {{ getIniciaisMembro(getNomeMembro(obrigacao.assigned_to)) }}
-                    </div>
-                    <span class="hidden text-xs text-[var(--ct-text-muted)] lg:block">
-                      {{ getNomeMembro(obrigacao.assigned_to) }}
-                    </span>
+                    <span :class="getTaskBadge(obrigacao).class">{{
+                      getTaskBadge(obrigacao).label
+                    }}</span>
                   </div>
-                </td>
-
-                <td
-                  class="px-6 py-4 text-sm"
-                  :class="
-                    isAtrasada(obrigacao.due_date, obrigacao.status)
-                      ? 'font-semibold text-red-600'
-                      : 'text-[var(--ct-ink)]'
+                  <div class="mt-3 flex items-center justify-between">
+                    <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">{{
+                      getImportanciaBadge(obrigacao.grau_importancia).label
+                    }}</span
+                    ><span
+                      class="text-xs"
+                      :class="
+                        isAtrasada(obrigacao.due_date, obrigacao.status)
+                          ? 'font-semibold text-red-600'
+                          : 'text-slate-500'
+                      "
+                      >{{ formatDate(obrigacao.due_date) }}</span
+                    >
+                  </div>
+                </button>
+                <button
+                  v-if="
+                    obrigacao.status !== 'concluida' &&
+                    !authStore.trialReadOnly &&
+                    obrigacao.type !== 'receita_federal'
                   "
+                  :disabled="isUpdatingStatus"
+                  class="mt-3 text-xs font-semibold text-emerald-700"
+                  @click="concluirTarefa(obrigacao)"
                 >
-                  {{ formatDate(obrigacao.due_date) }}
-                </td>
-
-                <td class="px-6 py-4">
-                  <span :class="getImportanciaBadge(obrigacao.grau_importancia).class">
-                    {{ getImportanciaBadge(obrigacao.grau_importancia).label }}
-                  </span>
-                </td>
-
-                <td class="px-6 py-4">
-                  <span :class="getStatusBadge(obrigacao.status).class">
-                    {{ getStatusBadge(obrigacao.status).label }}
-                  </span>
-                </td>
-
-                <td class="px-6 py-4">
-                  <div class="flex justify-end gap-2">
+                  Marcar como concluída
+                </button>
+                <button
+                  v-if="obrigacao.status === 'concluida' && !authStore.trialReadOnly"
+                  type="button"
+                  :disabled="isUpdatingStatus || archivingTaskId !== null"
+                  class="mt-3 text-xs font-medium text-blue-600 disabled:opacity-50"
+                  @click="arquivarOuRestaurar(obrigacao)"
+                >
+                  {{ obrigacao.archived_at ? 'Restaurar' : 'Arquivar' }}
+                </button>
+              </article>
+            </div>
+            <table class="ct-obligations-table hidden w-full min-w-[760px] text-left md:table">
+              <thead class="bg-[#f5f7fa] text-slate-500">
+                <tr>
+                  <th class="w-8 rounded-l-md"><span class="sr-only">Concluir obrigação</span></th>
+                  <th>Tarefa</th>
+                  <th>Cliente</th>
+                  <th>Responsável</th>
+                  <th>Prazo</th>
+                  <th>Status</th>
+                  <th class="w-36 rounded-r-md"><span class="sr-only">Ações</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="obrigacao in obrigacoesFiltradas"
+                  :key="obrigacao.id"
+                  class="border-b border-[#edf1f7] transition-colors hover:bg-slate-50/60"
+                >
+                  <td>
+                    <input
+                      type="checkbox"
+                      :checked="obrigacao.status === 'concluida'"
+                      :disabled="
+                        isUpdatingStatus ||
+                        archivingTaskId !== null ||
+                        Boolean(obrigacao.archived_at) ||
+                        authStore.trialReadOnly ||
+                        obrigacao.type === 'receita_federal'
+                      "
+                      :aria-label="`${obrigacao.status === 'concluida' ? 'Reabrir' : 'Concluir'} ${obrigacao.title}`"
+                      class="ct-obligation-checkbox"
+                      @change="toggleCompleted(obrigacao, $event)"
+                    />
+                  </td>
+                  <td>
                     <button
-                      v-if="obrigacao.status !== 'concluida'"
-                      @click="concluirTarefa(obrigacao)"
-                      class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                    >
-                      Concluir
-                    </button>
-
-                    <button
+                      type="button"
                       @click="abrirDetalhes(obrigacao)"
-                      class="rounded-lg border border-[var(--ct-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      class="flex items-center gap-2 text-left font-medium text-slate-800 hover:text-blue-600"
+                      :title="obrigacao.description"
                     >
-                      Detalhes
+                      <span
+                        :class="
+                          obrigacao.status === 'concluida' ? 'text-slate-400 line-through' : ''
+                        "
+                        >{{ obrigacao.title }}</span
+                      >
+                      <span
+                        v-if="obrigacao.is_recurring"
+                        class="text-blue-500"
+                        title="Obrigação recorrente"
+                        aria-label="Obrigação recorrente"
+                        >↻</span
+                      >
                     </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <PaginationControls
-          :page="currentPage"
-          :pages="totalPages"
-          :total="totalResults"
-          @change="changePage"
-        />
+                  </td>
+                  <td class="text-slate-500">{{ getNomeCliente(obrigacao.client_id) }}</td>
+                  <td class="text-slate-500">{{ getNomeMembro(obrigacao.assigned_to) }}</td>
+                  <td
+                    class="whitespace-nowrap"
+                    :class="
+                      isAtrasada(obrigacao.due_date, obrigacao.status) ||
+                      (obrigacao.due_date === dateToday() && obrigacao.status !== 'concluida')
+                        ? 'text-rose-500'
+                        : 'text-slate-500'
+                    "
+                  >
+                    {{ getListDate(obrigacao.due_date) }}
+                  </td>
+                  <td>
+                    <span :class="getTaskBadge(obrigacao).class">{{
+                      getTaskBadge(obrigacao).label
+                    }}</span>
+                  </td>
+                  <td class="whitespace-nowrap">
+                    <button
+                      v-if="obrigacao.status === 'concluida' && !authStore.trialReadOnly"
+                      type="button"
+                      :aria-label="`${obrigacao.archived_at ? 'Restaurar' : 'Arquivar'} ${obrigacao.title}`"
+                      :disabled="isUpdatingStatus || archivingTaskId !== null"
+                      class="mr-2 rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 disabled:opacity-50"
+                      @click="arquivarOuRestaurar(obrigacao)"
+                    >
+                      {{ obrigacao.archived_at ? 'Restaurar' : 'Arquivar' }}
+                    </button>
+                    <button
+                      type="button"
+                      @click="abrirDetalhes(obrigacao)"
+                      :aria-label="`Ver detalhes e ações de ${obrigacao.title}`"
+                      class="rounded px-2 py-1 text-lg leading-none text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                    >
+                      ⋮
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <PaginationControls
+            :page="currentPage"
+            :pages="totalPages"
+            :total="totalResults"
+            @change="changePage"
+          />
+        </section>
       </section>
 
       <!-- modal cadastro/edição -->
@@ -1170,6 +1137,11 @@ onMounted(async () => {
                       {{ obrigacaoSelecionada.title }}
                     </h3>
 
+                    <p v-if="obrigacaoSelecionada.archived_at" class="mt-2 text-xs text-slate-500">
+                      Arquivada em
+                      {{ new Date(obrigacaoSelecionada.archived_at).toLocaleDateString('pt-BR') }}.
+                      Restaure para editar.
+                    </p>
                     <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
                       {{ obrigacaoSelecionada.description || 'Sem descrição adicional.' }}
                     </p>
@@ -1270,6 +1242,16 @@ onMounted(async () => {
                   </button>
 
                   <button
+                    v-if="obrigacaoSelecionada.status === 'concluida' && !authStore.trialReadOnly"
+                    type="button"
+                    :disabled="isUpdatingStatus || archivingTaskId !== null"
+                    class="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-600 disabled:opacity-50"
+                    @click="arquivarOuRestaurar(obrigacaoSelecionada)"
+                  >
+                    {{ obrigacaoSelecionada.archived_at ? 'Restaurar' : 'Arquivar' }}
+                  </button>
+                  <button
+                    v-if="!obrigacaoSelecionada.archived_at"
                     @click="abrirEdicao(obrigacaoSelecionada)"
                     class="rounded-xl bg-[var(--ct-navy)] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[var(--ct-primary-hover)]"
                   >

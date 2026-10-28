@@ -19,7 +19,7 @@ from access_control import (
 )
 from fastapi import HTTPException, UploadFile, status
 from pagination import paginate
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 
@@ -113,6 +113,50 @@ def list_documents(
             "geral": geral,
         },
     )
+
+
+
+def list_document_folders(
+    db: Session,
+    current_user: dict,
+    filters: DocumentListFilters,
+) -> dict:
+    """One folder per accessible client, counting the complete filtered repository."""
+    require_permission(current_user, Permission.DOCUMENT_READ)
+    repository = tenant_repository(db, current_user)
+    documents = repository.query(models.Document)
+    if filters.search:
+        documents = documents.filter(
+            models.Document.nome_arquivo.icontains(filters.search.strip(), autoescape=True)
+        )
+    if filters.category:
+        documents = documents.filter(models.Document.categoria == filters.category)
+    counts = documents.with_entities(
+        models.Document.client_id.label("client_id"),
+        func.count(models.Document.id).label("document_count"),
+        func.max(models.Document.created_at).label("last_uploaded_at"),
+    ).group_by(models.Document.client_id).subquery()
+
+    client_name = func.coalesce(
+        models.Client.razao_social, models.Client.nome, "Cliente sem nome"
+    )
+    query = apply_client_scope(repository.query(models.Client), current_user)
+    query = query.outerjoin(counts, counts.c.client_id == models.Client.id)
+    if filters.client_id:
+        query = query.filter(models.Client.id == filters.client_id)
+    if filters.search or filters.category:
+        query = query.filter(counts.c.document_count > 0)
+    else:
+        # Keep archived clients' existing files reachable, without empty archived folders.
+        query = query.filter(or_(models.Client.ativo.is_(True), counts.c.document_count > 0))
+    query = query.with_entities(
+        models.Client.id.label("client_id"),
+        client_name.label("client_name"),
+        func.coalesce(models.Client.ativo, True).label("client_active"),
+        func.coalesce(counts.c.document_count, 0).label("document_count"),
+        counts.c.last_uploaded_at,
+    ).order_by(client_name.asc(), models.Client.id.asc())
+    return paginate(query, page=filters.page, page_size=filters.page_size)
 
 
 def _safe_original_name(filename: str | None) -> tuple[str, str]:

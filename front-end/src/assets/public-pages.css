@@ -1,0 +1,385 @@
+/* Institutional pages share the proportions, palette and spacing of the landing page. */
+.ct-clarity-page {
+  --public-blue: #087cff;
+  --public-muted: #65718b;
+  --public-line: #e5ecf7;
+  background: white;
+  color: #0b1027;
+}
+.ct-public-hero {
+  padding: 60px 0;
+  background:
+    radial-gradient(ellipse at 70% 60%, #eff6ff88, transparent 70%), linear-gradient(#fff, #f8fbfe);
+}
+.ct-public-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  align-items: center;
+  gap: 56px;
+}
+.ct-public-hero-start {
+  align-items: start;
+}
+.ct-public-hero-centered {
+  text-align: center;
+}
+.ct-public-eyebrow {
+  margin: 0 0 20px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #53698a;
+}
+.ct-public-title {
+  max-width: 16ch;
+  margin: 0;
+  font-size: clamp(36px, 4.1vw, 54px);
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  font-weight: 700;
+}
+.ct-public-lead {
+  max-width: 490px;
+  margin: 24px 0 0;
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--public-muted);
+}
+.ct-public-hero-centered :is(.ct-public-title, .ct-public-lead) {
+  margin-inline: auto;
+}
+.ct-public-hero-centered .ct-public-title {
+  max-width: 22ch;
+}
+.ct-public-hero-centered .ct-public-lead {
+  max-width: 680px;
+}
+.ct-public-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 28px;
+}
+.ct-public-hero-note {
+  margin-top: 20px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--public-muted);
+}
+.ct-public-hero-centered .ct-public-hero-actions {
+  justify-content: center;
+}
+.ct-clarity-page :is(.ct-button-primary, .ct-button-secondary) {
+  padding: 14px 23px;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 48px;
+}
+.ct-public-section {
+  padding-block: 64px;
+}
+.ct-public-section-soft {
+  background: linear-gradient(105deg, #f7faff, white);
+}
+.ct-public-section-heading {
+  max-width: 680px;
+  margin-bottom: 32px;
+}
+.ct-public-section-heading.centered {
+  margin-inline: auto;
+  text-align: center;
+}
+.ct-public-heading {
+  font-size: clamp(28px, 3vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.18;
+}
+.ct-public-copy {
+  font-size: 16px;
+  line-height: 1.8;
+  color: var(--public-muted);
+}
+.ct-public-card {
+  min-width: 0;
+  padding: 26px;
+  border: 1px solid var(--public-line);
+  border-radius: 14px;
+  background: white;
+}
+.ct-public-card h3 {
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+.ct-public-card p {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.ct-public-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #eef5ff;
+  color: var(--public-blue);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.ct-public-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.ct-public-illustration {
+  border-radius: 28px;
+  background: linear-gradient(135deg, #eaf2ff, #f7faff);
+  padding: 30px;
+}
+.ct-public-example {
+  font-size: 11px;
+  line-height: 1.7;
+  color: #7a879e;
+  text-align: center;
+}
+.ct-public-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--public-blue);
+}
+.ct-public-link:hover {
+  text-decoration: underline;
+}
+.ct-public-cta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 40px;
+  align-items: center;
+  padding: 38px 42px;
+  background: linear-gradient(100deg, #eef5ff, #f6f9ff);
+  border-radius: 14px;
+}
+.ct-public-cta .ct-public-eyebrow {
+  color: var(--public-blue);
+  margin-bottom: 14px;
+}
+.ct-public-cta h2 {
+  max-width: 24ch;
+  font-size: 32px;
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+.ct-public-cta p:not(.ct-public-eyebrow) {
+  margin-top: 14px;
+  max-width: 540px;
+  color: var(--public-muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+.ct-public-cta-action {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+}
+.ct-public-cta-action > span {
+  font-size: 11px;
+  color: var(--public-muted);
+}
+.ct-public-step-number {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #eaf3ff;
+  color: var(--public-blue);
+  font-size: 14px;
+  font-weight: 700;
+}
+.ct-public-form {
+  padding: 28px;
+  border: 1px solid var(--public-line);
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 15px 35px #243b6408;
+}
+.ct-public-form .ct-field {
+  border-radius: 7px;
+  border-color: #dfe7f2;
+}
+.ct-public-form :is(input, select, textarea):focus {
+  box-shadow: 0 0 0 3px #087cff12;
+}
+.ct-public-contact-channel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--public-line);
+  background: white;
+  border-radius: 12px;
+  min-width: 0;
+}
+.ct-public-contact-channel:hover {
+  border-color: #b6d4ff;
+}
+.ct-public-contact-channel p {
+  overflow-wrap: anywhere;
+}
+.ct-public-plan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 26px 20px;
+  border: 1px solid var(--public-line);
+  border-radius: 14px;
+  background: white;
+}
+.ct-public-plan-featured {
+  border: 2px solid var(--public-blue);
+  padding: 25px 19px;
+  box-shadow: 0 12px 28px #087cff0d;
+}
+.ct-public-plan-badge {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translate(-50%, -50%);
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: var(--public-blue);
+  color: white;
+  font-size: 10px;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.ct-public-plan h3 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.ct-public-plan-price {
+  margin-top: 22px;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+.ct-public-plan-description {
+  min-height: 84px;
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--public-muted);
+  line-height: 1.7;
+}
+.ct-public-plan-features {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-block: 22px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ct-public-plan-features li {
+  display: flex;
+  gap: 8px;
+}
+.ct-public-plan-features li > span:first-child {
+  color: var(--public-blue);
+}
+.ct-public-plan .ct-button-primary,
+.ct-public-plan .ct-button-secondary {
+  padding: 12px 10px;
+  min-height: 44px;
+  font-size: 12px;
+}
+.ct-public-faq details {
+  border-bottom: 1px solid var(--public-line);
+  padding-block: 20px;
+}
+.ct-public-faq summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.ct-public-faq details p {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--public-muted);
+}
+@media (min-width: 1400px) {
+  .ct-public-title {
+    font-size: 58px;
+  }
+}
+@media (max-width: 1023px) {
+  .ct-public-hero-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+  .ct-public-title {
+    max-width: 22ch;
+  }
+  .ct-public-lead {
+    max-width: 620px;
+  }
+  .ct-public-hero {
+    padding-block: 44px;
+  }
+  .ct-public-cta {
+    gap: 28px;
+    padding: 30px;
+  }
+  .ct-public-cta h2 {
+    font-size: 28px;
+  }
+}
+@media (max-width: 639px) {
+  .ct-public-title {
+    font-size: clamp(34px, 9vw, 44px);
+  }
+  .ct-public-lead {
+    font-size: 16px;
+    line-height: 1.7;
+  }
+  .ct-public-section {
+    padding-block: 42px;
+  }
+  .ct-public-hero {
+    padding-block: 34px;
+  }
+  .ct-public-card {
+    padding: 22px;
+  }
+  .ct-public-illustration {
+    padding: 20px;
+  }
+  .ct-public-form {
+    padding: 20px;
+  }
+  .ct-public-cta {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 26px;
+  }
+  .ct-public-cta-action {
+    align-items: flex-start;
+  }
+  .ct-public-cta h2 {
+    font-size: 27px;
+  }
+  .ct-public-plan-description {
+    min-height: 0;
+  }
+}

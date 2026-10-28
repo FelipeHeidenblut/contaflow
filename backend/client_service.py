@@ -1,4 +1,5 @@
 from trial_service import effective_plan
+from workload_service import attach_task_counts
 import csv
 import io
 import re
@@ -33,6 +34,7 @@ class ClientListFilters:
     unassigned: bool = False
     page: int = 1
     page_size: int = 20
+    include_workload: bool = False
 
 
 def _lock_tenant_and_get_client_capacity(
@@ -240,12 +242,16 @@ def list_clients(
         func.coalesce(models.Client.razao_social, models.Client.nome).asc(),
         models.Client.id.asc(),
     )
-    return paginate(
+    result = paginate(
         query,
         page=filters.page,
         page_size=filters.page_size,
         summary={"total": total, "pj": total_pj, "pf": total_pf},
     )
+    if filters.include_workload:
+        attach_task_counts(db, current_user, result["items"], group_by="client_id")
+    return result
+
 
 
 def deactivate_client(

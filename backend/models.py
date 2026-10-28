@@ -109,6 +109,10 @@ class Task(Base):
     __tablename__ = "tasks"
     __table_args__ = (
         CheckConstraint(
+            "archived_at IS NULL OR status = 'concluida'",
+            name="ck_tasks_archived_completed",
+        ),
+        CheckConstraint(
             "recurrence_day IS NULL OR recurrence_day BETWEEN 1 AND 31",
             name="ck_tasks_recurrence_day",
         ),
@@ -128,6 +132,7 @@ class Task(Base):
             "recurrence_period",
             name="uq_tasks_tenant_series_period",
         ),
+        Index("ix_tasks_tenant_archived_due_id", "tenant_id", "archived_at", "due_date", "id"),
         Index("ix_tasks_tenant_due_id", "tenant_id", "due_date", "id"),
         Index("ix_tasks_tenant_client", "tenant_id", "client_id"),
         Index("ix_tasks_tenant_assignee", "tenant_id", "assigned_to"),
@@ -148,6 +153,7 @@ class Task(Base):
     status = Column(
         String(50), default=TaskStatus.PENDENTE.value, nullable=False
     )  # Usando o Enum
+    archived_at = Column(DateTime(timezone=True), nullable=True)
     due_date = Column(Date, nullable=False)
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

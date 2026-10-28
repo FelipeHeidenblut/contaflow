@@ -4,9 +4,10 @@ import { fetchPage } from '../services/pagination'
 import type { Obrigacao, TaskStatus } from '../types/obrigacao'
 
 const props = defineProps<{
-  filters: Record<string, string | number | undefined>
+  filters: Record<string, string | number | boolean | undefined>
   refreshKey: number
   updating: boolean
+  readOnly?: boolean
   clientName: (id: string | number) => string
   memberName: (id?: string | number | null) => string
   overdue: (date: string, status: string) => boolean
@@ -15,6 +16,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   details: [task: Obrigacao]
   move: [task: Obrigacao, status: TaskStatus]
+  archive: [task: Obrigacao]
 }>()
 
 const columns: { status: TaskStatus; label: string; color: string }[] = [
@@ -36,7 +38,9 @@ const draggedTask = ref<Obrigacao | null>(null)
 const activeDrop = ref<TaskStatus | null>(null)
 const visibleColumns = computed(() =>
   columns.filter(
-    (column) => !props.filters.task_status || column.status === props.filters.task_status,
+    (column) =>
+      (!props.filters.archived || column.status === 'concluida') &&
+      (!props.filters.task_status || column.status === props.filters.task_status),
   ),
 )
 let generation = 0
@@ -82,7 +86,7 @@ watch(
 )
 
 function startDrag(event: DragEvent, task: Obrigacao) {
-  if (props.updating || task.type === 'receita_federal') {
+  if (props.updating || props.readOnly || task.archived_at || task.type === 'receita_federal') {
     event.preventDefault()
     return
   }
@@ -108,14 +112,16 @@ function endDrag() {
 function dropTask(status: TaskStatus) {
   const task = draggedTask.value
   endDrag()
-  if (task && !props.updating && task.status !== status) emit('move', task, status)
+  if (task && !props.updating && !props.readOnly && !task.archived_at && task.status !== status)
+    emit('move', task, status)
 }
 
 function selectStatus(event: Event, task: Obrigacao) {
   const select = event.target as HTMLSelectElement
   const status = select.value as TaskStatus
   select.value = task.status
-  if (status !== task.status && !props.updating) emit('move', task, status)
+  if (status !== task.status && !props.updating && !props.readOnly && !task.archived_at)
+    emit('move', task, status)
 }
 </script>
 
@@ -125,7 +131,11 @@ function selectStatus(event: Event, task: Obrigacao) {
       {{
         updating
           ? 'Salvando alteração…'
-          : 'Arraste os cartões ou use a opção de status em cada tarefa.'
+          : filters.archived
+            ? 'Restaure uma tarefa para voltar à lista de concluídas.'
+            : readOnly
+              ? 'Consulta das tarefas do escritório.'
+              : 'Arraste os cartões ou use a opção de status em cada tarefa.'
       }}
     </p>
     <div class="flex items-start gap-4 overflow-x-auto pb-4">
@@ -146,7 +156,7 @@ function selectStatus(event: Event, task: Obrigacao) {
         <header class="mb-4 flex items-center gap-2 px-1">
           <span :class="column.color" class="h-2.5 w-2.5 rounded-full" aria-hidden="true"></span>
           <h2 :id="`kanban-${column.status}`" class="text-sm font-semibold text-[var(--ct-ink)]">
-            {{ column.label }}
+            {{ filters.archived ? 'Arquivadas' : column.label }}
           </h2>
           <span class="ml-auto rounded-full bg-white px-2 py-0.5 text-xs text-slate-600">
             {{ state[column.status]?.total ?? '—' }}
@@ -156,9 +166,14 @@ function selectStatus(event: Event, task: Obrigacao) {
           <article
             v-for="task in state[column.status]?.items"
             :key="task.id"
-            :draggable="!updating && task.type !== 'receita_federal'"
+            :draggable="
+              !updating && !readOnly && !task.archived_at && task.type !== 'receita_federal'
+            "
             class="rounded-lg border border-[var(--ct-border)] bg-white p-4 shadow-sm"
-            :class="{ 'opacity-50': draggedTask?.id === task.id, 'cursor-grab': !updating }"
+            :class="{
+              'opacity-50': draggedTask?.id === task.id,
+              'cursor-grab': !updating && !readOnly && !task.archived_at,
+            }"
             @dragstart="startDrag($event, task)"
             @dragend="endDrag"
           >
@@ -212,7 +227,9 @@ function selectStatus(event: Event, task: Obrigacao) {
             </p>
             <select
               :value="task.status"
-              :disabled="updating || task.type === 'receita_federal'"
+              :disabled="
+                updating || readOnly || Boolean(task.archived_at) || task.type === 'receita_federal'
+              "
               :aria-label="`Status de ${task.title}`"
               class="mt-3 w-full rounded-lg border border-[var(--ct-border)] bg-white px-2 py-2 text-xs text-[var(--ct-ink)] disabled:opacity-50"
               @change="selectStatus($event, task)"
@@ -225,6 +242,17 @@ function selectStatus(event: Event, task: Obrigacao) {
                 {{ destination.label }}
               </option>
             </select>
+            <p v-if="task.archived_at" class="mt-3 text-xs text-slate-500">Arquivada</p>
+            <button
+              v-if="task.status === 'concluida' && !readOnly"
+              type="button"
+              :disabled="updating"
+              :aria-label="`${task.archived_at ? 'Restaurar' : 'Arquivar'} ${task.title}`"
+              class="mt-3 text-xs font-semibold text-blue-600 hover:underline disabled:opacity-50"
+              @click="emit('archive', task)"
+            >
+              {{ task.archived_at ? 'Restaurar' : 'Arquivar' }}
+            </button>
           </article>
           <p
             v-if="state[column.status]?.loading"

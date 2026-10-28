@@ -43,6 +43,7 @@ EXPECTED_COLUMNS = {
     "profiles": {"is_superadmin", "deadline_alerts_enabled", "calendar_token"},
     "clients": {"natureza_operacao", "responsible_profile_id", "email"},
     "tasks": {
+        "archived_at",
         "is_recurring",
         "recurrence_day",
         "grau_importancia",
@@ -85,6 +86,7 @@ EXPECTED_COLUMNS = {
 
 EXPECTED_OPERATIONAL_INDEXES = {
     "tasks": {
+        "ix_tasks_tenant_archived_due_id",
         "ix_tasks_tenant_due_id",
         "ix_tasks_tenant_client",
         "ix_tasks_tenant_assignee",
@@ -106,7 +108,7 @@ def test_migration_history_has_one_base_and_one_head():
     script = ScriptDirectory.from_config(_alembic_config())
 
     assert script.get_base() == "452ebc16bf35"
-    assert script.get_current_head() == "f2d8a1b6c903"
+    assert script.get_current_head() == "b7c4e2a9d615"
 
 
 def test_full_history_compiles_for_an_empty_postgresql_database():
@@ -141,6 +143,8 @@ def test_full_history_compiles_for_an_empty_postgresql_database():
     assert "ADD COLUMN asaas_customer_id" in sql
     assert "ADD COLUMN is_superadmin" in sql
     assert "ADD COLUMN natureza_operacao" in sql
+    assert "ADD COLUMN archived_at TIMESTAMP WITH TIME ZONE" in sql
+    assert "ck_tasks_archived_completed" in sql
     assert "ADD COLUMN is_recurring" in sql
     assert "ADD COLUMN recurrence_series_id" in sql
     assert "uq_tasks_tenant_series_period" in sql
@@ -225,4 +229,4 @@ def test_upgrade_head_on_disposable_empty_postgresql_database():
         current_revision = connection.execute(
             sa.text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-        assert current_revision == "f2d8a1b6c903"
+        assert current_revision == "b7c4e2a9d615"

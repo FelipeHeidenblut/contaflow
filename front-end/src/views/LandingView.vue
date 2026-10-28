@@ -1,712 +1,430 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import PublicLayout from '@/components/PublicLayout.vue'
-import { useScrollReveal } from '@/composables/useScrollReveal'
-
-const page = ref<HTMLElement | null>(null)
-useScrollReveal(page)
-
-const proofPoints = [
-  { value: '14', label: 'dias grátis do Profissional', detail: 'Comece sem cartão' },
-  { value: '5 MB', label: 'por documento', detail: 'Arquivos ligados ao cliente' },
-  { value: '12 meses', label: 'por relatório', detail: 'Visão consolidada nos planos pagos' },
-]
-
-const capabilities = [
+const monthOffset = ref(0)
+const calendarDate = computed(() => new Date(2026, 9 + monthOffset.value, 1))
+const calendarLabel = computed(() =>
+  calendarDate.value.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }),
+)
+const calendarDays = computed(() =>
+  Array.from({ length: 42 }, (_, i) => {
+    const date = new Date(
+      calendarDate.value.getFullYear(),
+      calendarDate.value.getMonth(),
+      i - calendarDate.value.getDay() + 1,
+    )
+    return {
+      key: i,
+      number: date.getDate(),
+      current: date.getMonth() === calendarDate.value.getMonth(),
+    }
+  }),
+)
+const previewTasks = [
+  { name: 'Enviar DCTFWeb', client: 'Comércio Silva', status: 'Em atraso', tone: 'redtag' },
   {
-    number: '01',
-    title: 'Carteira com contexto',
-    description: 'Dados cadastrais, documentos e histórico permanecem ligados ao cliente certo.',
-    meta: 'cliente · visão única',
-    icon: 'client',
+    name: 'Conferir folha de pagamento',
+    client: 'Mercado Boa Vista',
+    status: 'Em andamento',
+    tone: 'bluetag',
   },
   {
-    number: '02',
-    title: 'Prazos que pedem atenção',
-    description: 'A equipe enxerga o que vence hoje, o que atrasou e o que depende do cliente.',
-    meta: 'obrigação · ao vivo',
-    icon: 'deadline',
+    name: 'Enviar EFD-Contribuições',
+    client: 'Indústria Lima',
+    status: 'Pendente',
+    tone: 'yellowtag',
   },
   {
-    number: '03',
-    title: 'Trabalho bem distribuído',
-    description: 'Responsáveis, prioridades e carga da equipe aparecem antes do gargalo acontecer.',
-    meta: 'equipe · capacidade',
-    icon: 'team',
+    name: 'Revisar apuração de ICMS',
+    client: 'Loja do João',
+    status: 'Pendente',
+    tone: 'yellowtag',
   },
   {
-    number: '04',
-    title: 'Decisão com o mês inteiro à vista',
-    description:
-      'Relatórios transformam tarefas, clientes e atrasos em uma leitura operacional clara.',
-    meta: 'relatório · planos pagos',
-    icon: 'report',
-  },
-]
-
-const workflow = [
-  {
-    number: '01',
-    title: 'Cadastre',
-    description: 'Importe a carteira e reúna os dados essenciais de cada cliente.',
-    meta: 'carteira · entrada',
-  },
-  {
-    number: '02',
-    title: 'Planeje',
-    description: 'Defina obrigações, vencimentos, recorrências e responsáveis.',
-    meta: 'rotina · organização',
-  },
-  {
-    number: '03',
-    title: 'Execute',
-    description: 'Acompanhe pendências, documentos e retornos do cliente.',
-    meta: 'equipe · em andamento',
-  },
-  {
-    number: '04',
-    title: 'Comprove',
-    description: 'Consulte o histórico e transforme a operação em relatório.',
-    meta: 'resultado · visível',
+    name: 'Entregar balancete mensal',
+    client: 'Clínica Saúde Mais',
+    status: 'Pendente',
+    tone: 'yellowtag',
   },
 ]
-
-const comparison = [
-  ['Obrigação recorrente', 'Copiar linha no próximo mês', 'Próxima ocorrência criada no fluxo'],
-  ['Documento recebido', 'Procurar em pasta ou conversa', 'Arquivo ligado ao cliente e à tarefa'],
-  ['Prazo em risco', 'Descobrir durante a cobrança', 'Alerta visível antes da reunião'],
-  ['Carga da equipe', 'Perguntar quem está disponível', 'Distribuição reunida no dashboard'],
-]
-
-const trustPoints = [
+const questions = [
   {
-    title: 'Cada escritório no seu ambiente',
-    description: 'Clientes, tarefas e documentos são consultados dentro do tenant correto.',
+    title: 'Como funcionam os 14 dias gratuitos?',
+    text: 'Novos escritórios experimentam o Profissional ao concluir o cadastro: até 100 clientes e 10 membros, sem cartão e sem cobrança automática.',
   },
   {
-    title: 'Permissões que seguem a rotina',
-    description: 'Administradores e colaboradores recebem acessos compatíveis com sua função.',
+    title: 'O que acontece quando o teste termina?',
+    text: 'Sem contratação, sua conta volta ao Gratuito, com 5 clientes ativos e 1 membro. Seus dados permanecem disponíveis. Se estiver acima desses limites, você pode consultar e exportar os dados, adequar a conta ou contratar um plano.',
   },
   {
-    title: 'Arquivos com acesso temporário',
-    description: 'Downloads usam links assinados e limitados no tempo, sem exposição permanente.',
+    title: 'Posso contratar durante o teste?',
+    text: 'Sim. A assinatura paga começa após a confirmação do pagamento. Os dias gratuitos restantes não são adicionados à assinatura.',
   },
 ]
 </script>
-
 <template>
-  <PublicLayout>
-    <div ref="page" class="ct-modern-landing overflow-hidden">
-      <section class="relative border-b border-[var(--ct-border)] bg-white">
-        <div class="ct-engineering-grid pointer-events-none absolute inset-0 opacity-60"></div>
-        <div
-          class="pointer-events-none absolute -right-40 top-0 h-[34rem] w-[34rem] rounded-full bg-blue-100/70 blur-[100px]"
-        ></div>
-        <div
-          class="ct-container relative grid min-h-[720px] items-center gap-12 py-16 lg:grid-cols-[0.84fr_1.16fr] lg:py-20"
-        >
-          <div data-reveal>
-            <p class="ct-technical-label">
-              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-              Gestão operacional para contabilidade
-            </p>
-            <h1 class="ct-modern-display mt-6">
-              A rotina contábil inteira,
-              <span class="ct-gradient-text">visível antes do prazo vencer.</span>
-            </h1>
-            <p class="mt-6 max-w-xl text-[17px] leading-7 text-[var(--ct-text-muted)]">
-              Clientes, obrigações, documentos e equipe no mesmo fluxo. Você sabe o que precisa ser
-              feito, quem cuida e onde a operação pede atenção.
-            </p>
-            <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-              <RouterLink to="/cadastro" class="ct-button-primary ct-landing-primary">
-                Experimentar grátis por 14 dias
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-width="2" d="M5 12h14m-6-6 6 6-6 6" />
-                </svg>
-              </RouterLink>
-              <RouterLink to="/como-funciona" class="ct-button-secondary ct-landing-secondary">
-                Ver como funciona
-              </RouterLink>
-            </div>
-            <div class="mt-6 flex flex-wrap gap-x-5 gap-y-2 font-mono text-[11px] text-slate-500">
-              <span>✓ Profissional por 14 dias</span><span>✓ sem cartão</span
-              ><span>✓ sem cobrança automática</span>
-            </div>
-          </div>
-
-          <div data-reveal style="--reveal-delay: 120ms" class="relative lg:pl-4">
-            <div
-              class="absolute -inset-5 rounded-[28px] border border-blue-100 bg-blue-50/40 [transform:rotate(1.25deg)]"
-              aria-hidden="true"
-            ></div>
-            <div
-              class="relative overflow-hidden rounded-2xl border border-slate-300 bg-[#f7f9fc] shadow-[0_28px_80px_rgba(15,23,42,0.16)]"
-            >
-              <div
-                class="flex h-11 items-center justify-between border-b border-slate-200 bg-white px-4"
-              >
-                <div class="flex items-center gap-2">
-                  <span class="h-2 w-2 rounded-full bg-red-300"></span>
-                  <span class="h-2 w-2 rounded-full bg-amber-300"></span>
-                  <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                </div>
-                <span class="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-400">
-                  ambiente demonstrativo · ao vivo
-                </span>
-              </div>
-              <div class="grid min-h-[470px] sm:grid-cols-[148px_1fr]">
-                <aside class="hidden border-r border-slate-200 bg-white p-3 sm:flex sm:flex-col">
-                  <p class="px-2 py-2 text-[11px] font-bold text-[#101a38]">ContablyTask</p>
-                  <div class="mt-5 space-y-1 text-[10px]">
-                    <p class="rounded-lg bg-blue-50 px-2.5 py-2.5 font-semibold text-blue-700">
-                      Visão geral
-                    </p>
-                    <p class="px-2.5 py-2.5 text-slate-500">Clientes</p>
-                    <p class="px-2.5 py-2.5 text-slate-500">Obrigações</p>
-                    <p class="px-2.5 py-2.5 text-slate-500">Calendário</p>
-                    <p class="px-2.5 py-2.5 text-slate-500">Documentos</p>
-                    <p class="px-2.5 py-2.5 text-slate-500">Relatórios</p>
-                  </div>
-                  <div class="mt-auto rounded-lg border border-slate-200 bg-slate-50 p-2.5">
-                    <p class="text-[9px] font-semibold text-slate-700">Escritório Modelo</p>
-                    <p class="mt-1 text-[8px] text-slate-400">Operação organizada</p>
-                  </div>
-                </aside>
-
-                <div class="p-4 sm:p-5">
-                  <div class="flex items-start justify-between gap-3">
-                    <div>
-                      <p class="text-[15px] font-semibold tracking-tight text-[#101a38]">
-                        Bom dia, Felipe 👋
-                      </p>
-                      <p class="mt-1 text-[9px] text-slate-500">Resumo da operação de hoje.</p>
-                    </div>
-                    <span
-                      class="rounded-lg bg-blue-600 px-2.5 py-2 text-[9px] font-semibold text-white"
-                    >
-                      + Nova obrigação
-                    </span>
-                  </div>
-
-                  <div class="mt-4 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
-                      <p class="text-[8px] text-slate-500">Tarefas ativas</p>
-                      <p class="mt-1.5 text-lg font-semibold text-[#101a38]">28</p>
-                      <p class="mt-1 text-[7px] text-blue-600">8 em andamento</p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
-                      <p class="text-[8px] text-slate-500">Vencendo hoje</p>
-                      <p class="mt-1.5 text-lg font-semibold text-[#101a38]">4</p>
-                      <p class="mt-1 text-[7px] text-amber-600">Pedem atenção</p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
-                      <p class="text-[8px] text-slate-500">Atrasadas</p>
-                      <p class="mt-1.5 text-lg font-semibold text-[#101a38]">2</p>
-                      <p class="mt-1 text-[7px] text-red-600">Fora do prazo</p>
-                    </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
-                      <p class="text-[8px] text-slate-500">No prazo</p>
-                      <p class="mt-1.5 text-lg font-semibold text-[#101a38]">93%</p>
-                      <p class="mt-1 text-[7px] text-emerald-600">Operação em dia</p>
-                    </div>
-                  </div>
-
-                  <div class="mt-2 grid gap-2 xl:grid-cols-[1.35fr_.65fr]">
-                    <div class="overflow-hidden rounded-lg border border-slate-200 bg-white p-3">
-                      <div class="flex items-center justify-between">
-                        <p class="text-[9px] font-semibold text-[#101a38]">Fluxo de tarefas</p>
-                        <span class="font-mono text-[7px] text-slate-400">este mês</span>
-                      </div>
-                      <div class="mt-4 grid grid-cols-4 text-center">
-                        <div>
-                          <b class="block text-xs">9</b
-                          ><span class="text-[7px] text-slate-400">A fazer</span>
-                        </div>
-                        <div>
-                          <b class="block text-xs">8</b
-                          ><span class="text-[7px] text-slate-400">Em curso</span>
-                        </div>
-                        <div>
-                          <b class="block text-xs">5</b
-                          ><span class="text-[7px] text-slate-400">Cliente</span>
-                        </div>
-                        <div>
-                          <b class="block text-xs">18</b
-                          ><span class="text-[7px] text-slate-400">Concluídas</span>
-                        </div>
-                      </div>
-                      <svg
-                        class="mt-2 h-16 w-full"
-                        viewBox="0 0 440 72"
-                        preserveAspectRatio="none"
-                        aria-hidden="true"
-                      >
-                        <defs>
-                          <linearGradient id="landing-flow" x1="0" x2="1">
-                            <stop stop-color="#2563eb" />
-                            <stop offset=".55" stop-color="#0891b2" />
-                            <stop offset="1" stop-color="#16a34a" />
-                          </linearGradient>
-                          <linearGradient id="landing-fill" x1="0" y1="0" x2="0" y2="1">
-                            <stop stop-color="#dbeafe" stop-opacity=".8" />
-                            <stop offset="1" stop-color="#fff" stop-opacity="0" />
-                          </linearGradient>
-                        </defs>
-                        <path
-                          d="M0 45 C65 24 105 29 155 43 S250 55 310 32 S390 34 440 14 L440 72H0Z"
-                          fill="url(#landing-fill)"
-                        />
-                        <path
-                          d="M0 45 C65 24 105 29 155 43 S250 55 310 32 S390 34 440 14"
-                          fill="none"
-                          stroke="url(#landing-flow)"
-                          stroke-width="2.5"
-                        />
-                      </svg>
-                    </div>
-                    <div class="rounded-lg border border-slate-200 bg-white p-3">
-                      <p class="text-[9px] font-semibold text-[#101a38]">Alertas</p>
-                      <div class="mt-3 space-y-3">
-                        <div class="flex gap-2">
-                          <span class="mt-0.5 h-2 w-2 rounded-full bg-red-500"></span>
-                          <div>
-                            <p class="text-[8px] font-semibold">2 atrasadas</p>
-                            <p class="text-[7px] text-slate-400">Revise os prazos</p>
-                          </div>
-                        </div>
-                        <div class="flex gap-2">
-                          <span class="mt-0.5 h-2 w-2 rounded-full bg-amber-500"></span>
-                          <div>
-                            <p class="text-[8px] font-semibold">4 vencem hoje</p>
-                            <p class="text-[7px] text-slate-400">Priorize entregas</p>
-                          </div>
-                        </div>
-                        <div class="flex gap-2">
-                          <span class="mt-0.5 h-2 w-2 rounded-full bg-cyan-500"></span>
-                          <div>
-                            <p class="text-[8px] font-semibold">5 aguardam cliente</p>
-                            <p class="text-[7px] text-slate-400">Retorno externo</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="mt-2 rounded-lg border border-slate-200 bg-white p-3">
-                    <div class="flex items-center justify-between">
-                      <p class="text-[9px] font-semibold text-[#101a38]">Minhas prioridades</p>
-                      <span class="text-[7px] font-semibold text-blue-600">Ver todas</span>
-                    </div>
-                    <div class="mt-2 grid gap-2 sm:grid-cols-3">
-                      <div class="border-t border-slate-100 pt-2">
-                        <p class="truncate text-[8px] font-semibold">Fechamento contábil</p>
-                        <p class="mt-1 text-[7px] text-slate-400">Comércio Horizonte</p>
-                      </div>
-                      <div class="border-t border-slate-100 pt-2">
-                        <p class="truncate text-[8px] font-semibold">Enviar DCTFWeb</p>
-                        <p class="mt-1 text-[7px] text-slate-400">Clínica Modelo</p>
-                      </div>
-                      <div class="border-t border-slate-100 pt-2">
-                        <p class="truncate text-[8px] font-semibold">Revisar documentos</p>
-                        <p class="mt-1 text-[7px] text-slate-400">Padaria Central</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="border-b border-[var(--ct-border)] bg-white" aria-label="Recursos objetivos">
-        <div class="ct-container grid lg:grid-cols-[0.8fr_repeat(3,1fr)]">
-          <div
-            class="flex items-center border-b border-slate-200 py-6 lg:border-b-0 lg:border-r lg:pr-8"
-          >
-            <p class="max-w-[15rem] text-sm font-semibold leading-5 text-[#101a38]">
-              Estrutura concreta para começar pequeno e crescer sem refazer a operação.
-            </p>
-          </div>
-          <article
-            v-for="item in proofPoints"
-            :key="item.value"
-            class="border-b border-slate-200 py-6 lg:border-b-0 lg:border-r lg:px-8 lg:last:border-r-0"
-          >
-            <p class="font-mono text-[22px] font-semibold tracking-[-0.04em] text-blue-600">
-              {{ item.value }}
-            </p>
-            <p class="mt-1 text-xs font-semibold text-[#26344f]">{{ item.label }}</p>
-            <p class="mt-1 text-[11px] text-slate-500">{{ item.detail }}</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="bg-[#f8fafc] py-20 lg:py-28">
-        <div class="ct-container">
-          <div data-reveal class="grid gap-6 lg:grid-cols-[0.72fr_1.28fr] lg:items-end">
-            <div>
-              <p class="ct-technical-label">O produto em operação</p>
-              <h2 class="ct-modern-section-title mt-5">
-                Tudo que o escritório precisa, no mesmo contexto.
-              </h2>
-            </div>
-            <p
-              class="max-w-2xl text-[15px] leading-7 text-[var(--ct-text-muted)] lg:justify-self-end"
-            >
-              Não é apenas uma lista de tarefas. Cada ação continua ligada ao cliente, ao prazo, ao
-              responsável e aos arquivos necessários para concluir a entrega.
-            </p>
-          </div>
-
-          <div class="mt-12 grid gap-4 lg:grid-cols-2">
-            <article
-              v-for="(item, index) in capabilities"
-              :key="item.number"
-              data-reveal
-              class="ct-capability-card group"
-              :style="{ '--reveal-delay': `${(index % 2) * 90}ms` }"
-            >
-              <div class="flex items-center justify-between">
-                <span class="font-mono text-[11px] font-semibold tracking-[0.12em] text-blue-600">{{
-                  item.number
-                }}</span>
-                <span
-                  class="rounded-full border border-slate-200 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.1em] text-slate-500"
-                  >{{ item.meta }}</span
-                >
-              </div>
-              <h3 class="mt-5 text-[24px] font-semibold tracking-[-0.03em] text-[#101a38]">
-                {{ item.title }}
-              </h3>
-              <p class="mt-2 max-w-lg text-sm leading-6 text-slate-600">{{ item.description }}</p>
-
-              <div class="mt-7 overflow-hidden rounded-xl border border-slate-200 bg-[#fbfcfe]">
-                <div class="flex items-center gap-1.5 border-b border-slate-200 bg-white px-3 py-2">
-                  <span class="h-1.5 w-1.5 rounded-full bg-blue-400"></span
-                  ><span class="h-1.5 w-1.5 rounded-full bg-slate-200"></span>
-                  <span
-                    class="ml-1.5 font-mono text-[9px] uppercase tracking-[0.1em] text-slate-400"
-                    >{{ item.meta }}</span
-                  >
-                </div>
-                <div class="p-4">
-                  <svg
-                    v-if="item.icon === 'client'"
-                    viewBox="0 0 520 150"
-                    class="h-36 w-full"
-                    aria-hidden="true"
-                  >
-                    <g fill="none" stroke="#cbd5e1" stroke-width="1.4">
-                      <rect x="10" y="18" width="106" height="30" rx="7" />
-                      <rect x="10" y="60" width="106" height="30" rx="7" />
-                      <rect x="10" y="102" width="106" height="30" rx="7" />
-                    </g>
-                    <g fill="#64748b" font-family="ui-monospace" font-size="10">
-                      <text x="63" y="37" text-anchor="middle">cadastro</text>
-                      <text x="63" y="79" text-anchor="middle">documentos</text>
-                      <text x="63" y="121" text-anchor="middle">histórico</text>
-                    </g>
-                    <path
-                      d="M116 33H190V75H226M116 75H226M116 117H190V75"
-                      fill="none"
-                      stroke="#2563eb"
-                      stroke-width="1.8"
-                    />
-                    <rect x="226" y="48" width="120" height="54" rx="12" fill="#2563eb" />
-                    <text
-                      x="286"
-                      y="72"
-                      text-anchor="middle"
-                      fill="white"
-                      font-family="ui-monospace"
-                      font-size="11"
-                    >
-                      CLIENTE
-                    </text>
-                    <text
-                      x="286"
-                      y="87"
-                      text-anchor="middle"
-                      fill="#bfdbfe"
-                      font-family="ui-monospace"
-                      font-size="8"
-                    >
-                      contexto único
-                    </text>
-                    <path d="M346 75H390" stroke="#2563eb" stroke-width="1.8" />
-                    <rect x="390" y="48" width="118" height="54" rx="12" fill="#172554" />
-                    <path
-                      d="M408 84l16-20 16 11 18-27 17 9 18-18"
-                      fill="none"
-                      stroke="#93c5fd"
-                      stroke-width="2"
-                    />
-                  </svg>
-
-                  <svg
-                    v-else-if="item.icon === 'deadline'"
-                    viewBox="0 0 520 150"
-                    class="h-36 w-full"
-                    aria-hidden="true"
-                  >
-                    <line x1="28" y1="116" x2="492" y2="116" stroke="#cbd5e1" />
-                    <path
-                      d="M50 100 C120 88 150 44 222 60 S330 108 386 64 S448 42 482 26"
-                      fill="none"
-                      stroke="#2563eb"
-                      stroke-width="2.6"
-                    />
-                    <path
-                      d="M50 100 C120 88 150 44 222 60 S330 108 386 64 S448 42 482 26L482 116H50Z"
-                      fill="#dbeafe"
-                      opacity=".65"
-                    />
-                    <g fill="#2563eb">
-                      <circle cx="153" cy="51" r="4" />
-                      <circle cx="386" cy="64" r="4" />
-                      <circle cx="482" cy="26" r="4" />
-                    </g>
-                    <g fill="#64748b" font-family="ui-monospace" font-size="9">
-                      <text x="50" y="136">pendente</text>
-                      <text x="218" y="136">em curso</text>
-                      <text x="424" y="136">concluída</text>
-                    </g>
-                    <rect x="352" y="14" width="96" height="24" rx="12" fill="#fef2f2" />
-                    <text
-                      x="400"
-                      y="30"
-                      text-anchor="middle"
-                      fill="#dc2626"
-                      font-family="ui-monospace"
-                      font-size="9"
-                    >
-                      2 alertas
-                    </text>
-                  </svg>
-
-                  <svg
-                    v-else-if="item.icon === 'team'"
-                    viewBox="0 0 520 150"
-                    class="h-36 w-full"
-                    aria-hidden="true"
-                  >
-                    <g font-family="ui-monospace" font-size="9" fill="#475569">
-                      <text x="12" y="30">Ana</text>
-                      <text x="12" y="66">Rafael</text>
-                      <text x="12" y="102">Bruna</text>
-                      <text x="12" y="138">Lucas</text>
-                    </g>
-                    <g fill="#eef2f7">
-                      <rect x="82" y="17" width="400" height="16" rx="8" />
-                      <rect x="82" y="53" width="400" height="16" rx="8" />
-                      <rect x="82" y="89" width="400" height="16" rx="8" />
-                      <rect x="82" y="125" width="400" height="16" rx="8" />
-                    </g>
-                    <rect x="82" y="17" width="330" height="16" rx="8" fill="#2563eb" />
-                    <rect x="82" y="53" width="260" height="16" rx="8" fill="#0891b2" />
-                    <rect x="82" y="89" width="188" height="16" rx="8" fill="#16a34a" />
-                    <rect x="82" y="125" width="118" height="16" rx="8" fill="#93c5fd" />
-                  </svg>
-
-                  <svg v-else viewBox="0 0 520 150" class="h-36 w-full" aria-hidden="true">
-                    <g stroke="#e2e8f0">
-                      <line x1="20" y1="28" x2="500" y2="28" />
-                      <line x1="20" y1="67" x2="500" y2="67" />
-                      <line x1="20" y1="106" x2="500" y2="106" />
-                    </g>
-                    <g fill="#bfdbfe">
-                      <rect x="42" y="72" width="30" height="55" rx="4" />
-                      <rect x="114" y="48" width="30" height="79" rx="4" />
-                      <rect x="186" y="84" width="30" height="43" rx="4" />
-                      <rect x="258" y="38" width="30" height="89" rx="4" />
-                      <rect x="330" y="60" width="30" height="67" rx="4" />
-                      <rect x="402" y="28" width="30" height="99" rx="4" />
-                    </g>
-                    <g fill="#2563eb">
-                      <rect x="42" y="98" width="30" height="29" rx="4" />
-                      <rect x="114" y="78" width="30" height="49" rx="4" />
-                      <rect x="186" y="104" width="30" height="23" rx="4" />
-                      <rect x="258" y="73" width="30" height="54" rx="4" />
-                      <rect x="330" y="88" width="30" height="39" rx="4" />
-                      <rect x="402" y="62" width="30" height="65" rx="4" />
-                    </g>
-                    <path
-                      d="M44 82L129 58 201 72 273 43 345 52 417 21 478 35"
-                      fill="none"
-                      stroke="#172554"
-                      stroke-width="2.2"
-                      stroke-linecap="round"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="bg-white py-20 lg:py-28">
-        <div class="ct-container">
-          <div data-reveal class="grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-end">
-            <div>
-              <p class="ct-technical-label">Antes e depois</p>
-              <h2 class="ct-modern-section-title mt-5">Menos procura. Mais execução.</h2>
-            </div>
-            <p class="max-w-2xl text-[15px] leading-7 text-slate-600 lg:justify-self-end">
-              A plataforma reduz o trabalho invisível entre descobrir uma demanda e efetivamente
-              concluí-la.
-            </p>
-          </div>
-          <div data-reveal class="mt-12 overflow-hidden rounded-2xl border border-slate-200">
-            <div
-              class="hidden grid-cols-[1fr_1fr_1fr] bg-slate-50 font-mono text-[10px] uppercase tracking-[0.1em] text-slate-500 md:grid"
-            >
-              <p class="px-5 py-4">Situação</p>
-              <p class="px-5 py-4">Sem fluxo central</p>
-              <p class="px-5 py-4 text-blue-600">Com ContablyTask</p>
-            </div>
-            <article
-              v-for="row in comparison"
-              :key="row[0]"
-              class="grid gap-3 border-t border-slate-200 bg-white px-5 py-5 first:border-t-0 md:grid-cols-[1fr_1fr_1fr] md:gap-8"
-            >
-              <h3 class="text-sm font-semibold text-[#101a38]">{{ row[0] }}</h3>
-              <p class="text-sm text-slate-500">
-                <span class="mb-1 block font-mono text-[9px] uppercase text-slate-400 md:hidden"
-                  >Sem fluxo central</span
-                >{{ row[1] }}
-              </p>
-              <p class="text-sm font-medium text-blue-700">
-                <span class="mb-1 block font-mono text-[9px] uppercase text-blue-500 md:hidden"
-                  >Com ContablyTask</span
-                >{{ row[2] }}
-              </p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="px-3 pb-3 sm:px-4 sm:pb-4">
-        <div
-          class="relative isolate overflow-hidden rounded-[28px] bg-[var(--ct-navy)] py-20 text-white lg:py-28"
-        >
-          <div
-            class="ct-engineering-grid-dark pointer-events-none absolute inset-0 opacity-60"
-          ></div>
-          <div
-            class="pointer-events-none absolute -right-40 -top-48 h-[38rem] w-[38rem] rounded-full bg-blue-500/20 blur-[110px]"
-          ></div>
-          <div class="ct-container relative">
-            <div data-reveal class="max-w-3xl">
-              <p class="ct-technical-label border-white/15 bg-white/5 text-blue-200">
-                Do cadastro ao relatório
-              </p>
-              <h2
-                class="mt-6 text-[clamp(2.25rem,5vw,4.25rem)] font-semibold leading-[1.02] tracking-[-0.05em]"
-              >
-                Quatro passos. Um escritório inteiro no mesmo fluxo.
-              </h2>
-              <p class="mt-5 max-w-2xl text-[16px] leading-7 text-white/65">
-                A complexidade contábil continua existindo. O que muda é que a equipe deixa de
-                carregá-la na memória.
-              </p>
-            </div>
-            <div class="mt-12 grid gap-4 lg:grid-cols-4">
-              <article
-                v-for="(step, index) in workflow"
-                :key="step.number"
-                data-reveal
-                class="relative overflow-hidden rounded-2xl border p-6"
-                :class="
-                  index === workflow.length - 1
-                    ? 'border-blue-400/30 bg-blue-500/15'
-                    : 'border-white/10 bg-white/[0.035]'
-                "
-                :style="{ '--reveal-delay': `${index * 70}ms` }"
-              >
-                <div class="flex items-center justify-between">
-                  <span class="font-mono text-[11px] tracking-[0.12em] text-blue-300"
-                    >PASSO {{ step.number }}</span
-                  ><span
-                    v-if="index === workflow.length - 1"
-                    class="rounded-full border border-blue-300/20 px-2 py-1 font-mono text-[8px] uppercase tracking-wider text-blue-200"
-                    >resultado</span
-                  >
-                </div>
-                <h3 class="mt-6 text-xl font-semibold">{{ step.title }}</h3>
-                <p class="mt-2 min-h-16 text-sm leading-6 text-white/60">{{ step.description }}</p>
-                <div
-                  class="mt-6 border-t border-white/10 pt-4 font-mono text-[9px] uppercase tracking-[0.1em] text-white/35"
-                >
-                  {{ step.meta }}
-                </div>
-              </article>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="bg-white py-20 lg:py-28">
-        <div class="ct-container grid gap-12 lg:grid-cols-[0.7fr_1.3fr]">
-          <div data-reveal>
-            <p class="ct-technical-label">Segurança na rotina</p>
-            <h2 class="ct-modern-section-title mt-5">Controle que aparece onde precisa.</h2>
-            <p class="mt-5 max-w-md text-sm leading-7 text-slate-600">
-              A proteção não fica isolada numa página jurídica. Ela participa da autenticação, das
-              permissões e do acesso aos documentos.
-            </p>
-            <RouterLink to="/privacidade" class="ct-link-arrow mt-7"
-              >Conhecer os controles <span>→</span></RouterLink
-            >
-          </div>
-          <div
-            class="grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 md:grid-cols-3"
-          >
-            <article
-              v-for="(item, index) in trustPoints"
-              :key="item.title"
-              data-reveal
-              class="bg-white p-6"
-              :style="{ '--reveal-delay': `${index * 80}ms` }"
-            >
-              <span
-                class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 font-mono text-xs font-semibold text-blue-700"
-                >0{{ index + 1 }}</span
-              >
-              <h3 class="mt-6 text-base font-semibold text-[#101a38]">{{ item.title }}</h3>
-              <p class="mt-2 text-sm leading-6 text-slate-600">{{ item.description }}</p>
-            </article>
-          </div>
-        </div>
-      </section>
-
-      <section class="border-t border-slate-200 bg-[#f8fafc] py-20 lg:py-24">
-        <div
-          data-reveal
-          class="ct-container flex flex-col justify-between gap-8 lg:flex-row lg:items-end"
-        >
+  <PublicLayout
+    ><div class="reference-landing">
+      <svg
+        aria-hidden="true"
+        style="position: absolute; width: 0; height: 0; overflow: hidden"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <symbol id="landing-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></symbol>
+          <symbol id="landing-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6" /></symbol>
+          <symbol id="landing-calendar" viewBox="0 0 24 24">
+            <rect x="3" y="5" width="18" height="16" rx="2" />
+            <path d="M7 3v4m10-4v4M3 10h18m-13 5h1m6 0h1" />
+          </symbol>
+          <symbol id="landing-users" viewBox="0 0 24 24">
+            <circle cx="9" cy="7" r="3" />
+            <path d="M3 21v-3a6 6 0 0 1 12 0v3m2-18a3 3 0 0 1 0 6m4 12v-3a6 6 0 0 0-4-5" />
+          </symbol>
+          <symbol id="landing-file" viewBox="0 0 24 24">
+            <path d="M14 2H5v20h15V8zM14 2v6h6M8 12h8m-8 4h8" />
+          </symbol>
+          <symbol id="landing-chart" viewBox="0 0 24 24">
+            <path d="M3 21h18M5 17V9h4v8m3 0V4h4v13m3 0V7h2v14" />
+          </symbol>
+          <symbol id="landing-clock" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v6l3 2" />
+          </symbol>
+          <symbol id="landing-circle-check" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="m7 12 3 3 7-7" />
+          </symbol>
+          <symbol id="landing-play" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="m10 8 5 4-5 4z" />
+          </symbol>
+          <symbol id="landing-home" viewBox="0 0 24 24">
+            <path d="m3 10 9-7 9 7v11h-6v-8H9v8H3z" />
+          </symbol>
+          <symbol id="landing-layers" viewBox="0 0 24 24">
+            <path d="m12 3 10 5-10 5L2 8zm-10 9 10 5 10-5M2 16l10 5 10-5" />
+          </symbol>
+          <symbol id="landing-search" viewBox="0 0 24 24">
+            <circle cx="10" cy="10" r="6" />
+            <path d="m15 15 6 6" />
+          </symbol>
+          <symbol id="landing-bell" viewBox="0 0 24 24">
+            <path d="M5 17h14l-2-4V9a5 5 0 0 0-10 0v4zm5 3h4" />
+          </symbol>
+          <symbol id="landing-star" viewBox="0 0 24 24">
+            <path d="m12 2 3 6 7 1-5 5 1 8-6-4-6 4 1-8-5-5 7-1z" />
+          </symbol>
+          <symbol id="landing-settings" viewBox="0 0 24 24">
+            <path d="m12 2 9 5v10l-9 5-9-5V7z" />
+            <circle cx="12" cy="12" r="4" />
+          </symbol>
+          <symbol id="landing-help" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M9 8a3 3 0 0 1 6 1c0 2-3 2-3 5m0 3h.01" />
+          </symbol>
+        </defs>
+      </svg>
+      <section class="hero">
+        <div class="wrap hero-grid">
           <div>
-            <p class="ct-technical-label">Comece simples</p>
-            <h2 class="ct-modern-section-title mt-5 max-w-3xl">
-              Organize o próximo fechamento sem depender de mais uma planilha.
-            </h2>
-            <p class="mt-5 max-w-2xl text-[15px] leading-7 text-slate-600">
-              Experimente o Profissional por 14 dias, com até 100 clientes e 10 membros. Sem cartão.
-              Ao terminar, escolha uma assinatura ou continue no Gratuito.
+            <p class="eyebrow">GESTÃO DE TAREFAS PARA ESCRITÓRIOS CONTÁBEIS</p>
+            <h1>Organize seu<br />escritório contábil<br />com mais clareza</h1>
+            <p class="lead">
+              Centralize tarefas, prazos e clientes em um só lugar. Evite atrasos, aumente a
+              produtividade da equipe e tenha total visibilidade do que precisa ser feito.
+            </p>
+            <div class="actions">
+              <RouterLink class="btn" to="/cadastro"
+                >Começar agora <svg><use href="#landing-arrow" /></svg></RouterLink
+              ><RouterLink class="btn outline" to="/como-funciona"
+                ><svg style="color: var(--blue)"><use href="#landing-play" /></svg>Ver como
+                funciona</RouterLink
+              >
+            </div>
+            <p class="fine">
+              14 dias de Profissional grátis <span>•</span> Sem cartão <span>•</span> Sem cobrança
+              automática
             </p>
           </div>
-          <div class="flex shrink-0 flex-col gap-3 sm:flex-row">
-            <RouterLink to="/planos" class="ct-button-secondary ct-landing-secondary"
-              >Comparar planos</RouterLink
-            ><RouterLink to="/cadastro" class="ct-button-primary ct-landing-primary"
-              >Criar meu escritório <span>→</span></RouterLink
-            >
+          <div class="screen" aria-label="Prévia ilustrativa do painel ContablyTask">
+            <aside class="sidebar">
+              <div class="brand">
+                <span class="brand-mark"
+                  ><svg><use href="#landing-check" /></svg></span
+                ><span>Contably<em>Task</em></span>
+              </div>
+              <div class="sideitem active">
+                <svg><use href="#landing-home" /></svg>Início
+              </div>
+              <div class="sideitem">
+                <svg><use href="#landing-circle-check" /></svg>Obrigações
+              </div>
+              <div class="sideitem">
+                <svg><use href="#landing-calendar" /></svg>Calendário
+              </div>
+              <div class="sideitem">
+                <svg><use href="#landing-users" /></svg>Clientes
+              </div>
+              <div class="sideitem">
+                <svg><use href="#landing-layers" /></svg>Documentos
+              </div>
+              <div class="sideitem">
+                <svg><use href="#landing-chart" /></svg>Relatórios
+              </div>
+              <div class="sidebottom">
+                <div class="sideitem">
+                  <svg><use href="#landing-settings" /></svg>Configurações
+                </div>
+                <div class="sideitem">
+                  <svg><use href="#landing-help" /></svg>Ajuda
+                </div>
+              </div>
+            </aside>
+            <div class="screenmain">
+              <div class="toolbar">
+                <div class="search">
+                  <svg><use href="#landing-search" /></svg>Buscar tarefas, clientes ou
+                  processos...<span class="key">⌘ K</span>
+                </div>
+                <svg class="bell"><use href="#landing-bell" /></svg><span class="avatar">AS</span>
+              </div>
+              <div class="dash">
+                <h3>Olá, Ana!</h3>
+                <p>Aqui está um resumo das suas tarefas e prazos de hoje.</p>
+                <div class="stats">
+                  <div class="stat">
+                    <span class="round red"
+                      ><svg><use href="#landing-clock" /></svg
+                    ></span>
+                    <div><strong>8</strong><small>Em atraso</small></div>
+                  </div>
+                  <div class="stat">
+                    <span class="round"
+                      ><svg><use href="#landing-calendar" /></svg
+                    ></span>
+                    <div><strong>12</strong><small>Para hoje</small></div>
+                  </div>
+                  <div class="stat">
+                    <span class="round green"
+                      ><svg><use href="#landing-circle-check" /></svg
+                    ></span>
+                    <div>
+                      <strong>28</strong><small>Concluídas<br />esta semana</small>
+                    </div>
+                  </div>
+                  <div class="stat">
+                    <span class="round purple"
+                      ><svg><use href="#landing-users" /></svg
+                    ></span>
+                    <div><strong>24</strong><small>Clientes ativos</small></div>
+                  </div>
+                </div>
+                <div class="taskbox">
+                  <div class="boxhead">
+                    Tarefas de hoje<RouterLink to="/cadastro">Ver todas</RouterLink>
+                  </div>
+                  <div v-for="task in previewTasks" :key="task.name" class="taskrow">
+                    <span class="check" aria-hidden="true"></span><span>{{ task.name }}</span
+                    ><span class="client">{{ task.client }}</span
+                    ><span class="badge" :class="task.tone">{{ task.status }}</span
+                    ><span>Hoje</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="recursos" class="wrap benefits">
+        <article>
+          <div class="feature-icon">
+            <svg><use href="#landing-calendar" /></svg>
+          </div>
+          <h3>Controle de prazos</h3>
+          <p>Visualize o que precisa ser feito<br />e evite atrasos.</p>
+        </article>
+        <article>
+          <div class="feature-icon">
+            <svg><use href="#landing-users" /></svg>
+          </div>
+          <h3>Organização de clientes</h3>
+          <p>Centralize todas as informações<br />dos seus clientes.</p>
+        </article>
+        <article>
+          <div class="feature-icon">
+            <svg><use href="#landing-file" /></svg>
+          </div>
+          <h3>Processos recorrentes</h3>
+          <p>Organize e acompanhe<br />tarefas recorrentes.</p>
+        </article>
+        <article>
+          <div class="feature-icon">
+            <svg><use href="#landing-chart" /></svg>
+          </div>
+          <h3>Mais produtividade</h3>
+          <p>Tenha visibilidade e acompanhe<br />o progresso da equipe.</p>
+        </article>
+      </section>
+      <section class="overview">
+        <div class="wrap">
+          <div class="overview-grid">
+            <div class="analytics">
+              <div class="calendar">
+                <h4>Calendário</h4>
+                <div class="month">
+                  <b>{{ calendarLabel }}</b
+                  ><span
+                    ><button @click="monthOffset--" type="button" aria-label="Mês anterior">
+                      ‹</button
+                    ><button @click="monthOffset++" type="button" aria-label="Próximo mês">
+                      ›
+                    </button></span
+                  >
+                </div>
+                <div class="days">
+                  <span
+                    v-for="(day, i) in ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']"
+                    :key="'w' + i"
+                    class="weekday"
+                    >{{ day }}</span
+                  ><span
+                    v-for="day in calendarDays"
+                    :key="day.key"
+                    class="day"
+                    :class="{ muted: !day.current, selected: day.current && day.number === 29 }"
+                    >{{ day.number }}</span
+                  >
+                </div>
+              </div>
+              <div class="mini-stack">
+                <div class="mini-card">
+                  <h4>Próximos prazos <a href="/cadastro">Ver todos</a></h4>
+                  <div class="due-row">
+                    <svg><use href="#landing-calendar" /></svg>Hoje, 29 de out<span
+                      class="pill pink"
+                      >12</span
+                    >
+                  </div>
+                  <div class="due-row">
+                    <svg><use href="#landing-calendar" /></svg>Amanhã, 30 de out<span
+                      class="pill yellow"
+                      >8</span
+                    >
+                  </div>
+                  <div class="due-row">
+                    <svg><use href="#landing-calendar" /></svg>Sábado, 31 de out<span class="pill"
+                      >6</span
+                    >
+                  </div>
+                  <div class="due-row">
+                    <svg><use href="#landing-calendar" /></svg>Terça, 3 de nov<span class="pill"
+                      >10</span
+                    >
+                  </div>
+                </div>
+                <div class="mini-card">
+                  <h4>Tarefas por status</h4>
+                  <div class="chartrow">
+                    <div class="donut">
+                      <div class="donut-label"><b>48</b>tarefas</div>
+                    </div>
+                    <div class="legend">
+                      <div><i style="background: #ff6870"></i>Em atraso<b>8</b></div>
+                      <div><i style="background: #ffce51"></i>Pendentes<b>18</b></div>
+                      <div><i style="background: #2185ff"></i>Em andamento<b>12</b></div>
+                      <div><i style="background: #16c9a0"></i>Concluídas<b>10</b></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="overview-copy">
+              <p class="blue-label">VISÃO GERAL</p>
+              <h2>Tudo o que seu escritório precisa, em um só lugar</h2>
+              <p class="lead">
+                Acompanhe tarefas, prazos, clientes e processos em uma interface simples e
+                intuitiva, desenvolvida para a realidade dos escritórios contábeis.
+              </p>
+              <a class="textlink" href="#recursos"
+                >Conheça os recursos <svg><use href="#landing-arrow" /></svg
+              ></a>
+            </div>
+          </div>
+          <div class="cta">
+            <div>
+              <p class="blue-label">PARA ESCRITÓRIOS CONTÁBEIS</p>
+              <h2>Menos planilhas.<br />Mais tempo para o que importa.</h2>
+              <p class="lead">
+                Com a ContablyTask, você ganha organização, segurança e mais tempo para focar nos
+                seus clientes.
+              </p>
+              <RouterLink class="btn" to="/cadastro"
+                >Começar agora <svg><use href="#landing-arrow" /></svg
+              ></RouterLink>
+            </div>
+            <div class="checklist">
+              <div class="checkline">
+                <span class="round"
+                  ><svg><use href="#landing-check" /></svg></span
+                >Prazos sob controle
+              </div>
+              <div class="checkline">
+                <span class="round"
+                  ><svg><use href="#landing-check" /></svg></span
+                >Equipe mais produtiva
+              </div>
+              <div class="checkline">
+                <span class="round"
+                  ><svg><use href="#landing-check" /></svg></span
+                >Processos padronizados
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      <p class="wrap preview-note">Prévia ilustrativa do produto, com dados de exemplo.</p>
+      <section class="wrap trust" id="confianca">
+        <div>
+          <p class="blue-label">COMECE COM CLAREZA</p>
+          <h2>Organização para acompanhar o crescimento do seu escritório</h2>
+        </div>
+        <div class="metrics">
+          <div class="metric">
+            <svg><use href="#landing-users" /></svg><b>14 dias</b
+            ><span>Para testar o Profissional</span>
+          </div>
+          <div class="metric">
+            <svg><use href="#landing-circle-check" /></svg><b>Sem cartão</b
+            ><span>Para começar o teste</span>
+          </div>
+          <div class="metric">
+            <svg><use href="#landing-star" /></svg><b>Gratuito</b
+            ><span>Plano disponível após o teste</span>
           </div>
         </div>
       </section>
     </div>
+    <section class="ct-container grid gap-8 pb-20 lg:grid-cols-[0.8fr_1.2fr]">
+      <div>
+        <p class="ct-eyebrow">Antes de começar</p>
+        <h2 class="ct-section-title mt-4">Um teste sem surpresas.</h2>
+        <RouterLink to="/planos" class="mt-5 inline-block text-sm font-semibold text-blue-600"
+          >Comparar todos os planos →</RouterLink
+        >
+      </div>
+      <div>
+        <details
+          v-for="question in questions"
+          :key="question.title"
+          class="border-b border-slate-200 py-5"
+        >
+          <summary class="cursor-pointer text-sm font-semibold">{{ question.title }}</summary>
+          <p class="mt-3 text-sm leading-7 text-slate-500">{{ question.text }}</p>
+        </details>
+      </div>
+    </section>
   </PublicLayout>
 </template>
+<style scoped src="../assets/reference-landing.css"></style>

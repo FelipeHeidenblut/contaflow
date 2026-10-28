@@ -9,6 +9,7 @@ from document_service import (
     create_download_url,
     delete_document,
     list_documents,
+    list_document_folders,
     upload_document,
 )
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -50,6 +51,25 @@ def listar_documentos(
             category=categoria,
             page=page,
             page_size=page_size,
+        ),
+    )
+
+
+@router.get("/pastas", response_model=PaginatedResponse[schemas.DocumentFolderResponse])
+def listar_pastas_documentos(
+    search: str | None = Query(None, max_length=120),
+    client_id: UUID | None = Query(None),
+    categoria: str | None = Query(None, max_length=40),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return list_document_folders(
+        db, current_user,
+        DocumentListFilters(
+            search=search, client_id=client_id, category=categoria,
+            page=page, page_size=page_size,
         ),
     )
 

@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
 import { vMaska } from 'maska/vue'
 import { useAuthStore } from '../stores/auth'
-import { useRoute } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import ConfirmDialog from '../components/ConfirmDialog.vue'
 import EmptyState from '../components/EmptyState.vue'
 import CommentsPanel from '../components/CommentsPanel.vue'
 import PaginationControls from '../components/PaginationControls.vue'
 import { fetchAllPages, fetchPage } from '../services/pagination'
+import CollectionViewToggle from '../components/CollectionViewToggle.vue'
 
 interface Client {
   id: string
@@ -23,6 +24,8 @@ interface Client {
   natureza_operacao: string
   email: string | null
   responsible_profile_id: string | null
+  open_tasks_count?: number | null
+  overdue_tasks_count?: number | null
 }
 
 interface Member {
@@ -69,6 +72,15 @@ const isSubmitting = ref(false)
 const searchQuery = ref('')
 const filtroNatureza = ref('Todos')
 const filtroResponsavel = ref('Todos')
+const visualizacao = ref<'cards' | 'lista'>('cards')
+const getClientInitials = (client: Client) =>
+  (client.razao_social || client.nome || '?')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('')
+    .toUpperCase()
 
 const newClient = ref({
   tipo_pessoa: 'PJ',
@@ -121,7 +133,10 @@ const abrirDossier = async (client: Client) => {
 
   try {
     const [tasks, documents] = await Promise.all([
-      fetchAllPages<ClientTask>('/api/v1/obrigacoes'),
+      fetchAllPages<ClientTask>('/api/v1/obrigacoes', {
+        client_id: client.id,
+        include_archived: true,
+      }),
       fetchAllPages<ClientDocument>('/api/v1/documentos'),
     ])
 
@@ -185,10 +200,10 @@ const baixarDocDossier = async (docId: string, nomeArquivo: string) => {
 }
 
 const clientsFiltrados = computed(() => clients.value)
-const totalPJ = computed(() => clientSummary.value.pj)
-const totalPF = computed(() => clientSummary.value.pf)
 const getResponsibleName = (profileId: string | null) =>
-  members.value.find((member) => member.id === profileId)?.name || 'Sem responsável'
+  profileId
+    ? members.value.find((member) => member.id === profileId)?.name || 'Responsável indisponível'
+    : 'Sem responsável'
 const setTipoPessoa = (tipo: string) => {
   newClient.value.tipo_pessoa = tipo
   if (tipo === 'PJ') {
@@ -205,6 +220,7 @@ const fetchClients = async () => {
   isLoading.value = true
   try {
     const clientPage = await fetchPage<Client>('/api/v1/clientes', currentPage.value, pageSize, {
+      include_workload: true,
       search: searchQuery.value.trim() || undefined,
       natureza: filtroNatureza.value === 'Todos' ? undefined : filtroNatureza.value,
       responsible_profile_id:
@@ -410,6 +426,10 @@ const baixarTemplate = () => {
   document.body.removeChild(link)
 }
 
+onUnmounted(() => {
+  if (filterTimer) clearTimeout(filterTimer)
+})
+
 onMounted(() => {
   fetchClients()
   fetchMembers()
@@ -419,15 +439,15 @@ onMounted(() => {
 
 <template>
   <Layout title="Gerenciar Clientes">
-    <div class="ct-workspace relative space-y-4">
+    <div class="ct-directory-workspace ct-workspace relative space-y-4">
       <!-- topo -->
       <div
         class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
       >
         <div>
-          <h2 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
+          <h1 class="ct-page-title text-2xl font-semibold tracking-tight text-[var(--ct-ink)]">
             Carteira de clientes
-          </h2>
+          </h1>
           <p class="ct-page-description mt-1 text-sm text-[var(--ct-text-muted)]">
             Consulte a carteira e acesse rapidamente o histórico de cada cliente.
           </p>
@@ -463,40 +483,6 @@ onMounted(() => {
             </svg>
             <span>Novo cliente</span>
           </button>
-        </div>
-      </div>
-
-      <!-- resumo compacto -->
-      <div
-        class="ct-summary-grid flex flex-wrap items-center gap-x-8 gap-y-3 border-b border-[var(--ct-border)] pb-4"
-      >
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Clientes ativos</p>
-          <p
-            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ clients.length }}
-          </p>
-        </div>
-
-        <span class="hidden h-4 w-px bg-[var(--ct-border)] sm:block"></span>
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pessoa jurídica</p>
-          <p
-            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalPJ }}
-          </p>
-        </div>
-
-        <span class="hidden h-4 w-px bg-[var(--ct-border)] sm:block"></span>
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pessoa física</p>
-          <p
-            class="text-lg font-semibold tracking-tight text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]"
-          >
-            {{ totalPF }}
-          </p>
         </div>
       </div>
 
@@ -553,13 +539,20 @@ onMounted(() => {
             </select>
           </div>
 
-          <div class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</div>
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="text-xs text-slate-500">{{ totalResults }} resultado(s)</span
+            ><CollectionViewToggle v-model="visualizacao" />
+          </div>
         </div>
       </div>
 
       <!-- tabela -->
       <div
-        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+        :class="
+          visualizacao === 'lista' || isLoading || !clientsFiltrados.length
+            ? 'ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white'
+            : ''
+        "
       >
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-12 animate-pulse rounded-xl bg-slate-100"></div>
@@ -585,6 +578,83 @@ onMounted(() => {
           <p class="mt-1 text-sm text-[var(--ct-text-muted)]">
             Tente ajustar a busca ou remover filtros.
           </p>
+        </div>
+
+        <div
+          v-else-if="visualizacao === 'cards'"
+          class="ct-directory-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          aria-label="Carteira de clientes"
+        >
+          <article
+            v-for="client in clientsFiltrados"
+            :key="client.id"
+            class="ct-directory-card flex min-w-0 flex-col rounded-xl border border-[#e7edf5] bg-white p-5"
+            :aria-label="client.razao_social || client.nome || 'Cliente'"
+          >
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-500"
+                aria-hidden="true"
+                >{{ getClientInitials(client) }}</span
+              >
+              <button
+                v-if="canManageClients"
+                type="button"
+                :aria-label="`Arquivar ${client.razao_social || client.nome}`"
+                title="Arquivar cliente"
+                class="rounded px-2 py-1 text-lg leading-none text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+                @click="
+                  clientToArchive = {
+                    id: client.id,
+                    name: client.razao_social || client.nome || 'este cliente',
+                  }
+                "
+              >
+                ⋮
+              </button>
+            </div>
+            <button
+              type="button"
+              @click="abrirDossier(client)"
+              class="text-left text-sm font-semibold leading-6 text-slate-900 hover:text-blue-600"
+            >
+              {{ client.razao_social || client.nome }}
+            </button>
+            <p class="mt-2 text-xs leading-6 text-slate-500">
+              {{ client.tipo_pessoa === 'PF' ? 'CPF' : 'CNPJ' }}:
+              {{ formatDocumento(client) || 'Não informado' }}
+            </p>
+            <p class="text-xs leading-6 text-slate-500">
+              {{ client.regime_tributario }} · {{ client.natureza_operacao }}
+            </p>
+            <p class="mb-5 mt-1 text-xs leading-6 text-slate-500">
+              Responsável: {{ getResponsibleName(client.responsible_profile_id) }}
+            </p>
+            <div
+              class="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1f7] pt-4"
+            >
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span v-if="client.open_tasks_count != null"
+                  >{{ client.open_tasks_count }}
+                  {{ client.open_tasks_count === 1 ? 'tarefa aberta' : 'tarefas abertas' }}</span
+                >
+                <span v-else title="Atualize a página para tentar novamente"
+                  >Tarefas indisponíveis</span
+                >
+                <span
+                  v-if="client.overdue_tasks_count"
+                  class="rounded-full bg-rose-50 px-2 py-1 text-[10px] text-rose-500"
+                  >{{ client.overdue_tasks_count }} em atraso</span
+                >
+              </div>
+              <RouterLink
+                :to="{ path: '/obrigacoes', query: { cliente: client.id } }"
+                class="text-xs font-medium text-blue-500 hover:underline"
+                :aria-label="`Ver tarefas de ${client.razao_social || client.nome}`"
+                >Ver tarefas →</RouterLink
+              >
+            </div>
+          </article>
         </div>
 
         <div v-else class="overflow-x-auto">
@@ -742,6 +812,9 @@ onMounted(() => {
           </table>
         </div>
         <PaginationControls
+          :class="
+            visualizacao === 'cards' ? 'mt-4 rounded-xl border border-[#e7edf5] bg-white' : ''
+          "
           :page="currentPage"
           :pages="totalPages"
           :total="totalResults"

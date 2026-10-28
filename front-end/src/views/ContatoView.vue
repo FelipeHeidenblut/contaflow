@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import VueTurnstile from 'vue-turnstile'
 import PublicLayout from '@/components/PublicLayout.vue'
-import { useScrollReveal } from '@/composables/useScrollReveal'
+import PublicPageHero from '@/components/PublicPageHero.vue'
 import { appConfig } from '@/config/env'
-
-const page = ref<HTMLElement | null>(null)
-useScrollReveal(page)
 
 const route = useRoute()
 const allowedSubjects = [
@@ -33,6 +30,15 @@ const successMessage = ref('')
 const errorMessage = ref('')
 const turnstileSiteKey = appConfig.turnstileSiteKey
 const apiBaseUrl = appConfig.apiBaseUrl
+
+const captchaMedia = window.matchMedia('(max-width: 380px)')
+const compactCaptcha = ref(captchaMedia.matches)
+const updateCaptchaLayout = () => {
+  compactCaptcha.value = captchaMedia.matches
+  captchaToken.value = ''
+}
+onMounted(() => captchaMedia.addEventListener('change', updateCaptchaLayout))
+onUnmounted(() => captchaMedia.removeEventListener('change', updateCaptchaLayout))
 
 const getResponseError = (detail: unknown) => {
   if (typeof detail === 'string') return detail
@@ -85,248 +91,172 @@ const enviarFormulario = async () => {
   }
 }
 </script>
-
 <template>
   <PublicLayout>
-    <div ref="page" class="ct-modern-landing overflow-hidden">
-      <section class="relative border-b border-slate-200 bg-white">
-        <div class="ct-engineering-grid pointer-events-none absolute inset-0 opacity-60"></div>
-        <div
-          class="ct-container relative grid items-center gap-14 py-16 lg:grid-cols-[0.85fr_1.15fr] lg:py-24"
-        >
-          <div data-reveal>
-            <p class="ct-technical-label">Contato · conversa direta</p>
-            <h1 class="ct-modern-display mt-6">
-              Converse com quem entende
-              <span class="ct-gradient-text">a rotina do escritório.</span>
-            </h1>
-            <p class="mt-6 max-w-xl text-[17px] leading-7 text-slate-600">
-              Tire dúvidas sobre planos, implantação ou uso da plataforma. Explique o contexto e
-              nossa equipe responde sem roteiro genérico.
-            </p>
-            <div
-              class="mt-8 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-            >
-              <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 ring-4 ring-emerald-50"></span>
-              <div>
-                <p class="text-xs font-semibold text-[#26344f]">Atendimento em horário comercial</p>
-                <p class="mt-1 font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                  segunda a sexta · normalmente em até 1 dia útil
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div data-reveal style="--reveal-delay: 120ms" class="grid gap-3 sm:grid-cols-2">
-            <a
-              href="mailto:contato@contablytask.com.br"
-              class="ct-capability-card group flex min-h-[190px] flex-col"
-              ><span
-                class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"
-                ><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="M4 6h16v12H4V6Zm0 1 8 6 8-6"
-                  /></svg
+    <div class="ct-clarity-page">
+      <PublicPageHero
+        eyebrow="Fale com a gente"
+        title="Vamos conversar sobre o seu escritório?"
+        description="Tire dúvidas sobre planos, conheça a plataforma ou conte como podemos ajudar na organização da sua rotina."
+        align-start
+      >
+        <template #actions>
+          <div class="w-full max-w-md space-y-3">
+            <a href="mailto:contato@contablytask.com.br" class="ct-public-contact-channel"
+              ><span class="ct-public-icon"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M4 6h16v12H4V6Zm0 1 8 6 8-6" /></svg
               ></span>
-              <p class="mt-6 font-mono text-[9px] uppercase tracking-wider text-blue-600">
-                Comercial
-              </p>
-              <p class="mt-2 text-sm font-semibold text-[#101a38]">contato@contablytask.com.br</p>
-              <span class="mt-auto pt-4 text-xs text-slate-400 group-hover:text-blue-600"
-                >Planos e plataforma →</span
-              ></a
+              <div class="min-w-0">
+                <p class="text-sm font-semibold">Planos e plataforma</p>
+                <p class="mt-1 text-xs text-slate-500">contato@contablytask.com.br</p>
+              </div></a
             >
-            <a
-              href="mailto:suporte@contablytask.com.br"
-              class="ct-capability-card group flex min-h-[190px] flex-col"
-              ><span
-                class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600"
-                ><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.8"
-                    d="M4 13a8 8 0 0 1 16 0v5h-4v-5h4M4 13v5h4v-5H4Zm4 7h5"
-                  /></svg
+            <a href="mailto:suporte@contablytask.com.br" class="ct-public-contact-channel"
+              ><span class="ct-public-icon"
+                ><svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
+                  <path d="M4 13a8 8 0 0 1 16 0v5h-4v-5h4M4 13v5h4v-5H4Zm4 7h5" /></svg
               ></span>
-              <p class="mt-6 font-mono text-[9px] uppercase tracking-wider text-blue-600">
-                Suporte
-              </p>
-              <p class="mt-2 text-sm font-semibold text-[#101a38]">suporte@contablytask.com.br</p>
-              <span class="mt-auto pt-4 text-xs text-slate-400 group-hover:text-blue-600"
-                >Ajuda com sua conta →</span
-              ></a
+              <div class="min-w-0">
+                <p class="text-sm font-semibold">Ajuda com sua conta</p>
+                <p class="mt-1 text-xs text-slate-500">suporte@contablytask.com.br</p>
+              </div></a
             >
-            <div
-              class="rounded-2xl border border-blue-950 bg-[var(--ct-navy)] p-6 text-white sm:col-span-2"
-            >
-              <div class="flex items-center justify-between">
-                <p class="font-mono text-[9px] uppercase tracking-wider text-blue-300">
-                  Como respondemos
-                </p>
-                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-              </div>
-              <div class="mt-6 grid gap-5 sm:grid-cols-3">
-                <div>
-                  <p class="text-lg font-semibold">Contexto primeiro</p>
-                  <p class="mt-2 text-xs leading-5 text-white/45">
-                    Entendemos a necessidade antes de indicar um plano.
-                  </p>
-                </div>
-                <div>
-                  <p class="text-lg font-semibold">Resposta objetiva</p>
-                  <p class="mt-2 text-xs leading-5 text-white/45">
-                    Sem esconder limitações ou próximos passos.
-                  </p>
-                </div>
-                <div>
-                  <p class="text-lg font-semibold">Canal humano</p>
-                  <p class="mt-2 text-xs leading-5 text-white/45">
-                    Sua mensagem chega à equipe responsável.
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
-        </div>
-      </section>
-
-      <section class="bg-[#f8fafc] py-20 lg:py-28">
-        <div class="ct-container grid gap-12 lg:grid-cols-[0.62fr_1.38fr]">
-          <div data-reveal class="lg:sticky lg:top-28 lg:self-start">
-            <p class="ct-technical-label">Envie sua mensagem</p>
-            <h2 class="ct-modern-section-title mt-5">Conte onde a operação precisa avançar.</h2>
-            <p class="mt-5 max-w-sm text-sm leading-7 text-slate-600">
-              Quanto mais contexto você enviar, mais direta pode ser a nossa resposta.
-            </p>
-            <div class="mt-8 space-y-4 border-t border-slate-200 pt-6">
-              <div class="flex gap-3">
-                <span class="font-mono text-[10px] text-blue-600">01</span>
-                <p class="text-sm text-slate-600">Identifique o escritório e o assunto.</p>
-              </div>
-              <div class="flex gap-3">
-                <span class="font-mono text-[10px] text-blue-600">02</span>
-                <p class="text-sm text-slate-600">Explique a dúvida ou cenário.</p>
-              </div>
-              <div class="flex gap-3">
-                <span class="font-mono text-[10px] text-blue-600">03</span>
-                <p class="text-sm text-slate-600">Receba a orientação pelo e-mail informado.</p>
-              </div>
-            </div>
-          </div>
-
-          <form
-            data-reveal
-            class="rounded-2xl border border-slate-200 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,0.06)] sm:p-8"
-            @submit.prevent="enviarFormulario"
+        </template>
+        <template #note>Sua mensagem será respondida pelo e-mail informado.</template>
+        <form class="ct-public-form" @submit.prevent="enviarFormulario">
+          <h2 class="text-2xl font-semibold tracking-tight">Como podemos ajudar?</h2>
+          <p class="mb-6 mt-2 text-sm leading-6 text-slate-500">
+            Preencha os dados e conte um pouco sobre o que você precisa.
+          </p>
+          <div
+            v-if="successMessage"
+            role="status"
+            class="mb-5 rounded-lg border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
           >
-            <div class="mb-7 flex items-center justify-between border-b border-slate-100 pb-5">
-              <div>
-                <p class="text-sm font-semibold text-[#101a38]">Formulário de contato</p>
-                <p class="mt-1 font-mono text-[9px] uppercase tracking-wider text-slate-400">
-                  campos seguros · resposta por e-mail
-                </p>
-              </div>
-              <span
-                class="rounded-full bg-blue-50 px-2.5 py-1 text-[9px] font-semibold text-blue-700"
-                >Contato</span
-              >
-            </div>
-            <div
-              v-if="successMessage"
-              role="status"
-              class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800"
-            >
-              {{ successMessage }}
-            </div>
-            <div
-              v-if="errorMessage"
-              role="alert"
-              class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
-              {{ errorMessage }}
-            </div>
-            <div class="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label for="contact-name" class="ct-label">Nome</label
-                ><input
-                  id="contact-name"
-                  v-model="nome"
-                  class="ct-field"
-                  required
-                  minlength="2"
-                  maxlength="120"
-                  autocomplete="name"
-                />
-              </div>
-              <div>
-                <label for="contact-email" class="ct-label">E-mail</label
-                ><input
-                  id="contact-email"
-                  v-model="email"
-                  class="ct-field"
-                  required
-                  type="email"
-                  autocomplete="email"
-                />
-              </div>
-              <div>
-                <label for="contact-company" class="ct-label">Escritório</label
-                ><input
-                  id="contact-company"
-                  v-model="empresa"
-                  class="ct-field"
-                  maxlength="150"
-                  autocomplete="organization"
-                />
-              </div>
-              <div>
-                <label for="contact-subject" class="ct-label">Assunto</label
-                ><select id="contact-subject" v-model="assunto" class="ct-field" required>
-                  <option value="" disabled>Selecione</option>
-                  <option v-for="option in allowedSubjects" :key="option">{{ option }}</option>
-                </select>
-              </div>
-            </div>
-            <div class="mt-5">
-              <label for="contact-message" class="ct-label">Como podemos ajudar?</label
-              ><textarea
-                id="contact-message"
-                v-model="mensagem"
-                class="ct-field min-h-36 resize-y"
+            {{ successMessage }}
+          </div>
+          <div
+            v-if="errorMessage"
+            role="alert"
+            class="mb-5 rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600"
+          >
+            {{ errorMessage }}
+          </div>
+          <div class="grid gap-5 sm:grid-cols-2">
+            <div>
+              <label for="contact-name" class="ct-label">Nome</label
+              ><input
+                id="contact-name"
+                v-model="nome"
+                class="ct-field"
                 required
-                minlength="10"
-                maxlength="4000"
-              ></textarea>
-              <p class="ct-help text-right">{{ mensagem.length }}/4000</p>
-            </div>
-            <div
-              class="mt-5 flex justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 py-3"
-            >
-              <VueTurnstile
-                v-model="captchaToken"
-                :site-key="turnstileSiteKey || '0x4AAAAAADe4izf5gmW3H2aL'"
-                theme="light"
+                minlength="2"
+                maxlength="120"
+                autocomplete="name"
               />
             </div>
-            <div
-              class="mt-6 flex flex-col-reverse items-start justify-between gap-4 border-t border-slate-100 pt-6 sm:flex-row sm:items-center"
-            >
-              <p class="max-w-xs text-xs leading-5 text-slate-500">
-                Seus dados serão usados somente para responder a esta solicitação.
-              </p>
-              <button
-                class="ct-button-primary ct-landing-primary w-full disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                type="submit"
-                :disabled="isSending || !captchaToken"
-              >
-                {{ isSending ? 'Enviando…' : 'Enviar mensagem' }} <span>→</span>
-              </button>
+            <div>
+              <label for="contact-email" class="ct-label">E-mail</label
+              ><input
+                id="contact-email"
+                v-model="email"
+                class="ct-field"
+                required
+                type="email"
+                autocomplete="email"
+              />
             </div>
-          </form>
+            <div>
+              <label for="contact-company" class="ct-label">Escritório</label
+              ><input
+                id="contact-company"
+                v-model="empresa"
+                class="ct-field"
+                maxlength="150"
+                autocomplete="organization"
+              />
+            </div>
+            <div>
+              <label for="contact-subject" class="ct-label">Assunto</label
+              ><select id="contact-subject" v-model="assunto" class="ct-field" required>
+                <option value="" disabled>Selecione</option>
+                <option v-for="option in allowedSubjects" :key="option">{{ option }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="mt-5">
+            <label for="contact-message" class="ct-label">Mensagem</label
+            ><textarea
+              id="contact-message"
+              v-model="mensagem"
+              class="ct-field min-h-36 resize-y"
+              required
+              minlength="10"
+              maxlength="4000"
+            ></textarea>
+            <p class="ct-help text-right">{{ mensagem.length }}/4000</p>
+          </div>
+          <div
+            class="mt-5 flex min-w-0 justify-center overflow-hidden rounded-lg border border-slate-100 bg-[#f8fbff] py-3"
+          >
+            <VueTurnstile
+              :key="compactCaptcha ? 'compact' : 'normal'"
+              :size="compactCaptcha ? 'compact' : 'normal'"
+              v-model="captchaToken"
+              :site-key="turnstileSiteKey || '0x4AAAAAADe4izf5gmW3H2aL'"
+              theme="light"
+            />
+          </div>
+          <button
+            class="ct-button-primary mt-5 w-full disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            :disabled="isSending || !captchaToken"
+          >
+            {{ isSending ? 'Enviando…' : 'Enviar mensagem' }} <span aria-hidden="true">→</span>
+          </button>
+          <p class="mt-4 text-xs leading-6 text-slate-500">
+            Seus dados serão usados para responder a esta solicitação. Consulte nossa
+            <RouterLink to="/privacidade" class="text-blue-600 underline"
+              >Política de Privacidade</RouterLink
+            >.
+          </p>
+        </form>
+      </PublicPageHero>
+      <section class="ct-public-section">
+        <div class="ct-container grid gap-5 md:grid-cols-2">
+          <div class="ct-public-card">
+            <h3>Quer conhecer a plataforma?</h3>
+            <p class="mt-3">
+              Veja como clientes, tarefas, prazos e documentos se conectam na rotina do escritório.
+            </p>
+            <RouterLink to="/como-funciona" class="ct-public-link mt-5"
+              >Veja como funciona <span aria-hidden="true">→</span></RouterLink
+            >
+          </div>
+          <div class="ct-public-card">
+            <h3>Está escolhendo um plano?</h3>
+            <p class="mt-3">
+              Compare os limites de clientes e equipe e encontre a capacidade certa para sua
+              operação.
+            </p>
+            <RouterLink to="/planos" class="ct-public-link mt-5"
+              >Conheça os planos <span aria-hidden="true">→</span></RouterLink
+            >
+          </div>
         </div>
       </section>
     </div>

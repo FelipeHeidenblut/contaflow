@@ -48,6 +48,8 @@ class ClientResponse(ClientBase):
     id: UUID
     tenant_id: UUID
     ativo: bool
+    open_tasks_count: int | None = Field(default=None, ge=0)
+    overdue_tasks_count: int | None = Field(default=None, ge=0)
 
 
 # ================== TAREFAS ==================
@@ -82,6 +84,7 @@ class TaskStatusUpdate(BaseModel):
 
 
 class TaskResponse(TaskBase):
+    archived_at: datetime | None = None
     id: UUID
     tenant_id: UUID
     created_at: datetime
@@ -108,6 +111,15 @@ class DocumentResponse(DocumentBase):
     tenant_id: UUID
     uploaded_by: Optional[UUID] = None
     created_at: datetime
+
+
+class DocumentFolderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    client_id: UUID
+    client_name: str
+    client_active: bool
+    document_count: int = Field(ge=0)
+    last_uploaded_at: datetime | None = None
 
 
 # ================== DASHBOARD ==================

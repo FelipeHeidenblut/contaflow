@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from datetime import date
+from datetime import datetime, timezone
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import models
 import schemas
@@ -34,6 +35,9 @@ class TaskListFilters:
     task_status: TaskStatus | None = None
     page: int = 1
     page_size: int = 20
+    overdue: bool = False
+    archived: bool = False
+    include_archived: bool = False
 
 
 def list_tasks(
@@ -42,10 +46,15 @@ def list_tasks(
     filters: TaskListFilters,
 ) -> dict:
     require_permission(current_user, Permission.TASK_READ)
+    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
     base_query = apply_task_scope(
         tenant_repository(db, current_user).query(models.Task),
         current_user,
     )
+    if filters.archived:
+        base_query = base_query.filter(models.Task.archived_at.is_not(None))
+    elif not filters.include_archived:
+        base_query = base_query.filter(models.Task.archived_at.is_(None))
     total, completed, pending, waiting, overdue = base_query.with_entities(
         func.count(models.Task.id),
         func.count(models.Task.id).filter(
@@ -58,7 +67,7 @@ def list_tasks(
             models.Task.status == TaskStatus.AGUARDANDO_CLIENTE.value
         ),
         func.count(models.Task.id).filter(
-            models.Task.due_date < date.today(),
+            models.Task.due_date < today,
             models.Task.status != TaskStatus.CONCLUIDA.value,
         ),
     ).one()
@@ -78,6 +87,12 @@ def list_tasks(
         query = query.filter(models.Task.assigned_to == filters.assigned_to)
     if filters.task_status:
         query = query.filter(models.Task.status == filters.task_status.value)
+
+    if filters.overdue:
+        query = query.filter(
+            models.Task.due_date < today,
+            models.Task.status != TaskStatus.CONCLUIDA.value,
+        )
 
     priority_order = case(
         (models.Task.grau_importancia == "Urgente", 4),
@@ -179,11 +194,45 @@ def change_task_status(
 ) -> models.Task:
     require_permission(current_user, Permission.TASK_WRITE)
     task = get_accessible_task(db, task_id, current_user, for_update=True)
+    _require_unarchived(task)
     task.status = task_status.value
     if task_status == TaskStatus.CONCLUIDA:
         ensure_next_occurrence(db, task)
     db.commit()
     db.refresh(task)
+    return task
+
+
+def _require_unarchived(task: models.Task) -> None:
+    if getattr(task, "archived_at", None) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Restaure a tarefa arquivada antes de editar ou alterar seu status.",
+        )
+
+
+def archive_task(db: Session, current_user: dict, task_id: UUID) -> models.Task:
+    require_permission(current_user, Permission.TASK_WRITE)
+    task = get_accessible_task(db, task_id, current_user, for_update=True)
+    if task.status != TaskStatus.CONCLUIDA.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Somente tarefas concluídas podem ser arquivadas.",
+        )
+    if getattr(task, "archived_at", None) is None:
+        task.archived_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(task)
+    return task
+
+
+def restore_task(db: Session, current_user: dict, task_id: UUID) -> models.Task:
+    require_permission(current_user, Permission.TASK_WRITE)
+    task = get_accessible_task(db, task_id, current_user, for_update=True)
+    if getattr(task, "archived_at", None) is not None:
+        task.archived_at = None
+        db.commit()
+        db.refresh(task)
     return task
 
 
@@ -202,6 +251,7 @@ def update_task(
 ) -> models.Task:
     require_permission(current_user, Permission.TASK_WRITE)
     task = get_accessible_task(db, task_id, current_user, for_update=True)
+    _require_unarchived(task)
     _validate_task_relationships(db, current_user, task_input)
 
     task.title = task_input.title

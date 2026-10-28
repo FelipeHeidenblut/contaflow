@@ -169,17 +169,6 @@ const mobileAgenda = computed(() =>
     .sort((a, b) => (a.due_date || a.date || '').localeCompare(b.due_date || b.date || '')),
 )
 
-const totalPrazos = computed(() => tasks.value.length)
-const totalFederais = computed(
-  () => tasks.value.filter((task) => task.type === 'receita_federal').length,
-)
-const totalPendentes = computed(
-  () => tasks.value.filter((task) => task.status === 'pendente').length,
-)
-const totalEmAndamento = computed(
-  () => tasks.value.filter((task) => task.status === 'em_andamento').length,
-)
-
 const prevMonth = () => {
   currentDate.value = new Date(currentDate.value.getFullYear(), currentDate.value.getMonth() - 1, 1)
 }
@@ -300,39 +289,6 @@ onMounted(() => {
           </p>
         </div>
       </header>
-
-      <!-- indicadores -->
-      <section
-        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
-      >
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de prazos</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalPrazos }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Prazos federais</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalFederais }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Pendentes</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalPendentes }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Em andamento</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalEmAndamento }}
-          </p>
-        </div>
-      </section>
 
       <!-- preferências individuais de alerta -->
       <section

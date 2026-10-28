@@ -8,12 +8,12 @@ import PublicLayout from '@/components/PublicLayout.vue'
       <article
         class="mx-auto w-[min(100%-2rem,48rem)] overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
       >
-        <header class="bg-[var(--ct-navy)] px-7 py-9 text-white sm:px-11">
+        <header class="bg-[#edf5ff] px-7 py-9 text-slate-800 sm:px-11">
           <p class="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ct-accent)]">
             Transparência e dados pessoais
           </p>
           <h1 class="mt-3 text-3xl font-semibold tracking-tight">Política de Privacidade</h1>
-          <p class="mt-3 text-sm text-white/70">
+          <p class="mt-3 text-sm text-slate-600">
             Última atualização: agosto de 2026 · Práticas orientadas pela LGPD
           </p>
         </header>

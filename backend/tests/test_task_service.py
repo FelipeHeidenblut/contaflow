@@ -248,6 +248,9 @@ def test_delete_task_removes_authorized_task(monkeypatch):
 
 def test_list_tasks_returns_paginated_summary_from_authorized_scope(monkeypatch):
     class TaskQuery:
+        def filter(self, *_values):
+            return self
+
         def with_entities(self, *_values):
             return self
 
@@ -283,3 +286,60 @@ def test_list_tasks_returns_paginated_summary_from_authorized_scope(monkeypatch)
         "aguardando": 2,
         "atrasadas": 1,
     }
+
+
+def test_overdue_filter_combines_scope_search_status_and_pagination():
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+    from sqlalchemy import Column, MetaData, Table, create_engine
+    from sqlalchemy.orm import Session
+    import models
+
+    engine = create_engine("sqlite:///:memory:")
+    # Exercise the real query against an isolated table without PostgreSQL-only constraints.
+    Table("tasks", MetaData(), *(
+        Column(column.name, column.type, primary_key=column.primary_key)
+        for column in models.Task.__table__.columns
+    )).create(engine)
+    user = make_user()
+    tenant_id = UUID(user["tenant_id"])
+    client_id, assigned_to = uuid4(), uuid4()
+    today = datetime.now(ZoneInfo("America/Sao_Paulo")).date()
+
+    def task(**overrides):
+        values = dict(
+            id=uuid4(), tenant_id=tenant_id, client_id=client_id,
+            assigned_to=assigned_to, title="Fechamento mensal",
+            due_date=today - timedelta(days=1), status="pendente",
+        )
+        values.update(overrides)
+        return models.Task(**values)
+
+    with Session(engine) as database:
+        matches = [task() for _ in range(3)]
+        database.add_all(matches + [
+            task(due_date=today),
+            task(due_date=today + timedelta(days=1)),
+            task(status="concluida"),
+            task(status="em_andamento"),
+            task(client_id=uuid4()),
+            task(assigned_to=uuid4()),
+            task(title="Outra obrigação"),
+            task(tenant_id=uuid4()),
+        ])
+        database.commit()
+        result = task_service.list_tasks(database, user, task_service.TaskListFilters(
+            overdue=True, client_id=client_id, assigned_to=assigned_to,
+            task_status=TaskStatus.PENDENTE, search="Fechamento",
+            page=2, page_size=2,
+        ))
+        assert result["total"] == 3
+        assert result["pages"] == 2
+        assert len(result["items"]) == 1
+        assert result["items"][0].id in {item.id for item in matches}
+        assert result["summary"]["total"] == 10
+
+        result = task_service.list_tasks(database, user, task_service.TaskListFilters(overdue=True))
+        assert result["total"] == 7
+        assert all(item.status != "concluida" and item.due_date < today for item in result["items"])
+    engine.dispose()

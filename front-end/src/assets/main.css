@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import './public-pages.css';
 
 :root {
   --ct-bg: #f8fafc;
@@ -507,4 +508,458 @@ a {
     min-height: 5rem;
     padding: 0.875rem;
   }
+}
+
+/* Clarity: shared visual language for the public website and the workspace. */
+:root {
+  --ct-bg: #f5f7fc;
+  --ct-primary: #1683ff;
+  --ct-primary-hover: #0869d8;
+  --ct-primary-soft: #e7f1ff;
+  --ct-ink: #151e35;
+  --ct-border: #e7edf5;
+  --ct-text-muted: #5e708f;
+}
+.ct-clarity-hero {
+  background: linear-gradient(120deg, #fff 25%, #f4f8ff);
+}
+.ct-public-page {
+  background: white;
+}
+.ct-public-page .ct-engineering-grid,
+.ct-public-page .ct-engineering-grid-dark {
+  display: none;
+}
+.ct-public-page .ct-modern-display {
+  max-width: 18ch;
+  font-size: clamp(2.3rem, 4.4vw, 3.8rem);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+}
+.ct-public-page .ct-modern-section-title {
+  max-width: 24ch;
+  font-size: clamp(1.9rem, 3vw, 2.6rem);
+  line-height: 1.16;
+  letter-spacing: -0.035em;
+}
+.ct-public-page .ct-technical-label {
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  font-family: inherit;
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+}
+.ct-public-page .ct-gradient-text {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ct-ink);
+}
+.ct-public-page .ct-capability-card {
+  border-radius: 1rem;
+  box-shadow: none;
+}
+.ct-public-page :is(.ct-button-primary, .ct-button-secondary) {
+  border-radius: 0.625rem;
+}
+.ct-app-shell .ct-summary-grid > div::after {
+  display: none;
+}
+.ct-app-shell :is(.ct-data-panel, .ct-filter-panel, .ct-information-panel) {
+  border-radius: 0.875rem;
+  box-shadow: none;
+}
+.ct-app-shell .ct-page-title {
+  font-size: clamp(1.5rem, 2vw, 1.9rem);
+}
+.ct-app-shell .ct-summary-grid > div {
+  border-radius: 0.875rem;
+  background: white;
+  box-shadow: none;
+}
+.ct-dashboard-card {
+  border: 1px solid #e7edf5;
+  border-radius: 0.875rem;
+  background: white;
+}
+.ct-public-page .ct-button-primary {
+  color: white;
+}
+
+/* Dimensões e paleta da referência, compartilhadas pelas páginas do produto. */
+.ct-public-page,
+.ct-app-shell {
+  font-family: Arial, Helvetica, sans-serif;
+  --ct-primary: #087cff;
+  --ct-primary-hover: #0068dc;
+  --ct-accent-ink: #087cff;
+  --ct-ink: #0d1427;
+  --ct-text-muted: #5f6e88;
+  --ct-border: #e5ecf7;
+}
+.ct-public-page .ct-container {
+  width: 100%;
+  max-width: 1180px;
+  padding-inline: 28px;
+}
+.ct-public-page .ct-section-title {
+  font-size: clamp(1.9rem, 3vw, 2.25rem);
+  letter-spacing: -0.035em;
+}
+.ct-public-page :is(.ct-button-primary, .ct-button-secondary) {
+  border-radius: 7px;
+}
+.ct-reference-dashboard .ct-dashboard-card {
+  border-color: #edf0f5;
+  box-shadow: 0 2px 4px #182f4f01;
+  min-width: 0;
+}
+.ct-reference-dashboard :is(button, a).ct-dashboard-card:hover {
+  border-color: #cee1ff;
+  box-shadow: 0 5px 20px #123f6b07;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] svg {
+  width: 27px;
+  height: 27px;
+}
+.ct-reference-dashboard td {
+  height: 51px;
+}
+.ct-reference-dashboard aside a > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (min-width: 1400px) {
+  .ct-public-page .ct-container {
+    max-width: 1280px;
+  }
+}
+@media (max-width: 760px) {
+  .ct-public-page .ct-container {
+    padding-inline: 22px;
+  }
+}
+
+/* Tela inicial: proporções constantes do modelo visual, inclusive sem tarefas. */
+.ct-reference-dashboard > header h1 {
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+.ct-reference-dashboard > header > div > p {
+  font-size: 14px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.ct-reference-dashboard .ct-dashboard-date {
+  font-size: 11px;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] > .ct-dashboard-card {
+  min-height: 116px;
+  padding: 18px 16px;
+  gap: 16px;
+  align-items: flex-start;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] > .ct-dashboard-card > span:first-child {
+  width: 52px;
+  height: 52px;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] svg {
+  width: 24px;
+  height: 24px;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] strong {
+  font-size: 26px;
+  line-height: 1.2;
+  display: block;
+  margin-top: 4px;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] p {
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 6px;
+}
+.ct-reference-dashboard [aria-label='Indicadores'] > .ct-dashboard-card > span:last-child {
+  align-self: center;
+}
+.ct-dashboard-workspace h2 {
+  font-size: 16px;
+  line-height: 1.4;
+  letter-spacing: -0.3px;
+}
+.ct-dashboard-workspace h2 + a,
+.ct-dashboard-workspace h2 ~ a {
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ct-dashboard-workspace .ct-dashboard-card {
+  border-radius: 13px;
+}
+.ct-dashboard-tasks {
+  min-height: 340px;
+}
+.ct-dashboard-tasks > div:first-child {
+  padding: 17px 16px;
+}
+.ct-dashboard-tasks > div:nth-child(2) {
+  padding: 0 16px 16px;
+}
+.ct-dashboard-tasks table {
+  font-size: 11px;
+}
+.ct-dashboard-tasks th {
+  height: 35px;
+  font-size: 10px;
+  padding: 0 8px;
+}
+.ct-reference-dashboard .ct-dashboard-tasks td {
+  height: 46px;
+  padding: 8px;
+}
+.ct-dashboard-tasks td .rounded-full {
+  font-size: 9px;
+  padding: 4px 6px;
+}
+.ct-reference-dashboard .ct-dashboard-tasks .ct-dashboard-empty-cell {
+  padding: 0;
+}
+.ct-dashboard-insights > .ct-dashboard-card {
+  min-height: 262px;
+  padding: 16px;
+}
+.ct-dashboard-status > div {
+  margin-top: 23px;
+  gap: 20px;
+}
+.ct-dashboard-status [role='img'] {
+  width: 164px;
+  height: 164px;
+}
+.ct-dashboard-status [role='img'] > div {
+  width: 114px;
+  height: 114px;
+}
+.ct-dashboard-status [role='img'] strong {
+  font-size: 26px;
+}
+.ct-dashboard-status [role='img'] span {
+  font-size: 11px;
+}
+.ct-dashboard-status ul {
+  font-size: 11px;
+}
+.ct-dashboard-status li {
+  padding-block: 11px;
+}
+.ct-dashboard-deadlines > div:nth-child(2) {
+  margin-top: 20px;
+}
+.ct-dashboard-deadlines button {
+  min-height: 36px;
+  padding-block: 6px;
+  font-size: 11px;
+}
+.ct-dashboard-deadlines button > span:last-child {
+  font-size: 10px;
+}
+.ct-dashboard-side > .ct-dashboard-card {
+  padding: 16px;
+}
+.ct-dashboard-calendar {
+  min-height: 318px;
+}
+.ct-dashboard-month {
+  margin-block: 22px 14px;
+}
+.ct-dashboard-month h3 {
+  font-size: 13px;
+}
+.ct-dashboard-calendar .grid {
+  font-size: 11px;
+  gap: 3px 0;
+}
+.ct-dashboard-calendar .grid > span {
+  padding-block: 7px;
+}
+.ct-dashboard-calendar .grid > button {
+  width: 27px;
+  height: 27px;
+}
+.ct-dashboard-activity {
+  min-height: 284px;
+}
+.ct-dashboard-activity-list a {
+  gap: 10px;
+  margin-top: 16px;
+}
+.ct-dashboard-activity-list a > span {
+  width: 30px;
+  height: 30px;
+}
+.ct-dashboard-activity-list svg {
+  width: 16px;
+  height: 16px;
+}
+.ct-dashboard-activity-list a > div {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding-right: 42px;
+}
+.ct-dashboard-activity-list a p:first-child {
+  font-size: 10px;
+  line-height: 1.4;
+}
+.ct-dashboard-activity-list a p:nth-child(2) {
+  font-size: 10px;
+  line-height: 1.4;
+  margin-top: 6px;
+}
+.ct-dashboard-activity-list a p:last-child {
+  position: absolute;
+  right: 0;
+  top: 0;
+  margin: 0;
+  font-size: 9px;
+  color: #8291aa;
+}
+@media (max-width: 1279px) {
+  .ct-dashboard-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .ct-dashboard-side > .ct-dashboard-card {
+    margin: 0;
+  }
+}
+@media (max-width: 639px) {
+  .ct-reference-dashboard > header h1 {
+    font-size: 26px;
+  }
+  .ct-dashboard-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ct-dashboard-tasks {
+    min-height: 0;
+  }
+  .ct-dashboard-status > div {
+    justify-content: center;
+  }
+}
+
+.ct-dashboard-date::first-letter {
+  text-transform: uppercase;
+}
+.ct-dashboard-activity-list a:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  top: 30px;
+  bottom: -16px;
+  width: 1px;
+  background: #edf0f6;
+}
+.ct-dashboard-activity-list a > span {
+  position: relative;
+  z-index: 1;
+}
+
+/* Obrigações: filtros e lista em um painel, com linhas leves como a referência. */
+.ct-obligations-workspace .ct-page-title {
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.04em !important;
+}
+.ct-obligations-panel {
+  min-width: 0;
+}
+.ct-obligations-tab {
+  font-size: 11px;
+  line-height: 1.4;
+  min-height: 32px;
+}
+.ct-obligations-table th {
+  height: 35px;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.ct-obligations-table td {
+  height: 46px;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.ct-obligations-table :is(th, td):first-child {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.ct-obligations-table td .rounded-full {
+  border: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.ct-obligation-checkbox {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid #c9d8ed;
+  border-radius: 3px;
+  background: white;
+  cursor: pointer;
+}
+.ct-obligation-checkbox:checked {
+  background: #1bc39b;
+  border-color: #1bc39b;
+}
+.ct-obligation-checkbox:checked::after {
+  content: '✓';
+  font-size: 11px;
+  color: white;
+}
+.ct-obligation-checkbox:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+@media (max-width: 639px) {
+  .ct-obligations-workspace .ct-page-title {
+    font-size: 26px !important;
+  }
+}
+
+.ct-directory-workspace .ct-page-title {
+  font-size: 30px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.04em !important;
+}
+.ct-directory-card {
+  min-height: 248px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.ct-directory-card:hover {
+  border-color: #cbdfff;
+  box-shadow: 0 4px 16px #123f6b06;
+}
+.ct-directory-card :is(h2, button, p, a, span) {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 639px) {
+  .ct-directory-workspace .ct-page-title {
+    font-size: 26px !important;
+  }
+}
+
+.ct-document-folder {
+  min-height: 210px;
+}
+.ct-document-folder :is(h2, p, span) {
+  overflow-wrap: anywhere;
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { RouterLink, useRoute } from 'vue-router'
 import api from '../services/api'
 import Layout from '../components/Layout.vue'
 import { toast } from 'vue3-toastify'
@@ -10,12 +10,15 @@ import EmptyState from '../components/EmptyState.vue'
 import { getApiErrorMessage } from '../utils/apiError'
 import PaginationControls from '../components/PaginationControls.vue'
 import { fetchPage } from '../services/pagination'
+import CollectionViewToggle from '../components/CollectionViewToggle.vue'
 
 interface Membro {
   id: string
   name: string
   email: string
   role: 'admin' | 'gerente' | 'colaborador'
+  open_tasks_count?: number | null
+  overdue_tasks_count?: number | null
 }
 
 const membros = ref<Membro[]>([])
@@ -26,6 +29,7 @@ const totalResults = ref(0)
 const pageSize = 20
 const searchQuery = ref('')
 const roleFilter = ref('')
+const visualizacao = ref<'cards' | 'lista'>('cards')
 const memberSummary = ref({ total: 0, admins: 0, gerentes: 0, colaboradores: 0 })
 const isModalOpen = ref(false)
 const isSaving = ref(false)
@@ -42,15 +46,11 @@ const novoMembro = ref({
   role: 'colaborador',
 })
 
-const totalMembros = computed(() => memberSummary.value.total)
-const totalAdmins = computed(() => memberSummary.value.admins)
-const totalGerentes = computed(() => memberSummary.value.gerentes)
-const totalColaboradores = computed(() => memberSummary.value.colaboradores)
-
 const fetchData = async () => {
   isLoading.value = true
   try {
     const page = await fetchPage<Membro>('/api/v1/membros', currentPage.value, pageSize, {
+      include_workload: true,
       search: searchQuery.value.trim() || undefined,
       role: roleFilter.value || undefined,
     })
@@ -153,6 +153,10 @@ const getIniciaisMembro = (nome: string) => {
   return (primeiraLetra + ultimaLetra).toUpperCase() || '?'
 }
 
+onUnmounted(() => {
+  if (filterTimer) clearTimeout(filterTimer)
+})
+
 onMounted(() => {
   void fetchData()
   if (route.query.novo === '1' && authStore.role === 'admin') isModalOpen.value = true
@@ -161,7 +165,7 @@ onMounted(() => {
 
 <template>
   <Layout title="Membros e Acessos">
-    <div class="ct-workspace space-y-4">
+    <div class="ct-directory-workspace ct-workspace space-y-4">
       <!-- cabeçalho -->
       <header
         class="ct-page-header flex flex-col gap-4 border-b border-[var(--ct-border)] pb-5 xl:flex-row xl:items-end xl:justify-between"
@@ -192,40 +196,7 @@ onMounted(() => {
         </button>
       </header>
 
-      <!-- indicadores -->
-      <section
-        class="ct-summary-grid flex flex-wrap items-center gap-x-10 gap-y-4 border-b border-[var(--ct-border)] pb-5"
-      >
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Total de membros</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalMembros }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Gerentes</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalGerentes }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Administradores</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalAdmins }}
-          </p>
-        </div>
-
-        <div class="flex items-baseline gap-2">
-          <p class="text-xs font-medium text-[var(--ct-text-muted)]">Colaboradores</p>
-          <p class="text-xl font-semibold text-[var(--ct-ink)] [font-variant-numeric:tabular-nums]">
-            {{ totalColaboradores }}
-          </p>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <input
           v-model="searchQuery"
           type="search"
@@ -243,12 +214,19 @@ onMounted(() => {
           <option value="gerente">Gerentes</option>
           <option value="colaborador">Colaboradores</option>
         </select>
-        <span class="text-xs text-[var(--ct-text-muted)]">{{ totalResults }} resultado(s)</span>
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="text-xs text-slate-500">{{ totalResults }} resultado(s)</span
+          ><CollectionViewToggle v-model="visualizacao" />
+        </div>
       </section>
 
       <!-- tabela -->
       <section
-        class="ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white"
+        :class="
+          visualizacao === 'lista' || isLoading || !membros.length
+            ? 'ct-data-panel overflow-hidden rounded-xl border border-[var(--ct-border)] bg-white'
+            : ''
+        "
       >
         <div v-if="isLoading" class="space-y-3 p-6">
           <div class="h-14 animate-pulse rounded-xl bg-slate-100"></div>
@@ -271,6 +249,75 @@ onMounted(() => {
           "
           @action="isModalOpen = true"
         />
+
+        <div
+          v-else-if="visualizacao === 'cards'"
+          class="ct-directory-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          aria-label="Membros da equipe"
+        >
+          <article
+            v-for="membro in membros"
+            :key="membro.id"
+            class="ct-directory-card flex min-w-0 flex-col rounded-xl border border-[#e7edf5] bg-white p-5"
+            :aria-label="membro.name"
+          >
+            <div class="mb-4 flex items-start justify-between gap-3">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-semibold text-blue-500"
+                aria-hidden="true"
+                >{{ getIniciaisMembro(membro.name) }}</span
+              >
+              <span
+                v-if="membro.id === loggedUserId"
+                class="rounded-full bg-blue-50 px-2 py-1 text-[10px] text-blue-500"
+                >Você</span
+              >
+              <button
+                v-else-if="loggedUserRole === 'admin'"
+                type="button"
+                :aria-label="`Remover ${membro.name}`"
+                title="Remover membro"
+                class="rounded px-2 py-1 text-lg leading-none text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+                @click="memberToRemove = membro"
+              >
+                ⋮
+              </button>
+            </div>
+            <h2 class="text-sm font-semibold leading-6 text-slate-900">{{ membro.name }}</h2>
+            <p class="mt-2 break-words text-xs leading-6 text-slate-500">{{ membro.email }}</p>
+            <div class="mb-5 mt-3">
+              <span
+                class="inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                :class="getRoleBadge(membro.role)"
+                >{{ formatRole(membro.role) }}</span
+              >
+            </div>
+            <div
+              class="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1f7] pt-4"
+            >
+              <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span v-if="membro.open_tasks_count != null"
+                  >{{ membro.open_tasks_count }}
+                  {{ membro.open_tasks_count === 1 ? 'tarefa aberta' : 'tarefas abertas' }}</span
+                >
+                <span v-else title="Atualize a página para tentar novamente"
+                  >Tarefas indisponíveis</span
+                >
+                <span
+                  v-if="membro.overdue_tasks_count"
+                  class="rounded-full bg-rose-50 px-2 py-1 text-[10px] text-rose-500"
+                  >{{ membro.overdue_tasks_count }} em atraso</span
+                >
+              </div>
+              <RouterLink
+                :to="{ path: '/obrigacoes', query: { responsavel: membro.id } }"
+                class="text-xs font-medium text-blue-500 hover:underline"
+                :aria-label="`Ver tarefas de ${membro.name}`"
+                >Ver tarefas →</RouterLink
+              >
+            </div>
+          </article>
+        </div>
 
         <div v-else class="overflow-x-auto">
           <div class="divide-y divide-[var(--ct-border)] md:hidden">
@@ -380,6 +427,9 @@ onMounted(() => {
           </table>
         </div>
         <PaginationControls
+          :class="
+            visualizacao === 'cards' ? 'mt-4 rounded-xl border border-[#e7edf5] bg-white' : ''
+          "
           :page="currentPage"
           :pages="totalPages"
           :total="totalResults"

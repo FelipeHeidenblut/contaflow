@@ -3,13 +3,13 @@
     v-if="isVisible"
     role="dialog"
     aria-label="Preferências de cookies"
-    class="fixed bottom-0 left-0 z-[100] w-full border-t border-white/15 bg-[var(--ct-navy)] p-4 sm:p-5"
+    class="fixed bottom-0 left-0 z-[100] w-full border-t border-slate-200 bg-white shadow-lg p-4 sm:p-5"
   >
     <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-5">
-      <div class="text-white/70 text-sm leading-relaxed flex items-start gap-3">
+      <div class="text-slate-600 text-sm leading-relaxed flex items-start gap-3">
         <!-- Ícone de Cookie -->
         <svg
-          class="mt-0.5 hidden h-6 w-6 flex-shrink-0 text-[var(--ct-accent)] sm:block"
+          class="mt-0.5 hidden h-6 w-6 flex-shrink-0 text-blue-600 sm:block"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -24,10 +24,8 @@
         </svg>
         <p>
           Usamos cookies essenciais para o funcionamento da plataforma e opcionais para entender o
-          uso do <strong class="text-white">ContablyTask</strong>. Consulte nossa
-          <a
-            href="/privacidade"
-            class="font-semibold text-[var(--ct-accent)] underline hover:text-white"
+          uso do <strong class="text-slate-800">ContablyTask</strong>. Consulte nossa
+          <a href="/privacidade" class="font-semibold text-blue-600 underline hover:text-blue-700"
             >Política de Privacidade</a
           >.
         </p>
@@ -36,7 +34,7 @@
       <div class="flex shrink-0 gap-3 w-full sm:w-auto justify-end">
         <button
           @click="decline"
-          class="flex-1 rounded-lg border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/60 transition-colors hover:bg-white/5 hover:text-white sm:flex-none"
+          class="flex-1 rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-blue-700 sm:flex-none"
         >
           Somente essenciais
         </button>

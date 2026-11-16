@@ -12,6 +12,7 @@ import CommentsPanel from '../components/CommentsPanel.vue'
 import PaginationControls from '../components/PaginationControls.vue'
 import { fetchAllPages, fetchPage } from '../services/pagination'
 import CollectionViewToggle from '../components/CollectionViewToggle.vue'
+import { formatDossierDate } from '../utils/dossierDate'
 
 interface Client {
   id: string
@@ -156,11 +157,7 @@ const abrirDossier = async (client: Client) => {
   }
 }
 
-const formatDocDate = (dateString: string) => {
-  if (!dateString) return '-'
-  const [year, month, day] = dateString.split('-')
-  return `${day}/${month}/${year}`
-}
+const formatDocDate = formatDossierDate
 
 const formatDocumento = (client: Client): string => {
   if (client.tipo_pessoa === 'PF' || client.cpf) {

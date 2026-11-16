@@ -88,3 +88,39 @@ def test_first_subscription_invoice_ignores_malformed_payment_items(monkeypatch)
     assert payments == [
         {"id": "pay_123", "invoiceUrl": "https://invoice.test"}
     ]
+
+
+def test_retry_after_uncertain_creation_reuses_local_subscription_reference(monkeypatch):
+    tenant = SimpleNamespace(id=uuid4(), plano="free", asaas_customer_id="cus_test")
+    user = {"tenant_id": str(tenant.id), "user_id": str(uuid4()), "role": "admin"}
+
+    class Db:
+        subscription = None
+        def add(self, entity):
+            if isinstance(entity, subscription_service.models.BillingSubscription):
+                self.subscription = entity
+        def commit(self): pass
+
+    db = Db()
+    references = []
+    monkeypatch.setattr(subscription_service, "_get_locked_tenant", lambda *_: tenant)
+    monkeypatch.setattr(subscription_service, "_get_open_subscription", lambda *_: db.subscription)
+    monkeypatch.setattr(subscription_service, "ensure_asaas_customer", lambda *_: "cus_test")
+    monkeypatch.setattr(subscription_service, "_sync_initial_payments", lambda *_: "https://sandbox.invalid/invoice")
+
+    def remote(subscription, _customer):
+        references.append(subscription.external_reference)
+        if len(references) == 1:
+            raise subscription_service.AsaasUnavailableError("ambiguous timeout")
+        return {"id": "sub_recovered", "nextDueDate": "2026-12-01"}
+
+    monkeypatch.setattr(subscription_service, "_create_or_recover_remote_subscription", remote)
+    with pytest.raises(HTTPException) as caught:
+        subscription_service.create_subscription(db, user, "profissional", "monthly")
+    assert caught.value.status_code == 502
+    assert db.subscription.status == "creating"
+    result = subscription_service.create_subscription(db, user, "profissional", "monthly")
+    assert len(references) == 2
+    assert references[0] == references[1]
+    assert db.subscription.provider_subscription_id == "sub_recovered"
+    assert result["invoice_url"] == "https://sandbox.invalid/invoice"

@@ -352,6 +352,10 @@ def _apply_tenant_status(
     event_type: str,
     event_time: datetime,
 ) -> None:
+    if tenant.asaas_subscription_id and tenant.asaas_subscription_id != subscription.provider_subscription_id:
+        return  # O histórico de outra assinatura não altera o contrato atual.
+    if payment_status in {"confirmed", "received"} and subscription.status in {"canceled", "inactive", "expired"}:
+        return  # Um pagamento histórico não reativa uma assinatura encerrada.
     if tenant.billing_status_updated_at and event_time < tenant.billing_status_updated_at:
         return
     status_map = {
@@ -474,6 +478,8 @@ def apply_subscription_event(
         return None
     subscription, tenant = _find_subscription(db, provider_subscription_id, subscription_data)
     _validate_subscription_identity(subscription, tenant, subscription_data)
+    if subscription.last_synced_at and event_time < subscription.last_synced_at:
+        return tenant
     subscription.value = parse_money(subscription_data.get("value"))
     subscription.next_due_date = parse_provider_date(subscription_data.get("nextDueDate"))
     subscription.last_synced_at = event_time
@@ -490,7 +496,8 @@ def apply_subscription_event(
         return tenant
     old_value = f"{tenant.status_pagamento}:{tenant.subscription_status}"
     subscription.status = new_status
-    if new_status in {"inactive", "canceled"} and (
+    is_current = not tenant.asaas_subscription_id or tenant.asaas_subscription_id == provider_subscription_id
+    if is_current and new_status in {"inactive", "canceled"} and (
         not tenant.billing_status_updated_at or event_time >= tenant.billing_status_updated_at
     ):
         tenant.status_pagamento = "cancelado"

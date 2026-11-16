@@ -169,6 +169,51 @@ def test_pagamento_ativa_plano_pelo_codigo_e_nao_pelo_valor():
     assert db.payment.value == billing.Decimal("7.43")
 
 
+@pytest.mark.parametrize("closed_status", ["canceled", "inactive", "expired"])
+def test_late_payment_webhook_cannot_reactivate_closed_subscription(closed_status):
+    tenant, subscription = make_context()
+    subscription.status = closed_status
+    tenant.status_pagamento = "cancelado"
+    db = FakeBillingDb(subscription, tenant)
+    billing.apply_payment_event(db, payment_payload(), "PAYMENT_CONFIRMED", "late-payment",
+                               datetime.now(timezone.utc))
+    assert tenant.status_pagamento == "cancelado"
+    assert subscription.status == closed_status
+    assert tenant.plano == "free"
+    assert db.payment.status == "confirmed"  # Mantém o histórico financeiro.
+
+
+def test_previous_subscription_events_do_not_change_current_contract():
+    tenant, subscription = make_context()
+    tenant.asaas_subscription_id = "sub_new"
+    tenant.status_pagamento = "ativo"
+    tenant.subscription_status = "active"
+    tenant.plano = "business"
+    db = FakeBillingDb(subscription, tenant)
+    now = datetime.now(timezone.utc)
+    billing.apply_payment_event(db, payment_payload(), "PAYMENT_CONFIRMED", "old-contract", now)
+    assert tenant.plano == "business"
+    billing.apply_subscription_event(db, {
+        "id": "sub_123", "customer": "cus_123", "status": "INACTIVE", "value": 1499,
+    }, "SUBSCRIPTION_DELETED", now)
+    assert subscription.status == "canceled"
+    assert tenant.status_pagamento == "ativo"
+    assert tenant.subscription_status == "active"
+
+
+def test_out_of_order_subscription_event_does_not_undo_cancellation():
+    tenant, subscription = make_context()
+    now = datetime.now(timezone.utc)
+    subscription.status = "canceled"
+    subscription.last_synced_at = now
+    db = FakeBillingDb(subscription, tenant)
+    billing.apply_subscription_event(db, {
+        "id": "sub_123", "customer": "cus_123", "status": "ACTIVE", "value": 1499,
+    }, "SUBSCRIPTION_UPDATED", now - timedelta(hours=1))
+    assert subscription.status == "canceled"
+    assert subscription.last_synced_at == now
+
+
 @pytest.mark.parametrize(
     ("event_type", "expected_payment", "expected_tenant"),
     [

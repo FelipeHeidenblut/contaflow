@@ -349,8 +349,12 @@ def _record_creation_failure(
     tenant: models.Tenant,
     subscription: models.BillingSubscription,
     current_user: dict,
+    *,
+    uncertain: bool = False,
 ) -> None:
-    subscription.status = "failed"
+    # Um timeout não prova que o Asaas deixou de criar a assinatura. Manter a
+    # referência recuperável impede uma nova assinatura na próxima tentativa.
+    subscription.status = "creating" if uncertain else "failed"
     db.add(
         models.AdminAuditLog(
             tenant_id=tenant.id,
@@ -358,7 +362,7 @@ def _record_creation_failure(
             action="subscription_creation_failed",
             reason="Falha ao criar ou recuperar assinatura no Asaas.",
             old_value="creating",
-            new_value="failed",
+            new_value=subscription.status,
         )
     )
     db.commit()
@@ -698,6 +702,7 @@ def create_subscription(
             tenant,
             subscription,
             current_user,
+            uncertain=isinstance(error, AsaasUnavailableError),
         )
         if isinstance(error, HTTPException):
             raise

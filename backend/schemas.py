@@ -30,6 +30,8 @@ class ClientCreate(ClientBase):
             if len(normalized) != 14:
                 raise ValueError("CNPJ deve conter 14 caracteres.")
             self.cnpj = normalized
+            self.cpf = None
+            self.nome = None
         elif self.tipo_pessoa == "PF":
             if not self.nome:
                 raise ValueError("Nome completo é obrigatório para Pessoa Física")
@@ -37,6 +39,8 @@ class ClientCreate(ClientBase):
             if len(normalized) != 11:
                 raise ValueError("CPF deve conter 11 dígitos.")
             self.cpf = normalized
+            self.cnpj = None
+            self.razao_social = None
         else:
             raise ValueError('tipo_pessoa deve ser "PF" ou "PJ"')
 

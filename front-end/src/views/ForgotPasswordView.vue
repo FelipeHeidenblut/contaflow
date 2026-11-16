@@ -13,6 +13,7 @@ const emailEnviado = ref(false)
 const captchaToken = ref('')
 const turnstileSiteKey = appConfig.turnstileSiteKey
 const handleResetPassword = async () => {
+  if (isLoading.value) return
   if (!captchaToken.value) {
     toast.error('Conclua a verificação de segurança.')
     return
@@ -25,10 +26,11 @@ const handleResetPassword = async () => {
     })
     if (error) throw error
     emailEnviado.value = true
-    toast.success('Link de recuperação enviado!')
+    toast.success('Se houver uma conta com este e-mail, você receberá um link de recuperação.')
   } catch (error: unknown) {
     toast.error(error instanceof Error ? error.message : 'Erro ao enviar o e-mail.')
   } finally {
+    captchaToken.value = ''
     isLoading.value = false
   }
 }
@@ -43,7 +45,8 @@ const handleResetPassword = async () => {
       v-if="emailEnviado"
       class="border-l-2 border-emerald-500 bg-emerald-50 px-4 py-4 text-sm leading-6 text-emerald-800"
     >
-      <strong>E-mail enviado.</strong> Verifique sua caixa de entrada e a pasta de spam.<RouterLink
+      <strong>Solicitação recebida.</strong> Se houver uma conta com este e-mail, enviaremos um
+      link. Verifique sua caixa de entrada e a pasta de spam.<RouterLink
         to="/login"
         class="mt-4 block font-semibold text-[var(--ct-primary)]"
         >Voltar para o login</RouterLink

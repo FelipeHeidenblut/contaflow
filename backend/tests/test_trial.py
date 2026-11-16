@@ -102,6 +102,45 @@ def test_expired_trial_counts_usage_and_returns_free(clients, members, restricte
     assert user['trial_read_only'] is restricted
 
 
+def test_expired_office_resumes_operations_only_after_both_limits_are_met():
+    tenant = office(trial_started_at=NOW - timedelta(days=40), trial_ends_at=NOW - timedelta(days=26))
+    profile = SimpleNamespace(id=uuid4(), tenant_id=uuid4(), role="admin", is_superadmin=False)
+
+    class Query:
+        def __init__(self, value): self.value = value
+        def join(self, *_): return self
+        def filter(self, *_): return self
+        def first(self): return self.value
+        def count(self): return self.value
+
+    class Db:
+        def __init__(self, clients, members):
+            self.values = iter([(profile, tenant), clients, members])
+        def query(self, *_): return Query(next(self.values))
+
+    for clients, members, blocked in [(6, 2, True), (5, 2, True), (5, 1, False)]:
+        user = resolve_user_context(Db(clients, members), {"sub": str(profile.id)})
+        assert user["trial_read_only"] is blocked
+        assert user["plan"] == "free"
+        if blocked:
+            with pytest.raises(HTTPException) as caught:
+                get_active_user(user)
+            assert caught.value.status_code == 403
+        else:
+            assert get_active_user(user) == user
+    assert tenant.trial_ends_at == NOW - timedelta(days=26)
+
+
+def test_chargeback_is_not_overridden_by_trial_entitlements():
+    now = datetime.now(timezone.utc)
+    tenant = office(trial_started_at=now, trial_ends_at=now + timedelta(days=14), status_pagamento="chargeback")
+    profile = SimpleNamespace(id=uuid4(), tenant_id=uuid4(), role="admin", is_superadmin=False)
+    user = resolve_user_context(RegistrationDb([(profile, tenant)]), {"sub": str(profile.id)})
+    with pytest.raises(HTTPException) as caught:
+        get_active_user(user)
+    assert caught.value.status_code == 402
+
+
 def test_export_is_admin_only_and_scopes_every_query_to_office():
     from auth import export_office
     import json

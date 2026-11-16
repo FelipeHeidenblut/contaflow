@@ -2,6 +2,7 @@ from trial_service import effective_plan
 from workload_service import attach_task_counts
 import csv
 import io
+import logging
 import re
 from dataclasses import dataclass
 from uuid import UUID
@@ -17,6 +18,7 @@ from access_control import (
     validate_responsible_profile,
 )
 from fastapi import HTTPException, status
+from pydantic import ValidationError
 from pagination import paginate
 from plan_config import get_plan_limit, get_plan_name
 from sqlalchemy import func, or_
@@ -24,6 +26,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 DOCUMENT_LOOKUP_BATCH_SIZE = 1_000
+logger = logging.getLogger(__name__)
+
+
+def _is_document_conflict(error: IntegrityError) -> bool:
+    constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+    return constraint in {"uq_clients_tenant_cpf", "uq_clients_tenant_cnpj", "uq_tenant_cnpj"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +184,14 @@ def create_client(
         db.commit()
     except IntegrityError as error:
         db.rollback()
+        constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", None)
+        if not _is_document_conflict(error):
+            # Não registrar parâmetros da consulta: podem conter dados pessoais.
+            logger.error("Falha de integridade ao cadastrar cliente; restrição=%s", constraint)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Não foi possível cadastrar o cliente. Tente novamente ou contate o suporte.",
+            ) from error
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="CPF/CNPJ já cadastrado neste escritório.",
@@ -303,6 +319,14 @@ def _csv_rows(decoded_content: str) -> csv.DictReader:
     reader = csv.DictReader(io.StringIO(decoded_content), delimiter=";")
     if not reader.fieldnames or len(reader.fieldnames) < 3:
         reader = csv.DictReader(io.StringIO(decoded_content), delimiter=",")
+    headers = [header.strip().upper() for header in (reader.fieldnames or [])]
+    required = {"TIPO (PF/PJ)", "NOME_OU_RAZAO", "CPF_OU_CNPJ"}
+    if not required.issubset(headers) or len(set(headers)) != len(headers):
+        raise HTTPException(
+            status_code=400,
+            detail="Cabeçalhos CSV inválidos. Utilize o modelo de importação, sem colunas repetidas.",
+        )
+    reader.fieldnames = headers
     return reader
 
 
@@ -311,6 +335,8 @@ def _client_from_csv_row(
     *,
     tenant_id: UUID,
 ) -> tuple[models.Client | None, tuple[str, str] | None]:
+    if None in row:  # Mais valores do que colunas: não ignorar dados silenciosamente.
+        return None, None
     person_type = str(row.get("TIPO (PF/PJ)") or "").strip().upper()
     name = str(row.get("NOME_OU_RAZAO") or "").strip()
     document = re.sub(
@@ -341,7 +367,16 @@ def _client_from_csv_row(
     else:
         client.razao_social = name
         client.cnpj = document
-    return client, (person_type, document)
+    try:
+        validated = schemas.ClientCreate(
+            tipo_pessoa=person_type, nome=client.nome, cpf=client.cpf,
+            razao_social=client.razao_social, cnpj=client.cnpj,
+            regime_tributario=client.regime_tributario,
+            natureza_operacao=client.natureza_operacao,
+        )
+    except ValidationError:
+        return None, None
+    return models.Client(tenant_id=tenant_id, **validated.model_dump()), (person_type, document)
 
 
 def import_clients_from_csv(
@@ -416,6 +451,12 @@ def import_clients_from_csv(
         raise
     except IntegrityError as error:
         db.rollback()
+        if not _is_document_conflict(error):
+            logger.error("Falha de integridade durante importação de clientes.")
+            raise HTTPException(
+                status_code=500,
+                detail="Não foi possível concluir a importação. Nenhum cliente foi importado.",
+            ) from error
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(

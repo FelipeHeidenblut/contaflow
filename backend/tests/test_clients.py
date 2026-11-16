@@ -84,7 +84,7 @@ class FakeUpload:
     def __init__(self, contents=None, filename="clientes.csv"):
         self.filename = filename
         self.read_count = 0
-        self.contents = contents or (
+        self.contents = contents if contents is not None else (
             b"TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO\n"
             b"PJ;Empresa Teste;12345678000190;Simples Nacional\n"
         )
@@ -192,10 +192,51 @@ def test_importacao_acima_do_limite_nao_persiste_nenhuma_linha():
     assert db.rollbacks == 1
 
 
+@pytest.mark.parametrize("header", [
+    b"TIPO;NOME;DOCUMENTO\n", b"TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;CPF_OU_CNPJ\n", b"",
+])
+def test_invalid_csv_headers_never_write_clients(header):
+    db = FakeClientDb()
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(clientes.importar_clientes_csv(FakeUpload(header), db, admin_user(db.tenant.id)))
+    assert caught.value.status_code == 400
+    assert db.persisted == []
+
+
+def test_csv_rejects_extra_values_and_invalid_fields_without_losing_valid_rows():
+    db = FakeClientDb()
+    csv = (
+        b"TIPO (PF/PJ);NOME_OU_RAZAO;CPF_OU_CNPJ;REGIME_TRIBUTARIO\n"
+        b"PJ;Empresa;12345678000195;Simples Nacional\n"
+        b"PF;Pessoa;12345678901;Simples Nacional\n"
+        b"PJ;Empresa;94837261000104;X\n"
+        b"PJ;Empresa;94837261000104;Simples Nacional;extra\n"
+        b"PJ;Duplicado;12345678000195;Simples Nacional\n"
+    )
+    result = asyncio.run(clientes.importar_clientes_csv(FakeUpload(csv), db, admin_user(db.tenant.id)))
+    assert result["importados"] == 2
+    assert result["erros"] == 3
+    assert db.persisted[0].cpf is None
+    assert db.persisted[1].cnpj is None
+
+
+def test_csv_unknown_database_error_is_not_reported_as_duplicate():
+    db = FakeClientDb()
+    db.commit_error = IntegrityError("INSERT", {}, RuntimeError("foreign key"))
+    with pytest.raises(HTTPException) as caught:
+        asyncio.run(clientes.importar_clientes_csv(FakeUpload(), db, admin_user(db.tenant.id)))
+    assert caught.value.status_code == 500
+    assert "Nenhum cliente foi importado" in caught.value.detail
+    assert db.persisted == []
+    assert db.rollbacks == 1
+
+
 def test_falha_no_commit_reverte_toda_a_importacao():
     db = FakeClientDb()
+    original = RuntimeError("documento duplicado")
+    original.diag = SimpleNamespace(constraint_name="uq_clients_tenant_cnpj")
     db.commit_error = IntegrityError(
-        "INSERT clients", {}, RuntimeError("documento duplicado")
+        "INSERT clients", {}, original
     )
 
     with pytest.raises(HTTPException) as error:

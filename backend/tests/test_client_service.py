@@ -3,6 +3,11 @@ from uuid import UUID, uuid4
 
 import client_service
 import models
+import pytest
+from fastapi import HTTPException
+from sqlalchemy import Column, MetaData, Table, UniqueConstraint, create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from schemas import ClientCreate
 
 
@@ -106,6 +111,74 @@ def test_create_client_uses_authorized_tenant_and_validates_responsible(monkeypa
     assert database.added == [client]
     assert database.commits == 1
     assert database.refreshed == [client]
+
+
+@pytest.mark.parametrize("person_type", ["PJ", "PF"])
+def test_create_multiple_clients_with_empty_inapplicable_document(monkeypatch, person_type):
+    engine = create_engine("sqlite:///:memory:")
+    metadata = MetaData()
+    Table(
+        "clients", metadata,
+        *(Column(column.name, column.type, primary_key=column.primary_key)
+          for column in models.Client.__table__.columns),
+        UniqueConstraint("tenant_id", "cpf"),
+        UniqueConstraint("tenant_id", "cnpj"),
+    )
+    metadata.create_all(engine)
+    user = make_user()
+    monkeypatch.setattr(client_service, "validate_responsible_profile", lambda *_args: None)
+    monkeypatch.setattr(client_service, "_find_client_by_document", lambda *_args, **_kw: None)
+    monkeypatch.setattr(client_service, "_lock_tenant_and_get_client_capacity",
+                        lambda *_args: (SimpleNamespace(plano="free"), 5, 0))
+    try:
+        with Session(engine) as database:
+            for index in range(2):
+                payload = ClientCreate(
+                    tipo_pessoa=person_type,
+                    razao_social="Empresa" if person_type == "PJ" else "",
+                    nome="Pessoa" if person_type == "PF" else "",
+                    cnpj=f"1234567800019{index}" if person_type == "PJ" else "",
+                    cpf=f"1234567890{index}" if person_type == "PF" else "",
+                    regime_tributario="Simples Nacional",
+                )
+                client = client_service.create_client(database, user, payload)
+                assert (client.cpf if person_type == "PJ" else client.cnpj) is None
+            assert database.query(models.Client).count() == 2
+    finally:
+        engine.dispose()
+
+
+@pytest.mark.parametrize("constraint, expected_status", [
+    ("uq_clients_tenant_cpf", 409),
+    ("uq_clients_tenant_cnpj", 409),
+    ("uq_tenant_cnpj", 409),
+    ("fk_clients_tenant_id", 500),
+    (None, 500),
+])
+def test_create_client_only_reports_known_document_conflicts(monkeypatch, constraint, expected_status):
+    database = ClientDb()
+    user = make_user()
+    repository = SimpleNamespace(context=SimpleNamespace(tenant_id=UUID(user["tenant_id"])))
+    monkeypatch.setattr(client_service, "tenant_repository", lambda *_args: repository)
+    monkeypatch.setattr(client_service, "validate_responsible_profile", lambda *_args: None)
+    monkeypatch.setattr(client_service, "_find_client_by_document", lambda *_args, **_kw: None)
+    monkeypatch.setattr(client_service, "_lock_tenant_and_get_client_capacity",
+                        lambda *_args: (SimpleNamespace(plano="free"), 5, 0))
+    original = Exception("private database details")
+    original.diag = SimpleNamespace(constraint_name=constraint)
+
+    def fail_commit():
+        raise IntegrityError("INSERT", {"private": "data"}, original)
+
+    database.commit = fail_commit
+    with pytest.raises(HTTPException) as caught:
+        client_service.create_client(database, user, ClientCreate(
+            razao_social="Empresa", cnpj="12345678000195", regime_tributario="Simples Nacional",
+        ))
+    assert caught.value.status_code == expected_status
+    assert ("já cadastrado" in caught.value.detail) == (expected_status == 409)
+    assert "private" not in caught.value.detail
+    assert database.rollbacks == 1
 
 
 def test_assign_responsible_validates_profile_and_persists(monkeypatch):

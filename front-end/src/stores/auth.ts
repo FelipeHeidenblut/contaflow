@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { supabase } from '../services/supabase'
 import api from '../services/api'
+import { SESSION_REQUEST_TIMEOUT_MS, isTemporarySessionError } from '../services/sessionRecovery'
 
 export const useAuthStore = defineStore('auth', () => {
   interface AuthProfile {
@@ -112,11 +113,12 @@ export const useAuthStore = defineStore('auth', () => {
       }
       setIdentity(data.session.user)
       try {
-        const response = await api.get('/api/v1/auth/me')
+        const response = await api.get('/api/v1/auth/me', { timeout: SESSION_REQUEST_TIMEOUT_MS })
         setProfile(response.data)
-      } catch {
+      } catch (error) {
         clearSession()
-        isInitialized.value = true
+        // Permitir uma nova validação após indisponibilidade temporária.
+        isInitialized.value = !isTemporarySessionError(error)
         return false
       }
       isInitialized.value = true

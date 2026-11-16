@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import VueTurnstile from 'vue-turnstile'
 import { supabase } from '../services/supabase'
@@ -8,6 +8,7 @@ import { useAuthStore } from '../stores/auth'
 import AuthShell from '@/components/AuthShell.vue'
 import { getPlan, getPlanPrice, isBillingCycle } from '@/constants/plans'
 import { appConfig } from '@/config/env'
+import { SESSION_REQUEST_TIMEOUT_MS, isTemporarySessionError } from '../services/sessionRecovery'
 
 const router = useRouter()
 const route = useRoute()
@@ -23,6 +24,13 @@ const email = ref('')
 const senha = ref('')
 const captchaToken = ref('')
 const turnstileSiteKey = appConfig.turnstileSiteKey
+const hasAuthenticatedSession = ref(false)
+const isConnecting = ref(false)
+
+onMounted(async () => {
+  const { data } = await supabase.auth.getSession()
+  hasAuthenticatedSession.value = !!data.session
+})
 
 const getErrorMessage = (error: unknown): string => {
   const candidate = error as {
@@ -42,20 +50,31 @@ const getErrorMessage = (error: unknown): string => {
 }
 
 const handleLogin = async () => {
-  if (!captchaToken.value) {
+  if (isLoading.value) return
+  if (!hasAuthenticatedSession.value && !captchaToken.value) {
     erroMensagem.value = 'Por favor, aguarde a verificação de segurança.'
     return
   }
   erroMensagem.value = ''
   isLoading.value = true
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.value,
-      password: senha.value,
-      options: { captchaToken: captchaToken.value },
-    })
+    const { data, error } = hasAuthenticatedSession.value
+      ? await supabase.auth.getSession()
+      : await supabase.auth.signInWithPassword({
+          email: email.value,
+          password: senha.value,
+          options: { captchaToken: captchaToken.value },
+        })
     if (error) throw error
-    if (data?.session) {
+    if (!data.session) {
+      hasAuthenticatedSession.value = false
+      throw new Error('Sua sessão expirou. Entre novamente com e-mail e senha.')
+    }
+    if (data.session) {
+      hasAuthenticatedSession.value = true
+      isConnecting.value = true
+      senha.value = ''
+      const user = data.session.user
       let profile: {
         user_id?: string
         tenant_id?: string
@@ -63,32 +82,37 @@ const handleLogin = async () => {
         is_superadmin?: boolean
       }
       try {
-        const response = await api.get('/api/v1/auth/me')
+        const response = await api.get('/api/v1/auth/me', { timeout: SESSION_REQUEST_TIMEOUT_MS })
         profile = response.data
       } catch (syncError: unknown) {
         const candidate = syncError as { response?: { status?: number } }
         if (candidate.response?.status !== 403) throw syncError
-        const metadata = data.user.user_metadata
+        const metadata = user.user_metadata
         if (!metadata?.company_name || !metadata?.documento) {
           await supabase.auth.signOut()
+          hasAuthenticatedSession.value = false
           throw new Error(
             'Seu cadastro antigo está incompleto. Entre em contato com o suporte para vincular seu escritório.',
           )
         }
-        const syncResponse = await api.post('/api/v1/auth/sincronizar-cadastro', {
-          nome_completo: metadata.full_name || data.user.email,
-          nome_escritorio: metadata.company_name,
-          documento: metadata.documento,
-        })
+        const syncResponse = await api.post(
+          '/api/v1/auth/sincronizar-cadastro',
+          {
+            nome_completo: metadata.full_name || user.email,
+            nome_escritorio: metadata.company_name,
+            documento: metadata.documento,
+          },
+          { timeout: SESSION_REQUEST_TIMEOUT_MS },
+        )
         profile = {
-          user_id: data.user.id,
+          user_id: user.id,
           tenant_id: syncResponse.data.tenant_id,
           role: 'admin',
           is_superadmin: false,
         }
       }
-      authStore.initializeAuthenticatedSession(profile, data.user)
-      router.push(
+      authStore.initializeAuthenticatedSession(profile, user)
+      await router.push(
         selectedPlan && selectedPlan.id !== 'free'
           ? { path: '/faturamento', query: selectedQuery }
           : '/dashboard',
@@ -96,13 +120,21 @@ const handleLogin = async () => {
     }
   } catch (error: unknown) {
     const message = getErrorMessage(error)
-    if (message === 'Invalid login credentials') erroMensagem.value = 'E-mail ou senha incorretos.'
+    if (isTemporarySessionError(error)) {
+      erroMensagem.value = hasAuthenticatedSession.value
+        ? 'Sua sessão está autenticada, mas o escritório ainda não respondeu. Tente conectar novamente; não é necessário informar sua senha.'
+        : 'Não foi possível conectar agora. Aguarde um momento e tente novamente.'
+    } else if (message === 'Invalid login credentials')
+      erroMensagem.value = 'E-mail ou senha incorretos.'
     else if (message === 'Email not confirmed')
       erroMensagem.value = 'Por favor, confirme seu e-mail antes de acessar.'
     else erroMensagem.value = message
+    const { data } = await supabase.auth.getSession()
+    hasAuthenticatedSession.value = !!data.session
     captchaToken.value = ''
   } finally {
     isLoading.value = false
+    isConnecting.value = false
   }
 }
 </script>
@@ -141,7 +173,7 @@ const handleLogin = async () => {
       {{ erroMensagem }}
     </div>
     <form class="space-y-5" @submit.prevent="handleLogin">
-      <div>
+      <div v-if="!hasAuthenticatedSession">
         <label for="login-email" class="ct-label">E-mail</label
         ><input
           id="login-email"
@@ -154,7 +186,7 @@ const handleLogin = async () => {
           placeholder="seu@email.com"
         />
       </div>
-      <div>
+      <div v-if="!hasAuthenticatedSession">
         <div class="mb-1.5 flex items-center justify-between">
           <label for="login-password" class="text-[13px] font-semibold text-slate-700">Senha</label
           ><RouterLink to="/esqueceu-senha" class="text-xs font-semibold text-[var(--ct-primary)]"
@@ -171,7 +203,19 @@ const handleLogin = async () => {
           placeholder="Sua senha"
         />
       </div>
-      <div class="flex justify-center overflow-hidden py-1">
+      <p
+        v-if="hasAuthenticatedSession"
+        role="status"
+        aria-live="polite"
+        class="text-sm text-slate-600"
+      >
+        {{
+          isConnecting
+            ? 'Conectando ao escritório… A primeira conexão pode levar até 90 segundos.'
+            : 'Sua sessão foi identificada. Continue para conectar ao escritório.'
+        }}
+      </p>
+      <div v-if="!hasAuthenticatedSession" class="flex justify-center overflow-hidden py-1">
         <VueTurnstile
           v-model="captchaToken"
           :site-key="turnstileSiteKey || '0x4AAAAAADe4izf5gmW3H2aL'"
@@ -183,7 +227,15 @@ const handleLogin = async () => {
         :disabled="isLoading"
         class="ct-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {{ isLoading ? 'Entrando…' : 'Entrar' }}
+        {{
+          isConnecting
+            ? 'Conectando ao escritório…'
+            : isLoading
+              ? 'Entrando…'
+              : hasAuthenticatedSession
+                ? 'Conectar ao escritório'
+                : 'Entrar'
+        }}
       </button>
     </form>
     <p

@@ -2,8 +2,17 @@ export type AppEnvironment = 'development' | 'test' | 'staging' | 'production'
 
 const environments = new Set<AppEnvironment>(['development', 'test', 'staging', 'production'])
 
+const PUBLIC_ENV: Partial<Record<keyof ImportMetaEnv, string>> = {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+  VITE_APP_ENV: import.meta.env.VITE_APP_ENV,
+  VITE_GA_MEASUREMENT_ID: import.meta.env.VITE_GA_MEASUREMENT_ID,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_TURNSTILE_SITE_KEY: import.meta.env.VITE_TURNSTILE_SITE_KEY,
+}
+
 const required = (name: keyof ImportMetaEnv): string => {
-  const value = import.meta.env[name]?.trim()
+  const value = PUBLIC_ENV[name]?.trim()
   if (!value) throw new Error(`Configuração obrigatória ausente: ${name}`)
   return value
 }
